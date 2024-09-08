@@ -1,0 +1,149 @@
+namespace UnityTest
+{
+    /// <summary>
+    /// This method will be included in Window > Unit Test Manager. It must return void and accept a GameObject, which has this method's
+    /// Component attached. The GameObject is created by the SetUp function. Use UnityEngine.Assert to process tests.
+    /// </summary>
+    [System.AttributeUsage(System.AttributeTargets.Method)]
+    public class TestAttribute : System.Attribute, System.IEquatable<TestAttribute>, System.IComparable<TestAttribute>
+    {
+        public const string delimiter = "\n**..-- TestAttributeDelimiter --..**\n";
+
+        /// <summary>
+        /// A unique identifier for this test. Each '/' determines the depth in Window > Unit Test Manager.
+        /// </summary>
+        public string path { get; private set; }
+
+        /// <summary>
+        /// Name of a static method which returns a GameObject and accepts no parameters.
+        /// </summary>
+        public string setUp { get; private set; }
+
+        /// <summary>
+        /// Name of a static method which returns void and accepts the GameObject returned by SetUp.
+        /// </summary>
+        public string tearDown { get; private set; }
+
+        /// <summary>
+        /// Pause the editor when this test fails. No other subsequent tests will run. default = false.
+        /// </summary>
+        public bool pauseOnFail { get; private set; }
+
+        /// <summary>
+        /// DO NOT MODIFY. This is the path to the source file that this attribute was used in. It is set by a reflection technique.
+        /// </summary>
+        public string sourceFile { get; private set; }
+
+        /// <summary>
+        /// This method will be added to Window > Unit Test Manager based on its path. Use '/' to create nested toggles.
+        /// </summary>
+        /// <param name="path">A unique identifier for this test. Each '/' determines the depth in Window > Unit Test Manager.</param>
+        /// <param name="setUp">Name of a static method which returns a GameObject and accepts no parameters.</param>
+        /// <param name="tearDown">Name of a static method which returns void and accepts the GameObject returned by SetUp.</param>
+        /// <param name="pauseOnFail">Pause the editor when this test fails. No other subsequent tests will run. default = false.</param>
+        /// <param name="sourceFile">DO NOT USE. It is used by reflection techniques to locate the source file that this attribute was used in.</param>
+        public TestAttribute(
+            string path,
+            string setUp,
+            string tearDown,
+            bool pauseOnFail = false,
+            [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = default)
+        {
+            this.path = path;
+            this.pauseOnFail = pauseOnFail;
+            this.setUp = setUp;
+            this.tearDown = tearDown;
+            this.sourceFile = sourceFile;
+        }
+
+        /// <summary>
+        /// This method will be added to Window > Unit Test Manager based on its path. Use '/' to create nested toggles.
+        /// </summary>
+        /// <param name="path">A unique identifier for this test. Each '/' determines the depth in Window > Unit Test Manager.</param>
+        /// <param name="sourceFile">DO NOT USE. It is used by reflection techniques to locate the source file that this attribute was used in.</param>
+        public TestAttribute(
+            string path,
+            bool pauseOnFail = false,
+            [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = default)
+        {
+            this.path = path;
+            setUp = "";
+            tearDown = "";
+            this.pauseOnFail = pauseOnFail;
+            this.sourceFile = sourceFile;
+        }
+
+        /// <summary>
+        /// This method will be added to Window > Unit Test Manager based on its path. Use '/' to create nested toggles.
+        /// </summary>
+        /// <param name="path"><summary>A unique identifier for this test. Each '/' determines the depth in Window > Unit Test Manager.</summary></param>
+        /// <param name="setUp">Name of a static method which returns a GameObject and accepts no parameters.</param>
+        /// <param name="pauseOnFail">Pause the editor when this test fails. No other subsequent tests will run. default = false.</param>
+        /// <param name="sourceFile">DO NOT USE. It is used by reflection techniques to locate the source file that this attribute was used in.</param>
+        public TestAttribute(
+            string path,
+            string setUp,
+            bool pauseOnFail = false,
+            [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = default)
+        {
+            this.path = path;
+            this.setUp = setUp;
+            tearDown = "";
+            this.pauseOnFail = pauseOnFail;
+            this.sourceFile = sourceFile;
+        }
+
+
+        public string GetString()
+        {
+            string s = path;
+            s += delimiter;
+            s += setUp;
+            s += delimiter;
+            s += tearDown;
+            s += delimiter;
+            s += pauseOnFail.ToString();
+            s += delimiter;
+            s += sourceFile;
+            return s;
+        }
+
+        public static TestAttribute FromString(string s)
+        {
+            string[] contents = s.Split(delimiter);
+            string path = contents[0];
+            string setUp = contents[1];
+            string tearDown = contents[2];
+            bool pauseOnFail = bool.Parse(contents[3]);
+            string sourceFile = contents[4];
+            return new TestAttribute(path, setUp, tearDown, pauseOnFail, sourceFile);
+        }
+
+        /// <summary>
+        /// Copy the properties of other into this attribute, overwriting values.
+        /// </summary>
+        public void UpdateFrom(TestAttribute other)
+        {
+            path = other.path;
+            setUp = other.setUp;
+            tearDown = other.tearDown;
+            pauseOnFail = other.pauseOnFail;
+            sourceFile = other.sourceFile;
+        }
+
+
+        #region Operators
+        public override bool Equals(object obj)
+        {
+            if (obj.GetType() == typeof(TestAttribute)) return Equals(obj as TestAttribute);
+            return base.Equals(obj);
+        }
+        public bool Equals(TestAttribute other) => GetString() == other.GetString();
+        public int CompareTo(TestAttribute other) => path.CompareTo(other.path);
+        public override int GetHashCode() => System.HashCode.Combine(GetString());
+        
+        public static bool operator ==(TestAttribute left, TestAttribute right) => Equals(left, right);
+        public static bool operator !=(TestAttribute left, TestAttribute right) => !(left == right);
+        #endregion
+    }
+}
