@@ -42,6 +42,8 @@ namespace UnityTest
         private static float indentWidth;
         private static int indentLevel;
 
+        private static bool debug;
+
         private int previousFrameNumber;
 
         private Dictionary<string, GUIStyle> styles;
@@ -115,7 +117,12 @@ namespace UnityTest
         private string GetString(SortedDictionary<TestAttribute, Test> tests)
         {
             string data = "";
+
+            data += debug.ToString();
+            data += splitDelimiter;
+
             if (tests.Count == 0) return data;
+
             List<TestAttribute> attributes = new List<TestAttribute>();
             foreach (TestAttribute attribute in tests.Keys) attributes.Add(attribute);
             
@@ -143,17 +150,24 @@ namespace UnityTest
         {
             cachedTests.Clear();
             string[] split = data.Split(splitDelimiter);
-            foreach (string s in split[0].Split(delimiter)) 
-            {
-                Test newTest = Test.FromString(s);
-                if (newTest == null) continue;
-                cachedTests.Add(newTest.attribute.path, newTest);
-            }
+            try { debug = bool.Parse(split[0]); }
+            catch (System.FormatException) { }
 
             if (split.Length > 1)
             {
+
+                foreach (string s in split[1].Split(delimiter))
+                {
+                    Test newTest = Test.FromString(s);
+                    if (newTest == null) continue;
+                    cachedTests.Add(newTest.attribute.path, newTest);
+                }
+            }
+
+            if (split.Length > 2)
+            {
                 List<string> added = new List<string>();
-                foreach (string foldoutData in split[1].Split(foldoutDelimiter))
+                foreach (string foldoutData in split[2].Split(foldoutDelimiter))
                 {
                     Foldout foldout = Foldout.FromString(foldoutData);
                     if (foldout == null) continue;
@@ -284,7 +298,9 @@ namespace UnityTest
             // Start the next Test in the queue
             timer = 0f;
             nframes = 0;
-            queue.Dequeue().Run();
+            Test test = queue.Dequeue();
+            if (debug) Debug.Log("Running " + test.attribute.path, test.GetScript());
+            test.Run();
         }
 
 
@@ -455,12 +471,13 @@ namespace UnityTest
             }
             
             refreshing = false;
-            Debug.Log("Refreshed Unit Test Manager");
+            Debug.Log("Refreshed UnityTest Manager");
         }
 
         private void GoToEmptyScene()
         {
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene);
+            Debug.Log("Created an empty scene");
         }
 
         private void RunSelected()
@@ -504,13 +521,17 @@ namespace UnityTest
             public bool anySelected { get; private set; }
             public bool allSelected { get; private set; }
             public bool selectedHaveResults { get; private set; }
+            public bool anyResults { get; private set; }
 
             public State(Foldout rootFoldout)
             {
                 if (rootFoldout == null) return;
                 allSelected = true;
+                anyResults = false;
                 foreach (Test test in rootFoldout.GetTests())
                 {
+                    if (test.result != Test.Result.None) anyResults = true;
+
                     if (test.locked)
                     {
                         if (test.selected) selectedHaveResults |= test.result != Test.Result.None;
@@ -540,11 +561,8 @@ namespace UnityTest
 
             State state = new State(rootFoldout);
             
-            bool runAll = false;
             bool runSelected = false;
             bool refresh = false;
-            bool resetAll = false;
-            bool resetSelected = false;
             bool selectAll = false;
             bool deselectAll = false;
 
@@ -564,7 +582,7 @@ namespace UnityTest
                     Rect rect = GUILayoutUtility.GetRect(toggle, toggleStyle);
 
                     bool hover = false;
-                    if (Event.current != null) hover = rect.Contains(Event.current.mousePosition);
+                    if (Event.current != null) hover = rect.Contains(Event.current.mousePosition) && GUI.enabled;
 
                     // Change the style of the toggle button according to the current state
                     if (state.anySelected && !state.allSelected)
@@ -607,15 +625,19 @@ namespace UnityTest
                     GUIContent clear = new GUIContent(EditorGUIUtility.IconContent("d_clear"));
                     clear.tooltip = "Clear selected Test results";
                     GUI.enabled = state.selectedHaveResults;
-                    resetSelected = GUILayout.Button(clear, EditorStyles.toolbarButton);         // Clear button
 
+                    Rect clearRect = GUILayoutUtility.GetRect(clear, EditorStyles.toolbarDropDown);
+                    if (EditorGUI.DropdownButton(clearRect, clear, FocusType.Passive, EditorStyles.toolbarDropDown))
+                    {
+                        GenericMenu toolsMenu = new GenericMenu();
+                        if (state.anySelected) toolsMenu.AddItem(new GUIContent("Reset Selected"), false, ResetSelected);
+                        else toolsMenu.AddDisabledItem(new GUIContent("Reset Selected"));
 
+                        if (state.anyResults) toolsMenu.AddItem(new GUIContent("Reset All"), false, ResetAll);
+                        else toolsMenu.AddDisabledItem(new GUIContent("Reset All"));
 
-
-
-                    GUIContent refreshContent = new GUIContent(EditorGUIUtility.IconContent("Refresh"));
-                    refreshContent.tooltip = "Refresh Test methods and classes by searching all assemblies";
-                    refresh = GUILayout.Button(refreshContent, EditorStyles.toolbarButton);
+                        toolsMenu.DropDown(clearRect);
+                    }
 
 
 
@@ -624,16 +646,30 @@ namespace UnityTest
 
 
                     //Rect rect = EditorGUILayout.GetControlRect(false);
-                    GUIContent play = new GUIContent(EditorGUIUtility.IconContent("PlayButton"));
-                    play.tooltip = "Run selected tests";
+                    GUIContent run = new GUIContent(EditorGUIUtility.IconContent("PlayButton"));
+                    run.tooltip = "Run selected tests";
+                    GUI.enabled = EditorApplication.isPlaying && state.anySelected;
+                    runSelected = GUILayout.Button(run, EditorStyles.toolbarButton);         // Play button
+
+
                     GUIContent emptyScene = new GUIContent(EditorGUIUtility.IconContent("SceneLoadIn"));
                     emptyScene.tooltip = "Go to empty scene";
-
-                    GUI.enabled = EditorApplication.isPlaying && state.anySelected;
-                    GUILayout.Toggle(false, play, EditorStyles.toolbarButton);         // Play button
                     GUI.enabled = !IsSceneEmpty() && !Application.isPlaying;
-                    GUILayout.Toggle(false, emptyScene, EditorStyles.toolbarButton);   // Go to empty scene button
+                    if (GUILayout.Button(emptyScene, EditorStyles.toolbarButton))      // Go to empty scene button
+                    {
+                        GoToEmptyScene();
+                        GUIUtility.ExitGUI();
+                    }
                     GUI.enabled = wasEnabled;
+
+                    GUIContent debugContent = new GUIContent(EditorGUIUtility.IconContent("d_DebuggerDisabled"));
+                    if (debug) debugContent.image = EditorGUIUtility.IconContent("d_DebuggerAttached").image;
+                    debugContent.tooltip = "Enable/disable debug messages";
+                    debug = GUILayout.Toggle(debug, debugContent, EditorStyles.toolbarButton);
+
+                    GUIContent refreshContent = new GUIContent(EditorGUIUtility.IconContent("Refresh"));
+                    refreshContent.tooltip = "Refresh Test methods and classes by searching all assemblies";
+                    refresh = GUILayout.Button(refreshContent, EditorStyles.toolbarButton);      // Refresh button
 
 
                     GUI.enabled = wasEnabled;
@@ -657,11 +693,8 @@ namespace UnityTest
 
 
             // Doing things this way avoids annoying GUI errors complaining about groups not being ended properly.
-            if (runAll) RunAll();
-            else if (runSelected) RunSelected();
+            if (runSelected) RunSelected();
             else if (refresh) Refresh();
-            else if (resetAll) ResetAll();
-            else if (resetSelected) ResetSelected();
             else if (selectAll) SelectAll();
             else if (deselectAll) DeselectAll();
 
@@ -698,6 +731,7 @@ namespace UnityTest
                         float previousLabelWidth = EditorGUIUtility.labelWidth;
                         EditorGUIUtility.labelWidth = 0f;
                         float width = EditorStyles.boldLabel.CalcSize(new GUIContent("Current")).x;
+                        
                         EditorGUILayout.LabelField("Current", EditorStyles.boldLabel, GUILayout.Width(width));
 
                         GUILayout.FlexibleSpace();

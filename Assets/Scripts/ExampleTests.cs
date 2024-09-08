@@ -8,11 +8,6 @@ namespace UnityTest
 {
     public class ExampleTests : MonoBehaviour
     {
-        public void Start()
-        {
-            Debug.Log("Start");
-        }
-
         /// <summary>
         /// SetUp functions take no arguments and they return a GameObject to which this script is attached.
         /// The Unit Tests are performed after OnEnable, which means Start won't have been run before the test runs.
