@@ -4,6 +4,7 @@ using UnityEditor;
 using System.Reflection;
 using System.Linq;
 using UnityEditor.SceneManagement;
+using UnityEngine.EventSystems;
 
 namespace UnityTest
 {
@@ -22,20 +23,24 @@ namespace UnityTest
         private static SortedDictionary<string, Foldout> cachedFoldouts = new SortedDictionary<string, Foldout>();
         private static SortedDictionary<string, Test> cachedTests = new SortedDictionary<string, Test>();
 
+        public static List<Test> finishedTests = new List<Test>();
+
         public static Foldout rootFoldout;
+
+        private Vector2 scrollPosition;
 
         private bool refreshing = false;
 
-        private Vector2 scrollPosition, queueScrollPosition;
+        public const float minHeight = 300f;
         
         private const string delimiter = "\n===| TestManager |===\n"; // Some unique value
         private const string splitDelimiter = "\n===| TestSplit |===\n"; // Some unique value
         private const string foldoutDelimiter = "\n===| TestManagerFoldout |===\n"; // Some unique value
 
-        private Queue<Test> queue = new Queue<Test>();
+        public static Queue<Test> queue = new Queue<Test>();
 
-        private float timer;
-        private int nframes;
+        public static float timer;
+        public static int nframes;
 
         private static float indentWidth;
         private static int indentLevel;
@@ -72,6 +77,7 @@ namespace UnityTest
             timer = 0f;
             indentLevel = 0;
             indentWidth = 0f;
+            scrollPosition = Vector2.zero;
             nframes = 0;
             queue = new Queue<Test>();
             cachedTests = new SortedDictionary<string, Test>();
@@ -80,13 +86,13 @@ namespace UnityTest
             methods = new SortedDictionary<TestAttribute, MethodInfo>();
             rootFoldout = null;
             refreshing = false;
-            scrollPosition = Vector2.zero;
-            queueScrollPosition = Vector2.zero;
             fonts = null;
             playButtonPressed = false;
+            finishedTests = new List<Test>();
 
             Foldout.all = new Dictionary<string, Foldout>();
 
+            GUIQueue.Reset();
             
             OnEnable();
         }
@@ -152,6 +158,8 @@ namespace UnityTest
             data += splitDelimiter;
             data += playButtonPressed.ToString();
             data += splitDelimiter;
+            data += GUIQueue.GetString();
+            data += splitDelimiter;
 
             if (tests.Count == 0) return data;
 
@@ -201,6 +209,13 @@ namespace UnityTest
             if (split.Length > i)
             {
                 try { playButtonPressed = bool.Parse(split[i]); }
+                catch (System.FormatException) { return; }
+            }
+            i++;
+
+            if (split.Length > i)
+            {
+                try { GUIQueue.FromString(split[i]); }
                 catch (System.FormatException) { return; }
             }
             i++;
@@ -354,8 +369,19 @@ namespace UnityTest
             timer = 0f;
             nframes = 0;
             Test test = queue.Dequeue();
-            if (debug) Debug.Log("Running " + test.attribute.path, test.GetScript());
+            if (debug) Debug.Log("(UnityTest) Running " + test.attribute.path, test.GetScript());
             test.Run();
+            finishedTests.Add(test);
+            if (debug)
+            {
+                if (test.result == Test.Result.Pass)
+                    Debug.Log("(UnityTest) Pass: " + test.attribute.path, test.GetScript());
+                else if (test.result == Test.Result.Fail)
+                    Debug.LogError("(UnityTest) Fail: " + test.attribute.path, test.GetScript());
+                else if (test.result == Test.Result.None)
+                    Debug.LogWarning("(UnityTest) Inconclusive: " + test.attribute.path, test.GetScript());
+                else throw new System.NotImplementedException(test.result.ToString());
+            }
         }
 
 
@@ -615,18 +641,6 @@ namespace UnityTest
             }
 
             State state = new State(rootFoldout);
-
-            if (showWelcome) // Welcome message
-            {
-                EditorGUILayout.HelpBox(
-                    "Welcome to UnityTest! To get started, try running each of the Example tests below. Tests can only be run in Play Mode. " +
-                    "Press the X button to clear test results. Check out the code for the tests by double-clicking the script object. " +
-                    "Create your tests in any class in the Assets folder, by simply writing a method with a UnityTest.Test attribute. " +
-                    "See the included README for additional information. Happy testing!" + "\n\n" +
-                    "If you would like to support this project, please visit _____________________ and donate. It keeps me fed. Thank you :)" + "\n\n" +
-                    "To hide this message, press the speech bubble in the toolbar below."
-                , MessageType.Info);
-            }
             
             bool runSelected = false;
             bool refresh = false;
@@ -634,9 +648,8 @@ namespace UnityTest
             bool deselectAll = false;
 
             bool wasEnabled = GUI.enabled;
-            //GUI.enabled = (queue.Count == 0 && !Test.isTesting) || !Application.isPlaying;
             // The main window
-            EditorGUILayout.BeginVertical(GetStyle("box2"));
+            EditorGUILayout.BeginVertical();
             {
                 // Toolbar controls
                 EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
@@ -664,8 +677,20 @@ namespace UnityTest
                 }
                 EditorGUILayout.EndHorizontal();
 
+                if (showWelcome) // Welcome message
+                {
+                    EditorGUILayout.HelpBox(
+                        "Welcome to UnityTest! To get started, select a test below and click the Play button in the toolbar. " +
+                        "Press the X button in the toolbar to clear test results. You can open the code for each test by double-clicking its script object. " +
+                        "Create your tests in any C# class in the Assets folder by simply writing a method with a UnityTest.Test attribute. " +
+                        "See the included README for additional information. Happy testing!" + "\n\n" +
+                        "If you would like to support this project, please donate at _____________________. Any amount is greatly appreciated; it keeps me fed :)" + "\n\n" +
+                        "To hide this message, press the speech bubble in the toolbar below."
+                    , MessageType.Info);
+                }
+
                 // The box that shows the Tests
-                scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition, false, false);
+                scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition, false, false, GUI.skin.horizontalScrollbar, GUI.skin.verticalScrollbar, EditorStyles.inspectorFullWidthMargins);
                 if (rootFoldout != null)
                 {
                     indentLevel = 0;
@@ -683,7 +708,7 @@ namespace UnityTest
             else if (selectAll) SelectAll();
             else if (deselectAll) DeselectAll();
 
-            DrawQueue();
+            GUIQueue.Draw();
 
             if (playButtonPressed)
             {
@@ -802,100 +827,6 @@ namespace UnityTest
             GUIContent image = new GUIContent(EditorGUIUtility.IconContent("console.infoicon.sml"));
             image.tooltip = "Show/hide the welcome message";
             showWelcome = GUILayout.Toggle(showWelcome, image, EditorStyles.toolbarButton);
-        }
-
-
-
-
-
-        private void DrawQueueTest(Rect rect, Test test, bool paintResultFeatures = true)
-        {
-            if (paintResultFeatures) Test.PaintResultFeatures(rect, test.result);
-            GUI.Label(rect, test.attribute.path);
-        }
-        private void DrawQueueTest(Test test, bool paintResultFeatures = true)
-        {
-            Rect rect = EditorGUILayout.GetControlRect(false);
-            if (paintResultFeatures) Test.PaintResultFeatures(rect, test.result);
-            GUI.Label(rect, test.attribute.path);
-        }
-
-        
-
-        private void DrawQueue()
-        {
-            bool wasEnabled = GUI.enabled;
-
-            // The queue window
-            EditorGUILayout.BeginVertical(GetStyle("box"), GUILayout.ExpandWidth(true), GUILayout.MinHeight(200f));
-            {
-                // "Current" space
-                EditorGUILayout.BeginVertical();
-                {
-                    GUI.enabled = true;
-                    EditorGUILayout.BeginHorizontal();
-                    {
-                        float previousLabelWidth = EditorGUIUtility.labelWidth;
-                        EditorGUIUtility.labelWidth = 0f;
-                        float width = EditorStyles.boldLabel.CalcSize(new GUIContent("Current")).x;
-                        
-                        EditorGUILayout.LabelField("Current", EditorStyles.boldLabel, GUILayout.Width(width));
-
-                        GUILayout.FlexibleSpace();
-
-                        GUILayout.Label("frame " + string.Format("{0,8}", nframes) + "    " + timer.ToString("0.0000 s"));
-
-                        EditorGUIUtility.labelWidth = previousLabelWidth;
-                    }
-                    EditorGUILayout.EndHorizontal();
-                    GUI.enabled = false;
-
-                    Rect rect = EditorGUILayout.GetControlRect(false);
-                    rect.height += EditorStyles.helpBox.padding.vertical;
-                    GUI.Box(rect, GUIContent.none, "HelpBox");
-                    rect.x += EditorStyles.helpBox.padding.left;
-                    rect.width -= EditorStyles.helpBox.padding.horizontal;
-                    rect.y += EditorStyles.helpBox.padding.top;
-                    rect.height -= EditorStyles.helpBox.padding.vertical;
-                    Test next = null;
-                    if (queue.Count > 0) next = queue.Peek();
-                    if (Test.current == null && next != null) DrawQueueTest(rect, next, true);
-                    else if (Test.current != null) DrawQueueTest(rect, Test.current, true);
-                    GUI.enabled = true;
-                }
-                EditorGUILayout.EndVertical();
-
-                EditorGUILayout.Space();
-
-                // "Queue" space
-                GUI.enabled = true;
-                EditorGUILayout.BeginHorizontal();
-                {
-                    GUI.enabled = true;
-                    float width = EditorStyles.boldLabel.CalcSize(new GUIContent("Queue")).x;
-                    EditorGUILayout.LabelField("Queue", EditorStyles.boldLabel, GUILayout.Width(width));
-                    GUILayout.FlexibleSpace();
-                    GUI.enabled = queue.Count > 0;
-                    width = GUI.skin.button.CalcSize(new GUIContent("Clear")).x;
-                    if (GUILayout.Button("Clear", GUILayout.Width(width))) queue.Clear();
-                    GUI.enabled = true;
-                }
-                EditorGUILayout.EndHorizontal();
-
-                GUI.enabled = false;
-                EditorGUILayout.BeginVertical("HelpBox", GUILayout.ExpandHeight(true));
-                GUI.enabled = true;
-                {
-                    queueScrollPosition = EditorGUILayout.BeginScrollView(queueScrollPosition, false, false);
-                    GUI.enabled = false;
-                    foreach (Test test in queue) DrawQueueTest(test, false);
-                    GUI.enabled = true;
-                    EditorGUILayout.EndScrollView();
-                }
-                EditorGUILayout.EndVertical();
-                GUI.enabled = wasEnabled;
-            }
-            EditorGUILayout.EndHorizontal();
         }
 
         public class Settings : EditorWindow
@@ -1075,7 +1006,7 @@ namespace UnityTest
 
             public void Add(Test test)
             {
-                if (tests.Contains(test)) throw new System.Exception("Cannot add test because it has already been added: " + test);
+                if (tests.Contains(test)) return; //throw new System.Exception("Cannot add test because it has already been added: " + test);
                 if (!isSuite && tests.Count == 0 && test.IsInSuite()) isSuite = true;
                 else if (isSuite && !test.IsInSuite()) throw new System.Exception("Cannot have a mix of tests that are in a TestSuite and not in a suite for a single Foldout " + test); // Should never happen
                 tests.Add(test);
@@ -1405,6 +1336,301 @@ namespace UnityTest
                     indentLevel--;
                 }
             }
+        }
+    }
+
+
+
+    /// <summary>
+    /// This is where the queued and finished tests in the TestManager are drawn
+    /// </summary>
+    public class GUIQueue
+    {
+        private static Vector2 queueScrollPosition, finishedScrollPosition;
+
+        
+        public const float minHeight = 200f;
+
+        private static float height = minHeight;
+
+        private static Rect splitterRect, mainRect;
+        private static bool dragging;
+        private static bool hideMain = false;
+        private static Vector2 dragPos;
+
+        private const string delimiter = "-~!@ delim @!~-";
+
+        public static void Reset()
+        {
+            splitterRect = new Rect();
+            mainRect = new Rect();
+            queueScrollPosition = Vector2.zero;
+            finishedScrollPosition = Vector2.zero;
+            height = minHeight;
+            hideMain = false;
+        }
+
+        public static string GetString()
+        {
+            string data = "";
+            data += height.ToString();
+            data += delimiter;
+            data += hideMain.ToString();
+            return data;
+        }
+
+        public static void FromString(string data)
+        {
+            string[] split = data.Split(delimiter);
+
+            int i = 0;
+            if (split.Length > i)
+            {
+                height = float.Parse(split[i]);
+            }
+            i++;
+
+            if (split.Length > i)
+            {
+                hideMain = bool.Parse(split[i]);
+            }
+            i++;
+        }
+
+        public static void Draw()
+        {
+            bool wasEnabled = GUI.enabled;
+
+            DrawSplitter();
+
+            if (hideMain)
+            {
+                ProcessEvents();
+                return;
+            }
+
+            // The queue window
+            EditorGUILayout.BeginVertical(GUILayout.ExpandWidth(true), GUILayout.Height(height));
+            {
+                // "Current" space
+                EditorGUILayout.BeginVertical();
+                {
+                    GUI.enabled = true;
+                    EditorGUILayout.BeginHorizontal();
+                    {
+                        float previousLabelWidth = EditorGUIUtility.labelWidth;
+                        EditorGUIUtility.labelWidth = 0f;
+                        float width = EditorStyles.boldLabel.CalcSize(new GUIContent("Current")).x;
+
+                        EditorGUILayout.LabelField("Current", EditorStyles.boldLabel, GUILayout.Width(width));
+                        GUILayout.FlexibleSpace();
+
+                        GUILayout.Label("frame " + string.Format("{0,8}", TestManager.nframes) + "    " + TestManager.timer.ToString("0.0000 s"));
+
+                        EditorGUIUtility.labelWidth = previousLabelWidth;
+                    }
+                    EditorGUILayout.EndHorizontal();
+                    GUI.enabled = false;
+
+                    Rect rect = EditorGUILayout.GetControlRect(false);
+                    rect.height += EditorStyles.helpBox.padding.vertical;
+                    GUI.Box(rect, GUIContent.none, "HelpBox");
+                    rect.x += EditorStyles.helpBox.padding.left;
+                    rect.width -= EditorStyles.helpBox.padding.horizontal;
+                    rect.y += EditorStyles.helpBox.padding.top;
+                    rect.height -= EditorStyles.helpBox.padding.vertical;
+                    Test next = null;
+                    if (TestManager.queue.Count > 0) next = TestManager.queue.Peek();
+                    if (Test.current == null && next != null) DrawQueueTest(rect, next, true);
+                    else if (Test.current != null) DrawQueueTest(rect, Test.current, true);
+                    GUI.enabled = true;
+                }
+                EditorGUILayout.EndVertical();
+
+                EditorGUILayout.Space();
+
+
+                // "Queue" space
+                EditorGUILayout.BeginHorizontal();
+                {
+                    EditorGUILayout.BeginVertical(GUILayout.ExpandWidth(true));
+                    {
+                        // header labels for the queue
+                        GUI.enabled = true;
+                        EditorGUILayout.BeginHorizontal();
+                        {
+                            GUIContent label = new GUIContent("Queued");
+                            float width = EditorStyles.boldLabel.CalcSize(label).x;
+                            EditorGUILayout.LabelField(label, EditorStyles.boldLabel, GUILayout.Width(width));
+                            GUILayout.FlexibleSpace();
+                            GUI.enabled = TestManager.queue.Count > 0;
+                            label = new GUIContent("Clear");
+                            width = GUI.skin.button.CalcSize(label).x;
+                            if (GUILayout.Button(label, GUILayout.Width(width))) TestManager.queue.Clear();
+                            GUI.enabled = true;
+                        }
+                        EditorGUILayout.EndHorizontal();
+
+                        // Queue area
+                        EditorGUILayout.BeginVertical("HelpBox");
+                        {
+                            GUI.enabled = true;
+                            queueScrollPosition = EditorGUILayout.BeginScrollView(queueScrollPosition, false, false);
+                            {
+                                GUI.enabled = false;
+                                foreach (Test test in TestManager.queue) DrawQueueTest(test, false);
+                                GUI.enabled = true;
+                            }
+                            EditorGUILayout.EndScrollView();
+                        }
+                        EditorGUILayout.EndVertical();
+                    }
+                    EditorGUILayout.EndVertical();
+
+                    EditorGUILayout.BeginVertical(GUILayout.ExpandWidth(true));
+                    {
+                        // header labels for the "finished" area
+                        GUI.enabled = true;
+                        EditorGUILayout.BeginHorizontal();
+                        {
+                            GUIContent label = new GUIContent("Finished");
+                            float width = EditorStyles.boldLabel.CalcSize(label).x;
+                            EditorGUILayout.LabelField(label, EditorStyles.boldLabel, GUILayout.Width(width));
+                            GUILayout.FlexibleSpace();
+                            GUI.enabled = TestManager.finishedTests.Count > 0;
+                            label = new GUIContent("Clear");
+                            width = GUI.skin.button.CalcSize(label).x;
+                            if (GUILayout.Button(label, GUILayout.Width(width))) TestManager.finishedTests.Clear();
+                            GUI.enabled = true;
+                        }
+                        EditorGUILayout.EndHorizontal();
+
+                        // "Finished" area
+                        GUI.enabled = false;
+                        EditorGUILayout.BeginVertical("HelpBox");
+                        {
+                            GUI.enabled = true;
+                            finishedScrollPosition = EditorGUILayout.BeginScrollView(finishedScrollPosition, false, false);
+                            {
+                                GUI.enabled = false;
+                                foreach (Test test in TestManager.finishedTests) DrawQueueTest(test, false);
+                                GUI.enabled = true;
+                            }
+                            EditorGUILayout.EndScrollView();
+                        }
+                        EditorGUILayout.EndVertical();
+                    }
+                    EditorGUILayout.EndVertical();
+                }
+                EditorGUILayout.EndHorizontal();
+                
+            }
+            EditorGUILayout.EndHorizontal();
+
+            mainRect = GUILayoutUtility.GetLastRect();
+
+            GUI.enabled = wasEnabled;
+
+            ProcessEvents();
+        }
+
+        private static void DrawQueueTest(Rect rect, Test test, bool paintResultFeatures = true)
+        {
+            if (paintResultFeatures) Test.PaintResultFeatures(rect, test.result);
+            GUI.Label(rect, test.attribute.path);
+        }
+        private static void DrawQueueTest(Test test, bool paintResultFeatures = true)
+        {
+            Rect rect = EditorGUILayout.GetControlRect(false);
+            if (paintResultFeatures) Test.PaintResultFeatures(rect, test.result);
+            GUI.Label(rect, test.attribute.path);
+        }
+
+        private static void DrawSplitter()
+        {
+            GUIStyle style = new GUIStyle("PreToolbar");
+            GUILayout.BeginHorizontal(style);
+            {
+                GUIContent label = new GUIContent("Tests");
+                GUIStyle labelStyle = new GUIStyle("ToolbarBoldLabel");
+                GUILayout.Label(label, labelStyle, GUILayout.Width(labelStyle.CalcSize(label).x));
+
+                GUILayout.BeginHorizontal("ToolbarLabel", GUILayout.ExpandWidth(true));
+                {
+                    GUILayout.Space(GUI.skin.box.padding.left);
+                    GUILayout.BeginVertical();
+                    {
+                        GUILayout.FlexibleSpace();
+                        GUILayout.Box(GUIContent.none, "WindowBottomResize", GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
+                        GUILayout.FlexibleSpace();
+                    }
+                    GUILayout.EndVertical();
+                    GUILayout.Space(GUI.skin.box.padding.right);
+                }
+                GUILayout.EndHorizontal();
+
+                splitterRect = GUILayoutUtility.GetLastRect();
+
+                Rect cursorRect = new Rect(splitterRect);
+                if (dragging && Event.current != null) // This mimics Unity's preview window behavior
+                {
+                    cursorRect.yMin = 0f;
+                    cursorRect.yMax = Screen.currentResolution.height;
+                    cursorRect.xMin = 0f;
+                }
+
+                EditorGUIUtility.AddCursorRect(cursorRect, MouseCursor.SplitResizeUpDown);
+                //EditorGUI.DrawRect(cursorRect, Color.red); // for debugging
+
+                // "triple dot" menu
+                GUIContent options = new GUIContent(EditorGUIUtility.IconContent("pane options"));
+
+                Rect optionsRect = GUILayoutUtility.GetRect(options, EditorStyles.toolbarButton, GUILayout.Width(EditorStyles.toolbarButton.CalcSize(options).x));
+                if (EditorGUI.DropdownButton(optionsRect, options, FocusType.Passive, EditorStyles.toolbarButton))
+                {
+                    GenericMenu menu = new GenericMenu();
+                    menu.AddItem(new GUIContent("Reset"), false, Reset);
+                    menu.DropDown(optionsRect);
+                }
+            }
+            GUILayout.EndHorizontal();
+        }
+
+
+        private static void ProcessEvents()
+        {
+            if (Event.current == null) return;
+
+            if (Event.current.rawType == EventType.MouseDown && splitterRect.Contains(Event.current.mousePosition))
+            {
+                dragging = true;
+                dragPos = Event.current.mousePosition;
+            }
+            else if (Event.current.rawType == EventType.MouseUp)
+            {
+                dragging = false;
+                EditorWindow.GetWindow<TestManager>().Repaint();
+            }
+
+
+            if (dragging && Event.current.rawType == EventType.MouseDrag)
+            {
+                float delta = (Event.current.mousePosition.y + 0.5f * splitterRect.height) - dragPos.y;
+
+                hideMain = Event.current.mousePosition.y > mainRect.yMax - 0.5f * minHeight; 
+
+                if (!hideMain)
+                {
+                    float newHeight = Mathf.Max(mainRect.yMax - (dragPos.y + delta), minHeight);
+
+                    // Make sure that the main window maintains a minimum height
+                    if (mainRect.yMax - (newHeight + splitterRect.height) > TestManager.minHeight)
+                        height = newHeight;
+                }
+
+                EditorWindow.GetWindow<TestManager>().Repaint();
+            }
+            
         }
     }
 }
