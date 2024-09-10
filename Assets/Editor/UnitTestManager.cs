@@ -7,7 +7,7 @@ using UnityEditor.SceneManagement;
 
 namespace UnityTest
 {
-    public class TestManager : EditorWindow
+    public class TestManager : EditorWindow, IHasCustomMenu
     {
         /// <summary>
         /// The code methods which have a TestAttribute attached to them.
@@ -27,8 +27,6 @@ namespace UnityTest
         private bool refreshing = false;
 
         private Vector2 scrollPosition, queueScrollPosition;
-
-        private Color lineColor;
         
         private const string delimiter = "\n===| TestManager |===\n"; // Some unique value
         private const string splitDelimiter = "\n===| TestSplit |===\n"; // Some unique value
@@ -43,10 +41,14 @@ namespace UnityTest
         private static int indentLevel;
 
         private static bool debug;
+        private static bool showWelcome = true;
+        private static bool playButtonPressed = false;
 
         private int previousFrameNumber;
 
         private Dictionary<string, GUIStyle> styles;
+
+        private static string[] fonts;
 
         private static Settings _settings;
         private static Settings settings
@@ -58,22 +60,48 @@ namespace UnityTest
             }
         }
 
+        private void Reset()
+        {
+            OnDisable();
+            EditorPrefs.SetString(nameof(TestManager), "");
+
+            _settings = null;
+            previousFrameNumber = 0;
+            showWelcome = true;
+            debug = false;
+            timer = 0f;
+            indentLevel = 0;
+            indentWidth = 0f;
+            nframes = 0;
+            queue = new Queue<Test>();
+            cachedTests = new SortedDictionary<string, Test>();
+            cachedFoldouts = new SortedDictionary<string, Foldout>();
+            tests = new SortedDictionary<TestAttribute, Test>();
+            methods = new SortedDictionary<TestAttribute, MethodInfo>();
+            rootFoldout = null;
+            refreshing = false;
+            scrollPosition = Vector2.zero;
+            queueScrollPosition = Vector2.zero;
+            fonts = null;
+            playButtonPressed = false;
+
+            Foldout.all = new Dictionary<string, Foldout>();
+
+            
+            OnEnable();
+        }
+
+        public void AddItemsToMenu(GenericMenu menu)
+        {
+            menu.AddItem(new GUIContent("Reset"), false, Reset);
+        }
+
         private void InitializeStyles()
         {
             if (styles == null) styles = new Dictionary<string, GUIStyle>();
             styles.Clear();
 
-            GUIStyle monospaceStyle = new GUIStyle(GUI.skin.label);
-            monospaceStyle.name = "monospace";
-            foreach (string name in Font.GetOSInstalledFontNames())
-            {
-                if (name.ToLower().Contains("courier"))
-                {
-                    monospaceStyle.font = Font.CreateDynamicFontFromOSFont(name, monospaceStyle.fontSize);
-                    break;
-                }
-            }
-            styles.Add("monospace", monospaceStyle);
+            fonts = Font.GetOSInstalledFontNames();
 
             GUIStyle boxStyle = new GUIStyle("Window");
             GUIStyle g = new GUIStyle("GroupBox");
@@ -120,6 +148,10 @@ namespace UnityTest
 
             data += debug.ToString();
             data += splitDelimiter;
+            data += showWelcome.ToString();
+            data += splitDelimiter;
+            data += playButtonPressed.ToString();
+            data += splitDelimiter;
 
             if (tests.Count == 0) return data;
 
@@ -150,24 +182,44 @@ namespace UnityTest
         {
             cachedTests.Clear();
             string[] split = data.Split(splitDelimiter);
-            try { debug = bool.Parse(split[0]); }
-            catch (System.FormatException) { }
+            int i = 0;
 
-            if (split.Length > 1)
+            if (split.Length > i)
             {
+                try { debug = bool.Parse(split[i]); }
+                catch (System.FormatException) { return; }
+            }
+            i++;
 
-                foreach (string s in split[1].Split(delimiter))
+            if (split.Length > i)
+            {
+                try { showWelcome = bool.Parse(split[i]); }
+                catch (System.FormatException) { return; }
+            }
+            i++;
+
+            if (split.Length > i)
+            {
+                try { playButtonPressed = bool.Parse(split[i]); }
+                catch (System.FormatException) { return; }
+            }
+            i++;
+
+            if (split.Length > i)
+            {
+                foreach (string s in split[i].Split(delimiter))
                 {
                     Test newTest = Test.FromString(s);
                     if (newTest == null) continue;
                     cachedTests.Add(newTest.attribute.path, newTest);
                 }
             }
+            i++;
 
-            if (split.Length > 2)
+            if (split.Length > i)
             {
                 List<string> added = new List<string>();
-                foreach (string foldoutData in split[2].Split(foldoutDelimiter))
+                foreach (string foldoutData in split[i].Split(foldoutDelimiter))
                 {
                     Foldout foldout = Foldout.FromString(foldoutData);
                     if (foldout == null) continue;
@@ -185,6 +237,7 @@ namespace UnityTest
                     }
                 }
             }
+            i++;
         }
 
         /// <summary>
@@ -236,9 +289,11 @@ namespace UnityTest
             CreateTests();
             CreateFoldouts();
 
-            var method = typeof(EditorGUIUtility).GetMethod("GetDefaultBackgroundColor", BindingFlags.NonPublic | BindingFlags.Static);
-            Color inspectorBackgroundColor = (Color)method.Invoke(null, null);
-            lineColor = inspectorBackgroundColor * new Color(0.6f, 0.6f, 0.6f, 1f);
+            if (playButtonPressed)
+            {
+                playButtonPressed = false;
+                RunSelected();
+            }
         }
 
         private void OnPlayStateChanged(PlayModeStateChange change)
@@ -560,123 +615,54 @@ namespace UnityTest
             }
 
             State state = new State(rootFoldout);
+
+            if (showWelcome) // Welcome message
+            {
+                EditorGUILayout.HelpBox(
+                    "Welcome to UnityTest! To get started, try running each of the Example tests below. Tests can only be run in Play Mode. " +
+                    "Press the X button to clear test results. Check out the code for the tests by double-clicking the script object. " +
+                    "Create your tests in any class in the Assets folder, by simply writing a method with a UnityTest.Test attribute. " +
+                    "See the included README for additional information. Happy testing!" + "\n\n" +
+                    "If you would like to support this project, please visit _____________________ and donate. It keeps me fed. Thank you :)" + "\n\n" +
+                    "To hide this message, press the speech bubble in the toolbar below."
+                , MessageType.Info);
+            }
             
             bool runSelected = false;
             bool refresh = false;
             bool selectAll = false;
             bool deselectAll = false;
 
-            bool origEnabled = GUI.enabled;
             bool wasEnabled = GUI.enabled;
-            GUI.enabled = (queue.Count == 0 && !Test.isTesting) || !Application.isPlaying;
+            //GUI.enabled = (queue.Count == 0 && !Test.isTesting) || !Application.isPlaying;
             // The main window
             EditorGUILayout.BeginVertical(GetStyle("box2"));
             {
                 // Toolbar controls
                 EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
                 {
-                    // This is all just to draw the toggle button in the toolbar
-                    GUIContent toggle = new GUIContent(EditorGUIUtility.IconContent("d_toggle_on")); // guess at initial value
-                    GUIStyle toggleStyle = EditorStyles.toolbarButton;
+                    // Left
+                    runSelected = DrawPlayButton(state);
+                    DrawGoToEmptySceneButton();
 
-                    Rect rect = GUILayoutUtility.GetRect(toggle, toggleStyle);
+                    bool[] result = DrawUniversalToggle(state);
+                    selectAll = result[0];
+                    deselectAll = result[1];
 
-                    bool hover = false;
-                    if (Event.current != null) hover = rect.Contains(Event.current.mousePosition) && GUI.enabled;
-
-                    // Change the style of the toggle button according to the current state
-                    if (state.anySelected && !state.allSelected)
-                    {
-                        if (hover) toggle.image = EditorGUIUtility.IconContent("d_toggle_mixed_bg_hover").image;
-                        else toggle.image = EditorGUIUtility.IconContent("d_toggle_mixed_bg").image;
-                    }
-                    else
-                    {
-                        if (state.allSelected)
-                        {
-                            if (hover) toggle.image = EditorGUIUtility.IconContent("d_toggle_on_hover").image;
-                        }
-                        else if (!state.anySelected)
-                        {
-                            if (hover) toggle.image = EditorGUIUtility.IconContent("d_toggle_bg_hover").image;
-                            else toggle.image = EditorGUIUtility.IconContent("d_toggle_bg").image;
-                        }
-                    }
-
-                    toggle.tooltip = "Select/deselect all unlocked tests";
-
-                    bool wasMixed = EditorGUI.showMixedValue;
-                    EditorGUI.showMixedValue = state.anySelected && !state.allSelected;
-                    bool choice = GUI.Button(rect, toggle, toggleStyle);
-                    EditorGUI.showMixedValue = wasMixed;
-
-                    if (choice)
-                    {
-                        selectAll = !state.allSelected;
-                        deselectAll = state.anySelected;
-                    }
+                    DrawClearButton(state);
 
 
-
-                    // Done drawing the select-all / deselect-all button
-
-
-
-                    GUIContent clear = new GUIContent(EditorGUIUtility.IconContent("d_clear"));
-                    clear.tooltip = "Clear selected Test results";
-                    GUI.enabled = state.selectedHaveResults;
-
-                    Rect clearRect = GUILayoutUtility.GetRect(clear, EditorStyles.toolbarDropDown);
-                    if (EditorGUI.DropdownButton(clearRect, clear, FocusType.Passive, EditorStyles.toolbarDropDown))
-                    {
-                        GenericMenu toolsMenu = new GenericMenu();
-                        if (state.anySelected) toolsMenu.AddItem(new GUIContent("Reset Selected"), false, ResetSelected);
-                        else toolsMenu.AddDisabledItem(new GUIContent("Reset Selected"));
-
-                        if (state.anyResults) toolsMenu.AddItem(new GUIContent("Reset All"), false, ResetAll);
-                        else toolsMenu.AddDisabledItem(new GUIContent("Reset All"));
-
-                        toolsMenu.DropDown(clearRect);
-                    }
-
-
-
-
+                    // Left
                     GUILayout.FlexibleSpace();
+                    // Right
 
 
-                    //Rect rect = EditorGUILayout.GetControlRect(false);
-                    GUIContent run = new GUIContent(EditorGUIUtility.IconContent("PlayButton"));
-                    run.tooltip = "Run selected tests";
-                    GUI.enabled = EditorApplication.isPlaying && state.anySelected;
-                    runSelected = GUILayout.Button(run, EditorStyles.toolbarButton);         // Play button
-
-
-                    GUIContent emptyScene = new GUIContent(EditorGUIUtility.IconContent("SceneLoadIn"));
-                    emptyScene.tooltip = "Go to empty scene";
-                    GUI.enabled = !IsSceneEmpty() && !Application.isPlaying;
-                    if (GUILayout.Button(emptyScene, EditorStyles.toolbarButton))      // Go to empty scene button
-                    {
-                        GoToEmptyScene();
-                        GUIUtility.ExitGUI();
-                    }
-                    GUI.enabled = wasEnabled;
-
-                    GUIContent debugContent = new GUIContent(EditorGUIUtility.IconContent("d_DebuggerDisabled"));
-                    if (debug) debugContent.image = EditorGUIUtility.IconContent("d_DebuggerAttached").image;
-                    debugContent.tooltip = "Enable/disable debug messages";
-                    debug = GUILayout.Toggle(debug, debugContent, EditorStyles.toolbarButton);
-
-                    GUIContent refreshContent = new GUIContent(EditorGUIUtility.IconContent("Refresh"));
-                    refreshContent.tooltip = "Refresh Test methods and classes by searching all assemblies";
-                    refresh = GUILayout.Button(refreshContent, EditorStyles.toolbarButton);      // Refresh button
-
-
-                    GUI.enabled = wasEnabled;
+                    DrawWelcomeButton();
+                    DrawDebugButton();
+                    refresh = DrawRefreshButton();
+                    // Right
                 }
                 EditorGUILayout.EndHorizontal();
-
-
 
                 // The box that shows the Tests
                 scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition, false, false);
@@ -689,8 +675,7 @@ namespace UnityTest
             }
             EditorGUILayout.EndVertical();
 
-
-
+            GUI.enabled = wasEnabled;
 
             // Doing things this way avoids annoying GUI errors complaining about groups not being ended properly.
             if (runSelected) RunSelected();
@@ -700,8 +685,128 @@ namespace UnityTest
 
             DrawQueue();
 
-            GUI.enabled = origEnabled;
+            if (playButtonPressed)
+            {
+                if (EditorApplication.isPlaying) EditorApplication.ExitPlaymode();
+                else EditorApplication.EnterPlaymode();
+            }
         }
+
+        private bool[] DrawUniversalToggle(State state)
+        {
+            // This is all just to draw the toggle button in the toolbar
+            GUIContent toggle = new GUIContent(EditorGUIUtility.IconContent("d_toggle_on")); // guess at initial value
+            GUIStyle toggleStyle = EditorStyles.toolbarButton;
+
+            Rect rect = GUILayoutUtility.GetRect(toggle, toggleStyle);
+
+            bool hover = false;
+            if (Event.current != null) hover = rect.Contains(Event.current.mousePosition) && GUI.enabled;
+
+            // Change the style of the toggle button according to the current state
+            if (state.anySelected && !state.allSelected)
+            {
+                if (hover) toggle.image = EditorGUIUtility.IconContent("d_toggle_mixed_bg_hover").image;
+                else toggle.image = EditorGUIUtility.IconContent("d_toggle_mixed_bg").image;
+            }
+            else
+            {
+                if (state.allSelected)
+                {
+                    if (hover) toggle.image = EditorGUIUtility.IconContent("d_toggle_on_hover").image;
+                }
+                else if (!state.anySelected)
+                {
+                    if (hover) toggle.image = EditorGUIUtility.IconContent("d_toggle_bg_hover").image;
+                    else toggle.image = EditorGUIUtility.IconContent("d_toggle_bg").image;
+                }
+            }
+
+            toggle.tooltip = "Select/deselect all unlocked tests";
+
+            bool wasMixed = EditorGUI.showMixedValue;
+            EditorGUI.showMixedValue = state.anySelected && !state.allSelected;
+            bool choice = GUI.Button(rect, toggle, toggleStyle);
+            EditorGUI.showMixedValue = wasMixed;
+
+            if (choice) return new bool[2] { !state.allSelected, state.anySelected };
+            return new bool[2] { false, false };
+        }
+
+        private void DrawClearButton(State state)
+        {
+            bool wasEnabled = GUI.enabled;
+            GUIContent clear = new GUIContent(EditorGUIUtility.IconContent("d_clear"));
+            clear.tooltip = "Clear selected Test results";
+            GUI.enabled = state.selectedHaveResults;
+
+            Rect clearRect = GUILayoutUtility.GetRect(clear, EditorStyles.toolbarDropDown);
+            if (EditorGUI.DropdownButton(clearRect, clear, FocusType.Passive, EditorStyles.toolbarDropDown))
+            {
+                GenericMenu toolsMenu = new GenericMenu();
+                if (state.anySelected) toolsMenu.AddItem(new GUIContent("Reset Selected"), false, ResetSelected);
+                else toolsMenu.AddDisabledItem(new GUIContent("Reset Selected"));
+
+                if (state.anyResults) toolsMenu.AddItem(new GUIContent("Reset All"), false, ResetAll);
+                else toolsMenu.AddDisabledItem(new GUIContent("Reset All"));
+
+                toolsMenu.DropDown(clearRect);
+            }
+            GUI.enabled = wasEnabled;
+        }
+
+        private bool DrawPlayButton(State state)
+        {
+            bool wasEnabled = GUI.enabled;
+            
+            GUIContent run = new GUIContent(EditorGUIUtility.IconContent("PlayButton"));
+            run.tooltip = "Run selected tests";
+            GUI.enabled = state.anySelected;
+            bool ret = GUILayout.Toggle(playButtonPressed, run, EditorStyles.toolbarButton);
+            GUI.enabled = wasEnabled;
+            if (ret) playButtonPressed = true;
+            return ret;
+        }
+
+        private void DrawGoToEmptySceneButton()
+        {
+            bool wasEnabled = GUI.enabled;
+            GUIContent emptyScene = new GUIContent(EditorGUIUtility.IconContent("SceneLoadIn"));
+            emptyScene.tooltip = "Go to empty scene";
+            GUI.enabled = !IsSceneEmpty() && !Application.isPlaying;
+            if (GUILayout.Button(emptyScene, EditorStyles.toolbarButton))
+            {
+                GoToEmptyScene();
+                GUIUtility.ExitGUI();
+            }
+            GUI.enabled = wasEnabled;
+        }
+
+        private void DrawDebugButton()
+        {
+            GUIContent debugContent = new GUIContent(EditorGUIUtility.IconContent("d_DebuggerDisabled"));
+            if (debug) debugContent.image = EditorGUIUtility.IconContent("d_DebuggerAttached").image;
+            debugContent.tooltip = "Enable/disable debug messages";
+            debug = GUILayout.Toggle(debug, debugContent, EditorStyles.toolbarButton);
+        }
+
+        private bool DrawRefreshButton()
+        {
+            GUIContent refreshContent = new GUIContent(EditorGUIUtility.IconContent("Refresh"));
+            refreshContent.tooltip = "Refresh Test methods and classes by searching all assemblies";
+            return GUILayout.Button(refreshContent, EditorStyles.toolbarButton);
+        }
+
+        private void DrawWelcomeButton()
+        {
+            GUIContent image = new GUIContent(EditorGUIUtility.IconContent("console.infoicon.sml"));
+            image.tooltip = "Show/hide the welcome message";
+            showWelcome = GUILayout.Toggle(showWelcome, image, EditorStyles.toolbarButton);
+        }
+
+
+
+
 
         private void DrawQueueTest(Rect rect, Test test, bool paintResultFeatures = true)
         {
@@ -715,6 +820,8 @@ namespace UnityTest
             GUI.Label(rect, test.attribute.path);
         }
 
+        
+
         private void DrawQueue()
         {
             bool wasEnabled = GUI.enabled;
@@ -723,7 +830,7 @@ namespace UnityTest
             EditorGUILayout.BeginVertical(GetStyle("box"), GUILayout.ExpandWidth(true), GUILayout.MinHeight(200f));
             {
                 // "Current" space
-                EditorGUILayout.BeginVertical();// GUILayout.Height(45f));
+                EditorGUILayout.BeginVertical();
                 {
                     GUI.enabled = true;
                     EditorGUILayout.BeginHorizontal();
@@ -735,8 +842,8 @@ namespace UnityTest
                         EditorGUILayout.LabelField("Current", EditorStyles.boldLabel, GUILayout.Width(width));
 
                         GUILayout.FlexibleSpace();
-                        GUIContent content = new GUIContent("frame " + string.Format("{0,8}", nframes) + "    " + timer.ToString("0.0000 s"));
-                        GUILayout.Label(content, GetStyle("monospace"), GUILayout.Width(GetStyle("monospace").CalcSize(content).x));
+
+                        GUILayout.Label("frame " + string.Format("{0,8}", nframes) + "    " + timer.ToString("0.0000 s"));
 
                         EditorGUIUtility.labelWidth = previousLabelWidth;
                     }
@@ -968,9 +1075,9 @@ namespace UnityTest
 
             public void Add(Test test)
             {
-                if (tests.Contains(test)) throw new System.Exception("Cannot add Test because it has already been added: " + test);
+                if (tests.Contains(test)) throw new System.Exception("Cannot add test because it has already been added: " + test);
                 if (!isSuite && tests.Count == 0 && test.IsInSuite()) isSuite = true;
-                else if (isSuite && !test.IsInSuite()) throw new System.Exception("Cannot have a mix of Tests that are in a TestSuite and not in a suite for a single Foldout " + test);
+                else if (isSuite && !test.IsInSuite()) throw new System.Exception("Cannot have a mix of tests that are in a TestSuite and not in a suite for a single Foldout " + test); // Should never happen
                 tests.Add(test);
                 tests = tests.OrderBy(o => o.name).ToList();
             }
