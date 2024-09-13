@@ -62,6 +62,8 @@ namespace UnityTest
         private static GUIStyle toggleStyle;
         private static GUIStyle foldoutStyle;
 
+        private static bool sceneWarningPrinted = false;
+
 
         #region Operators
 
@@ -205,7 +207,7 @@ namespace UnityTest
             else DefaultTearDown();
         }
 
-
+        [HideInCallstack]
         public void Run()
         {
             if (!EditorApplication.isPlaying)
@@ -222,7 +224,7 @@ namespace UnityTest
             GameObject[] gameObjects = Object.FindObjectsOfType<GameObject>();
             if (gameObjects.Length > 0)
             {
-                bool ignore = false;
+                bool ignore = sceneWarningPrinted;
 
                 // When UnityEngine.Rendering.DebugManager.instance.enableRuntimeUI is true, it's because the user is both using the URP pipeline,
                 // and their settings are setup such that a GameObject called "[Debug Updater]" is created in empty scenes while in play mode.
@@ -234,9 +236,13 @@ namespace UnityTest
                     ignore = UnityEngine.Rendering.DebugManager.instance.enableRuntimeUI && gameObjects[0].name == "[Debug Updater]";
 #endif
                 }
-                if (!ignore) Debug.LogWarning("You are not in an empty scene. Unit Test results might be misleading. Perhaps your previous TearDown function " +
-                    "didn't correctly remove all the GameObjects, or you used Destroy instead of DestroyImmediate. Otherwise this might be intended behavior for " +
-                    "the custom tests you wrote, in which case you can ignore this error.");
+                if (!ignore)
+                {
+                    Debug.LogWarning("You are not in an empty scene. Unit Test results might be misleading. Perhaps your previous TearDown function " +
+                        "didn't correctly remove all the GameObjects, or you used Destroy instead of DestroyImmediate. Otherwise this might be intended behavior for " +
+                        "the custom tests you wrote, in which case you can ignore this error.");
+                    sceneWarningPrinted = true;
+                }
             }
 
             result = Result.None;
@@ -264,7 +270,7 @@ namespace UnityTest
                 else
                 {
                     try { StartCoroutine(method.Invoke(gameObject.GetComponent(method.DeclaringType), new object[] { gameObject }) as System.Collections.IEnumerator); }
-                    catch (TargetException) { Debug.LogError("Each unit test must be static"); }
+                    catch (TargetException) { Debug.LogError("TargetException was thrown (1). Please submit a bug report."); }
                 }
             }
             else
@@ -277,7 +283,7 @@ namespace UnityTest
                 else
                 {
                     try { method.Invoke(gameObject.GetComponent(method.DeclaringType), new object[] { gameObject }); } // probably of type void
-                    catch (TargetException) { Debug.LogError("Each unit test must be static"); }
+                    catch (TargetException) { Debug.LogError("TargetException was thrown (2). Please submit a bug report."); }
                 }
                 OnRunComplete();
             }
@@ -358,11 +364,20 @@ namespace UnityTest
         public Object GetScript()
         {
             if (script != null) return script;
+            
+            // Intercept trying to load the ExampleTests.cs script from the package folder
+            string internalDir = Path.Join(Path.Join(Path.Join(".", "Packages"), "UnityTest"), "Runtime");
+            if (Path.GetDirectoryName(attribute.sourceFile) == internalDir)
+            {
+                script = AssetDatabase.LoadAssetAtPath(attribute.sourceFile, typeof(MonoScript));
+                return script;
+            }
 
             string pathToSearch = Path.GetDirectoryName(Path.Join(
                 Path.GetFileName(Application.dataPath),     // Usually it's "Assets", unless Unity ever changes that
                 Path.GetRelativePath(Application.dataPath, attribute.sourceFile))
             );
+
 
             string basename = Path.GetFileName(attribute.sourceFile);
 

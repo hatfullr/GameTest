@@ -1,5 +1,4 @@
 using UnityEngine;
-using UnityEngine.Assertions;
 
 /// <summary>
 /// This is just for showing helpful (hopefully) Unit Test examples
@@ -38,7 +37,7 @@ namespace UnityTest
         /// GameObjects that you created in SetUp, you can specify your own TearDown method. It must accept a GameObject which
         /// is the same one that was returned by SetUp.
         /// </summary>
-        private static void TearDown(GameObject testObject)
+        private void TearDown(GameObject testObject)
         {
             ExampleTests script = testObject.GetComponent<ExampleTests>();
             // This will destroy both the parent we created in SetUp and the GameObject this Component is attached to.
@@ -50,25 +49,25 @@ namespace UnityTest
         [UnityTest.Test("Examples/SimpleFail")]
         private void SimpleFail(GameObject testObject)
         {
-            Assert.IsTrue(false, "You can include a message describing this test.");
+            UnityTest.Assert.IsTrue(false, "You can include a message describing this test.");
         }
 
         [UnityTest.Test("Examples/SimplePass")]
         private void SimplePass(GameObject testObject)
         {
-            Assert.IsTrue(true); // or no message
+            UnityTest.Assert.IsTrue(true); // or no message
         }
 
         /// <summary>
         /// You specify the exact SetUp and TearDown functions for each Unit Test, so you can make SetUp and TearDown
         /// functions for each one of them if you like.
         /// </summary>
-        [UnityTest.Test("Examples/SetUpTearDown", nameof(SetUp), nameof(TearDown), true)]
+        [UnityTest.Test("Examples/SetUpTearDown", nameof(SetUp), nameof(TearDown), false)]
         private void SetUpTearDown(GameObject testObject)
         {
             // Let the test fail so that it can be seen in the scene hierarchy that there is a GameObject with name "Test Parent"
             // and it has a child "ExampleTests (SetUpExample)" as defined in the SetUp script.
-            Assert.IsTrue(false, "SetUpTearDown is meant to fail");
+            UnityTest.Assert.IsTrue(false, "SetUpTearDown is meant to fail");
         }
     }
 

@@ -4,7 +4,6 @@ using UnityEditor;
 using System.Reflection;
 using System.Linq;
 using UnityEditor.SceneManagement;
-using UnityEngine.EventSystems;
 
 namespace UnityTest
 {
@@ -47,11 +46,22 @@ namespace UnityTest
 
         private static bool debug;
         private static bool showWelcome = true;
+
+        /// <summary>
+        /// current frame
+        /// </summary>
         private static bool playButtonPressed = false;
+
+        /// <summary>
+        /// previous frame
+        /// </summary>
+        private static bool playButtonWasPressed = false;
 
         private int previousFrameNumber;
 
         private Dictionary<string, GUIStyle> styles;
+
+        private static bool ranTests = false;
 
         private static string[] fonts;
 
@@ -64,6 +74,8 @@ namespace UnityTest
                 return _settings;
             }
         }
+
+        private static bool startCalled;
 
         private void Reset()
         {
@@ -89,6 +101,7 @@ namespace UnityTest
             fonts = null;
             playButtonPressed = false;
             finishedTests = new List<Test>();
+            ranTests = false;
 
             Foldout.all = new Dictionary<string, Foldout>();
 
@@ -99,7 +112,7 @@ namespace UnityTest
 
         public void AddItemsToMenu(GenericMenu menu)
         {
-            menu.AddItem(new GUIContent("Reset"), false, Reset);
+            menu.AddItem(new GUIContent("Reset"), false, ShowResetConfirmation);
         }
 
         private void InitializeStyles()
@@ -303,10 +316,16 @@ namespace UnityTest
             UpdateCachedTests();
             CreateTests();
             CreateFoldouts();
+        }
 
-            if (playButtonPressed)
+        /// <summary>
+        /// Implementing my own Start function because we need it
+        /// </summary>
+        private void Start()
+        {
+            startCalled = true;
+            if (EditorApplication.isPlaying && playButtonPressed)
             {
-                playButtonPressed = false;
                 RunSelected();
             }
         }
@@ -325,6 +344,14 @@ namespace UnityTest
             {
                 Focus();
             }
+
+
+            if (change == PlayModeStateChange.EnteredEditMode)
+            {
+                playButtonWasPressed = false;
+                playButtonPressed = false;
+                Repaint();
+            }
         }
 
         void OnDisable()
@@ -341,6 +368,7 @@ namespace UnityTest
         void Update()
         {
             if (!Application.isPlaying) return;
+            if (!startCalled) Start();
             Repaint();
             if (Time.frameCount > previousFrameNumber) OnUpdate();
             previousFrameNumber = Time.frameCount;
@@ -348,7 +376,7 @@ namespace UnityTest
 
         private void OnUpdate()
         {
-            if (!Application.isPlaying)
+            if (!EditorApplication.isPlaying)
             {
                 // Make sure the queue is cleared in this case
                 queue.Clear();
@@ -370,6 +398,7 @@ namespace UnityTest
             nframes = 0;
             Test test = queue.Dequeue();
             if (debug) Debug.Log("(UnityTest) Running " + test.attribute.path, test.GetScript());
+            ranTests = true;
             test.Run();
             finishedTests.Add(test);
             if (debug)
@@ -393,24 +422,14 @@ namespace UnityTest
 
         private void UpdateMethods()
         {
-            // Inspired by https://stackoverflow.com/a/46360267
-
-            IEnumerable<System.Type> types = typeof(Test).Assembly.GetTypes().Where(x => x.IsClass);
-            
+            // This hits all assemblies
+            IEnumerable<System.Type> types = System.AppDomain.CurrentDomain.GetAssemblies() // Returns all currenlty loaded assemblies
+                .SelectMany(x => x.GetTypes()) // returns all types defined in these assemblies
+                .Where(x => x.IsClass); // only yields classes
             List<MethodInfo> _methods = types
                 .SelectMany(x => x.GetMethods(Test.bindingFlags))
                 .Where(x => x.GetCustomAttributes(typeof(TestAttribute), false).FirstOrDefault() != null).ToList();
-
             List<System.Type> classes = types.Where(x => x.GetCustomAttributes(typeof(SuiteAttribute), false).FirstOrDefault() != null).ToList();
-
-            // This hits all assemblies, but it's a lot slower.
-            /*
-            List<MethodInfo> _methods = new List<MethodInfo>(System.AppDomain.CurrentDomain.GetAssemblies() // Returns all currenlty loaded assemblies
-                .SelectMany(x => x.GetTypes()) // returns all types defined in this assemblies
-                .Where(x => x.IsClass) // only yields classes
-                .SelectMany(x => x.GetMethods(BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly | BindingFlags.Static)) // returns all methods defined in those classes
-                .Where(x => x.GetCustomAttributes(typeof(TestAttribute), false).FirstOrDefault() != null)); // returns only methods that have the TestAttribute
-            */
 
             methods.Clear();
             foreach (MethodInfo method in _methods)
@@ -566,10 +585,6 @@ namespace UnityTest
             foreach (Test test in rootFoldout.GetTests())
                 if (test.selected) queue.Enqueue(test);// test.Run();
         }
-        private void RunAll()
-        {
-            foreach (Test test in tests.Values) queue.Enqueue(test);// test.Run();
-        }
 
         private void ResetSelected()
         {
@@ -603,15 +618,18 @@ namespace UnityTest
             public bool allSelected { get; private set; }
             public bool selectedHaveResults { get; private set; }
             public bool anyResults { get; private set; }
+            public bool anyFailed { get; private set; }
 
             public State(Foldout rootFoldout)
             {
                 if (rootFoldout == null) return;
                 allSelected = true;
                 anyResults = false;
+                anyFailed = false;
                 foreach (Test test in rootFoldout.GetTests())
                 {
                     if (test.result != Test.Result.None) anyResults = true;
+                    if (test.result == Test.Result.Fail) anyFailed = true;
 
                     if (test.locked)
                     {
@@ -642,7 +660,6 @@ namespace UnityTest
 
             State state = new State(rootFoldout);
             
-            bool runSelected = false;
             bool refresh = false;
             bool selectAll = false;
             bool deselectAll = false;
@@ -655,7 +672,7 @@ namespace UnityTest
                 EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
                 {
                     // Left
-                    runSelected = DrawPlayButton(state);
+                    DrawPlayButton(state);
                     DrawGoToEmptySceneButton();
 
                     bool[] result = DrawUniversalToggle(state);
@@ -702,19 +719,24 @@ namespace UnityTest
 
             GUI.enabled = wasEnabled;
 
-            // Doing things this way avoids annoying GUI errors complaining about groups not being ended properly.
-            if (runSelected) RunSelected();
-            else if (refresh) Refresh();
-            else if (selectAll) SelectAll();
-            else if (deselectAll) DeselectAll();
+            
 
             GUIQueue.Draw();
 
-            if (playButtonPressed)
+            //if ((queue.Count == 0 || Test.isTesting) && playButtonPressed) playButtonPressed = false;
+
+            if (playButtonPressed != playButtonWasPressed) // On the state change
             {
                 if (EditorApplication.isPlaying) EditorApplication.ExitPlaymode();
                 else EditorApplication.EnterPlaymode();
+
             }
+            else if (!playButtonPressed && playButtonWasPressed && !ranTests) RunSelected();
+
+            // Doing things this way avoids annoying GUI errors complaining about groups not being ended properly.
+            if (refresh) Refresh();
+            else if (selectAll) SelectAll();
+            else if (deselectAll) DeselectAll();
         }
 
         private bool[] DrawUniversalToggle(State state)
@@ -780,17 +802,15 @@ namespace UnityTest
             GUI.enabled = wasEnabled;
         }
 
-        private bool DrawPlayButton(State state)
+        private void DrawPlayButton(State state)
         {
             bool wasEnabled = GUI.enabled;
-            
             GUIContent run = new GUIContent(EditorGUIUtility.IconContent("PlayButton"));
             run.tooltip = "Run selected tests";
             GUI.enabled = state.anySelected;
-            bool ret = GUILayout.Toggle(playButtonPressed, run, EditorStyles.toolbarButton);
+            playButtonWasPressed = playButtonPressed;
+            playButtonPressed = GUILayout.Toggle(playButtonPressed, run, EditorStyles.toolbarButton); // true on mouse release, false otherwise
             GUI.enabled = wasEnabled;
-            if (ret) playButtonPressed = true;
-            return ret;
         }
 
         private void DrawGoToEmptySceneButton()
@@ -828,6 +848,22 @@ namespace UnityTest
             image.tooltip = "Show/hide the welcome message";
             showWelcome = GUILayout.Toggle(showWelcome, image, EditorStyles.toolbarButton);
         }
+
+        /// <summary>
+        /// Say "are you sure?"
+        /// </summary>
+        private void ShowResetConfirmation()
+        {
+            if (EditorPrefs.GetString(nameof(TestManager)) == GetString(GetTests())) return; // no data to lose
+            if (!EditorUtility.DisplayDialog("Reset UnityTest Manager?", "Are you sure? This will clear all saved information about tests, GameObjects, etc. " +
+                "If you have encountered a bug, first try closing the UnityTest Manager and opening it again.",
+                "Yes", "No"
+            //DialogOptOutDecisionType.ForThisMachine, "reset UnityTest Manager"
+            )) return;
+            // User clicked "OK"
+            Reset();
+        }
+
 
         public class Settings : EditorWindow
         {
@@ -923,6 +959,8 @@ namespace UnityTest
                 
             }
         }
+
+
 
         public class Foldout
         {
@@ -1412,126 +1450,101 @@ namespace UnityTest
             // The queue window
             EditorGUILayout.BeginVertical(GUILayout.ExpandWidth(true), GUILayout.Height(height));
             {
-                // "Current" space
-                EditorGUILayout.BeginVertical();
-                {
-                    GUI.enabled = true;
-                    EditorGUILayout.BeginHorizontal();
-                    {
-                        float previousLabelWidth = EditorGUIUtility.labelWidth;
-                        EditorGUIUtility.labelWidth = 0f;
-                        float width = EditorStyles.boldLabel.CalcSize(new GUIContent("Current")).x;
-
-                        EditorGUILayout.LabelField("Current", EditorStyles.boldLabel, GUILayout.Width(width));
-                        GUILayout.FlexibleSpace();
-
-                        GUILayout.Label("frame " + string.Format("{0,8}", TestManager.nframes) + "    " + TestManager.timer.ToString("0.0000 s"));
-
-                        EditorGUIUtility.labelWidth = previousLabelWidth;
-                    }
-                    EditorGUILayout.EndHorizontal();
-                    GUI.enabled = false;
-
-                    Rect rect = EditorGUILayout.GetControlRect(false);
-                    rect.height += EditorStyles.helpBox.padding.vertical;
-                    GUI.Box(rect, GUIContent.none, "HelpBox");
-                    rect.x += EditorStyles.helpBox.padding.left;
-                    rect.width -= EditorStyles.helpBox.padding.horizontal;
-                    rect.y += EditorStyles.helpBox.padding.top;
-                    rect.height -= EditorStyles.helpBox.padding.vertical;
-                    Test next = null;
-                    if (TestManager.queue.Count > 0) next = TestManager.queue.Peek();
-                    if (Test.current == null && next != null) DrawQueueTest(rect, next, true);
-                    else if (Test.current != null) DrawQueueTest(rect, Test.current, true);
-                    GUI.enabled = true;
-                }
-                EditorGUILayout.EndVertical();
+                DrawQueueCurrent();
 
                 EditorGUILayout.Space();
 
+                // Get the width here so we can properly size the controls to come
+                Rect previous = GUILayoutUtility.GetLastRect();
 
                 // "Queue" space
                 EditorGUILayout.BeginHorizontal();
                 {
-                    EditorGUILayout.BeginVertical(GUILayout.ExpandWidth(true));
-                    {
-                        // header labels for the queue
-                        GUI.enabled = true;
-                        EditorGUILayout.BeginHorizontal();
-                        {
-                            GUIContent label = new GUIContent("Queued");
-                            float width = EditorStyles.boldLabel.CalcSize(label).x;
-                            EditorGUILayout.LabelField(label, EditorStyles.boldLabel, GUILayout.Width(width));
-                            GUILayout.FlexibleSpace();
-                            GUI.enabled = TestManager.queue.Count > 0;
-                            label = new GUIContent("Clear");
-                            width = GUI.skin.button.CalcSize(label).x;
-                            if (GUILayout.Button(label, GUILayout.Width(width))) TestManager.queue.Clear();
-                            GUI.enabled = true;
-                        }
-                        EditorGUILayout.EndHorizontal();
-
-                        // Queue area
-                        EditorGUILayout.BeginVertical("HelpBox");
-                        {
-                            GUI.enabled = true;
-                            queueScrollPosition = EditorGUILayout.BeginScrollView(queueScrollPosition, false, false);
-                            {
-                                GUI.enabled = false;
-                                foreach (Test test in TestManager.queue) DrawQueueTest(test, false);
-                                GUI.enabled = true;
-                            }
-                            EditorGUILayout.EndScrollView();
-                        }
-                        EditorGUILayout.EndVertical();
-                    }
-                    EditorGUILayout.EndVertical();
-
-                    EditorGUILayout.BeginVertical(GUILayout.ExpandWidth(true));
-                    {
-                        // header labels for the "finished" area
-                        GUI.enabled = true;
-                        EditorGUILayout.BeginHorizontal();
-                        {
-                            GUIContent label = new GUIContent("Finished");
-                            float width = EditorStyles.boldLabel.CalcSize(label).x;
-                            EditorGUILayout.LabelField(label, EditorStyles.boldLabel, GUILayout.Width(width));
-                            GUILayout.FlexibleSpace();
-                            GUI.enabled = TestManager.finishedTests.Count > 0;
-                            label = new GUIContent("Clear");
-                            width = GUI.skin.button.CalcSize(label).x;
-                            if (GUILayout.Button(label, GUILayout.Width(width))) TestManager.finishedTests.Clear();
-                            GUI.enabled = true;
-                        }
-                        EditorGUILayout.EndHorizontal();
-
-                        // "Finished" area
-                        GUI.enabled = false;
-                        EditorGUILayout.BeginVertical("HelpBox");
-                        {
-                            GUI.enabled = true;
-                            finishedScrollPosition = EditorGUILayout.BeginScrollView(finishedScrollPosition, false, false);
-                            {
-                                GUI.enabled = false;
-                                foreach (Test test in TestManager.finishedTests) DrawQueueTest(test, false);
-                                GUI.enabled = true;
-                            }
-                            EditorGUILayout.EndScrollView();
-                        }
-                        EditorGUILayout.EndVertical();
-                    }
-                    EditorGUILayout.EndVertical();
+                    DrawQueue("Queued", TestManager.queue.ToList(), queueScrollPosition);
+                    DrawQueue("Finished", TestManager.finishedTests, finishedScrollPosition, true);
                 }
                 EditorGUILayout.EndHorizontal();
-                
             }
-            EditorGUILayout.EndHorizontal();
+            EditorGUILayout.EndVertical();
 
             mainRect = GUILayoutUtility.GetLastRect();
 
             GUI.enabled = wasEnabled;
 
             ProcessEvents();
+        }
+
+        private static void DrawQueue(string title, List<Test> queue, Vector2 scrollPosition, bool paintResultFeatures = false)
+        {
+            EditorGUILayout.BeginVertical();
+            {
+                // header labels for the queue
+                GUI.enabled = true;
+                EditorGUILayout.BeginHorizontal();
+                {
+                    EditorGUILayout.LabelField(title, EditorStyles.boldLabel);
+                    GUILayout.FlexibleSpace();
+                    GUI.enabled = queue.Count > 0;
+                    if (GUILayout.Button("Clear")) queue.Clear();
+                    GUI.enabled = true;
+                }
+                EditorGUILayout.EndHorizontal();
+
+                // Queue area
+                EditorGUILayout.BeginVertical("HelpBox", GUILayout.ExpandWidth(false));
+                {
+                    GUI.enabled = true;
+                    scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition, false, false);
+                    {
+                        GUI.enabled = false;
+                        foreach (Test test in queue) DrawQueueTest(test, paintResultFeatures);
+                        GUI.enabled = true;
+                    }
+                    EditorGUILayout.EndScrollView();
+                }
+                EditorGUILayout.EndVertical();
+            }
+            EditorGUILayout.EndVertical();
+        }
+
+        private static void DrawQueueCurrent()
+        {
+            // "Current" space
+            EditorGUILayout.BeginVertical();
+            {
+                GUI.enabled = true;
+                EditorGUILayout.BeginHorizontal();
+                {
+                    float previousLabelWidth = EditorGUIUtility.labelWidth;
+                    EditorGUIUtility.labelWidth = 0f;
+                    float width = EditorStyles.boldLabel.CalcSize(new GUIContent("Current")).x;
+
+                    EditorGUILayout.LabelField("Current", EditorStyles.boldLabel, GUILayout.Width(width));
+                    GUILayout.FlexibleSpace();
+
+                    GUI.enabled = false;
+                    GUILayout.Label("frame " + string.Format("{0,8}", TestManager.nframes) + "    " + TestManager.timer.ToString("0.0000 s"));
+                    GUI.enabled = true;
+
+                    EditorGUIUtility.labelWidth = previousLabelWidth;
+                }
+                EditorGUILayout.EndHorizontal();
+                GUI.enabled = false;
+
+                Rect rect = EditorGUILayout.GetControlRect(false);
+                rect.height += EditorStyles.helpBox.padding.vertical;
+                GUI.Box(rect, GUIContent.none, "HelpBox");
+                rect.x += EditorStyles.helpBox.padding.left;
+                rect.width -= EditorStyles.helpBox.padding.horizontal;
+                rect.y += EditorStyles.helpBox.padding.top;
+                rect.height -= EditorStyles.helpBox.padding.vertical;
+                Test next = null;
+                if (TestManager.queue.Count > 0) next = TestManager.queue.Peek();
+                if (Test.current == null && next != null) DrawQueueTest(rect, next, true);
+                else if (Test.current != null) DrawQueueTest(rect, Test.current, true);
+                GUI.enabled = true;
+            }
+            EditorGUILayout.EndVertical();
         }
 
         private static void DrawQueueTest(Rect rect, Test test, bool paintResultFeatures = true)
@@ -1542,8 +1555,7 @@ namespace UnityTest
         private static void DrawQueueTest(Test test, bool paintResultFeatures = true)
         {
             Rect rect = EditorGUILayout.GetControlRect(false);
-            if (paintResultFeatures) Test.PaintResultFeatures(rect, test.result);
-            GUI.Label(rect, test.attribute.path);
+            DrawQueueTest(rect, test, paintResultFeatures);
         }
 
         private static void DrawSplitter()
