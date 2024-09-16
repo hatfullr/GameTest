@@ -1,31 +1,63 @@
 # UnityTest
-A testing framework for the Unity editor that helps you maintain and debug your code without requiring "assembly definition" files, unlike the [Unity Test Framework](https://docs.unity3d.com/Packages/com.unity.test-framework@1.4/manual/index.html) (UTF).
+A testing framework for the Unity editor that helps you maintain and debug your code without requiring "assembly definition" (`*.asmdef`) files, unlike the [Unity Test Framework](https://docs.unity3d.com/Packages/com.unity.test-framework@1.4/manual/index.html) (UTF). However, `UnityTest` also still works with `*.asmdef` files.
 
-##Features
+## Features
 1. No `*.asmdef` files required.
-   - UTF requires assembly definition (`*.asmdef`) files in your project. This can create significant overhead for projects which do not already contain `*.asmdef` files, as all existing code must be organized into separate assemblies by hand. This can cause unsolvable dependency issues, rendering UTF unusable `UnityTest` requires no such prerequisite work.
-2. Run your tests directly from a Unity editor window.
-   - Select which tests to run.
-   - See the results directly in the editor window or in the console.
-3. Write test methods directly within your classes.
-   - Simply add an attribute above any method in any class to make it show in the UnityTest Manager window.
-4. Setup and teardown functions can be created for each test for finer control.
-   - By default, a test created as in (3) will instantiate a `GameObject` with the `MonoBehaviour` class attached to it. This is then passed as input to your test method in (3). You can instead programmatically create your own `GameObject` in a setup method, and cleanup your test in a teardown method.
-5. Create your own test suite classes for finer control.
-   - Each suite behaves similar to a `MonoBehaviour`, in that an inspector is available for linking object references and setting variable values. Each method in the suite works like the test methods in (3), with the benefit of residing in a separate class. This can be helpful for larger tests.
-6. Create complex testing environment prefabs.
-   - Most games require a specific code to function under specific conditions, such as an enemy being in a certain location or the player providing a series of inputs. You can create such environments by hand in the editor and save it as a prefab. Place that prefab in the "Default Prefab" field to instantiate it at the start of the test.
+2. Run and manage tests in an editor window.
+3. Write test methods in any class. AND/OR,
+4. Write test suites separate from your code.
+5. Create complex testing environment prefabs.
 
 ----------------------------
 
-##Getting Started
-1. 
+## Installation
+### Unity Package
+Under construction.
+
+### Simple
+1. Download the `*.cs` scripts from the `Runtime` folder and place them anywhere inside your project.
+2. Download `Editor/TestManager.cs` and move it into a folder named `Editor` in the `Assets` directory of your project.
 
 
+## Quick Start
+Unit testing is intended to make sure code runs properly even after other systems have been introduced. However, the following example keeps things simple. Suppose you have some Unity class called `Example`:
+```C#
+using UnityEngine;
 
+public class Example : MonoBehaviour
+{
+    public int number;
 
-##Test Methods
+    private void Method()
+    {
+        number++;
+    }
+}
+```
+Are we sure that `Method` actually increments `number` as we expect? Let's make a test to be sure:
+```C#
+using UnityEngine;
+using UnityTest;
 
+public class Example : MonoBehaviour
+{
+    public int number;
 
+    private void Method()
+    {
+        number++;
+    }
 
-##Test Suites
+    [Test("Method")] // Create a unit test with the name "Method"
+    private void TestMethod(GameObject gameObject)
+    {
+        Example script = gameObject.GetComponent<Example>(); // Get the Example component
+        int previous = script.number; // Store the previous value of "number"
+        script.Method(); // Increment "number"
+        Assert.AreEqual(previous + 1, script.number); // Check if the increment worked
+    }
+}
+```
+Open the test manager at `Window > UnityTest Manager`, check the box where you see "Method" and press the play button in the top left of the window (not the main editor play button). The editor will then enter Play mode and run the test by instantiating a `GameObject` with an attached `Example` component, and then calling `TestMethod` on it.
+
+If it appears as though nothing happened, then the test ran successfully. If you prefer a more detailed report, enable "debug" mode by clicking the bug icon in the top right of the window.

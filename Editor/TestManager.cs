@@ -4,6 +4,7 @@ using UnityEditor;
 using System.Reflection;
 using System.Linq;
 using UnityEditor.SceneManagement;
+using System.IO;
 
 namespace UnityTest
 {
@@ -44,7 +45,7 @@ namespace UnityTest
         private static float indentWidth;
         private static int indentLevel;
 
-        private static bool debug;
+        private static bool debug = true;
         private static bool showWelcome = true;
 
         /// <summary>
@@ -287,6 +288,24 @@ namespace UnityTest
                     cachedTests[path].attribute.UpdateFrom(attributes[path]);
                 }
             }
+
+            // If a test was removed since last load, we need to update our Foldouts accordingly
+            HashSet<string> expected = new HashSet<string>(); // HashSet = unique values only
+            foreach (Test test in cachedTests.Values)
+            {
+                expected.Add(Path.GetDirectoryName(test.attribute.path));
+            }
+
+            foreach (string path in new List<string>(cachedFoldouts.Keys))
+            {
+                if (expected.Contains(path)) continue;
+                cachedFoldouts.Remove(path);
+            }
+            foreach (string path in new List<string>(Foldout.all.Keys))
+            {
+                if (expected.Contains(path)) continue;
+                Foldout.all.Remove(path);
+            }
         }
 
         /// <summary>
@@ -365,6 +384,7 @@ namespace UnityTest
             Draw();
         }
 
+        [HideInCallstack]
         void Update()
         {
             if (!Application.isPlaying) return;
@@ -374,6 +394,7 @@ namespace UnityTest
             previousFrameNumber = Time.frameCount;
         }
 
+        [HideInCallstack]
         private void OnUpdate()
         {
             if (!EditorApplication.isPlaying)
@@ -397,20 +418,21 @@ namespace UnityTest
             timer = 0f;
             nframes = 0;
             Test test = queue.Dequeue();
-            if (debug) Debug.Log("(UnityTest) Running " + test.attribute.path, test.GetScript());
             ranTests = true;
             test.Run();
-            finishedTests.Add(test);
             if (debug)
             {
                 if (test.result == Test.Result.Pass)
-                    Debug.Log("(UnityTest) Pass: " + test.attribute.path, test.GetScript());
+                    Debug.Log("[UnityTest] <color=green>" + test.attribute.path + "</color>", test.GetScript());
                 else if (test.result == Test.Result.Fail)
-                    Debug.LogError("(UnityTest) Fail: " + test.attribute.path, test.GetScript());
+                    Debug.LogError("[UnityTest] <color=red>" + test.attribute.path + "</color>", test.GetScript());
                 else if (test.result == Test.Result.None)
-                    Debug.LogWarning("(UnityTest) Inconclusive: " + test.attribute.path, test.GetScript());
+                    Debug.LogWarning("[UnityTest] <color=yellow>" + test.attribute.path + "</color>", test.GetScript());
                 else throw new System.NotImplementedException(test.result.ToString());
+
+                if (queue.Count == 0) Debug.Log("[UnityTest] Finished");
             }
+            finishedTests.Add(test);
         }
 
 
