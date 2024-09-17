@@ -1,0 +1,15 @@
+{
+  "name": "unitytest",
+  "version": "0.0.0",
+  "displayName": "UnityTest",
+  "description": "Create and manage unit tests.",
+  "author": "Roger Hatfull",
+  "changelogUrl": "https://github.com/hatfullr/UnityTest",
+  "keywords": [
+     "test",
+	 "unit",
+	 "unitytest"
+  ],
+  "license": "See LICENSE file",
+  "type": "tool"
+}

@@ -1,0 +1,16 @@
+{
+    "name": "unitytest.Editor",
+    "rootNamespace": "",
+    "references": [
+        "GUID:219fefa90e8f60742934de6d5718c1bb"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
