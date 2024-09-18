@@ -760,7 +760,7 @@ namespace UnityTest
                         "Create your tests in any C# class in the Assets folder by simply writing a method with a UnityTest.Test attribute. " +
                         "See the included README for additional information. Happy testing!" + "\n\n" +
                         "If you would like to support this project, please donate at _____________________. Any amount is greatly appreciated; it keeps me fed :)" + "\n\n" +
-                        "To hide this message, press the speech bubble in the toolbar below."
+                        "To hide this message, press the speech bubble in the toolbar above."
                     , MessageType.Info);
                 }
                 GUI.enabled = wasEnabled;
