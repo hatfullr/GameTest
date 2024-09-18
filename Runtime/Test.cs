@@ -23,7 +23,7 @@ namespace UnityTest
         public MethodInfo method;
         public TestAttribute attribute { get; private set; }
 
-        private static Dictionary<string, Color> previousGUIColors;
+        public bool isExample { get; private set; } = false;
 
         public GameObject defaultGameObject
         {
@@ -364,20 +364,25 @@ namespace UnityTest
         public Object GetScript()
         {
             if (script != null) return script;
-            
+
+            isExample = false;
+
+            string pathToSearch;
+
             // Intercept trying to load the ExampleTests.cs script from the package folder
             string internalDir = Path.Join(Path.Join(Path.Join(".", "Packages"), "UnityTest"), "Runtime");
             if (Path.GetDirectoryName(attribute.sourceFile) == internalDir)
             {
-                script = AssetDatabase.LoadAssetAtPath(attribute.sourceFile, typeof(MonoScript));
-                return script;
+                pathToSearch = Path.Join("Packages", "UnityTest", "Runtime");
+                isExample = true;
             }
-
-            string pathToSearch = Path.GetDirectoryName(Path.Join(
-                Path.GetFileName(Application.dataPath),     // Usually it's "Assets", unless Unity ever changes that
-                Path.GetRelativePath(Application.dataPath, attribute.sourceFile))
-            );
-
+            else
+            {
+                pathToSearch = Path.GetDirectoryName(Path.Join(
+                    Path.GetFileName(Application.dataPath),     // Usually it's "Assets", unless Unity ever changes that
+                    Path.GetRelativePath(Application.dataPath, attribute.sourceFile))
+                );
+            }
 
             string basename = Path.GetFileName(attribute.sourceFile);
 
@@ -491,49 +496,6 @@ namespace UnityTest
             EditorGUI.showMixedValue = wasMixed;
 
             return new List<bool> { selected, locked };
-        }
-
-        /// <summary>
-        /// Set the color of the GUI based on the provided result. To set the colors back to what they were before, use Test.ResetGUIColor().
-        /// Use isRunning to indicate that the colors are being set for a Test that is currently running.
-        /// </summary>
-        public static void SetGUIColor(Test.Result result, bool isRunning = false)
-        {
-            if (previousGUIColors == null) previousGUIColors = new Dictionary<string, Color> {
-                {           "color", GUI.color           },
-                { "backgroundColor", GUI.backgroundColor },
-                {    "contentColor", GUI.contentColor    },
-            };
-            if (result == Test.Result.None && isRunning)
-            {
-                GUI.color = Color.yellow;
-                return;
-            }
-            if (result == Test.Result.Pass)
-            {
-                GUI.backgroundColor = Color.green;
-                return;
-            }
-            if (result == Test.Result.Fail)
-            {
-                GUI.backgroundColor = Color.red;
-                //GUI.contentColor = Color.white;
-                return;
-            }
-        }
-
-        /// <summary>
-        /// Return the GUI colors back to what they were before the first Test.SetGUIColor() call.
-        /// </summary>
-        public static void ResetGUIColor()
-        {
-            if (previousGUIColors == null) return;
-
-            GUI.color = previousGUIColors["color"];
-            GUI.backgroundColor = previousGUIColors["backgroundColor"];
-            GUI.contentColor = previousGUIColors["contentColor"];
-
-            previousGUIColors = null;
         }
 
         public void Draw(Rect rect, bool showLock = true, bool showFoldout = true, bool allowExpand = true)

@@ -447,13 +447,54 @@ namespace UnityTest
         private void UpdateMethods()
         {
             // This hits all assemblies
-            IEnumerable<System.Type> types = System.AppDomain.CurrentDomain.GetAssemblies() // Returns all currenlty loaded assemblies
-                .SelectMany(x => x.GetTypes()) // returns all types defined in these assemblies
-                .Where(x => x.IsClass); // only yields classes
-            List<MethodInfo> _methods = types
-                .SelectMany(x => x.GetMethods(Test.bindingFlags))
-                .Where(x => x.GetCustomAttributes(typeof(TestAttribute), false).FirstOrDefault() != null).ToList();
-            List<System.Type> classes = types.Where(x => x.GetCustomAttributes(typeof(SuiteAttribute), false).FirstOrDefault() != null).ToList();
+            Assembly[] assemblies = System.AppDomain.CurrentDomain.GetAssemblies();
+
+            List<MethodInfo> _methods = new List<MethodInfo>();
+            List<System.Type> classes = new List<System.Type>();
+            foreach (Assembly assembly in assemblies)
+            {
+                foreach (System.Type type in assembly.GetTypes())
+                {
+                    if (!type.IsClass) continue; // only work with classes
+
+                    // Fetch the test methods
+                    foreach (MethodInfo method in type.GetMethods(Test.bindingFlags))
+                    {
+                        // Make sure the method has the TestAttribute decorator
+                        object[] attributes = method.GetCustomAttributes(typeof(TestAttribute), false);
+                        if (attributes.Length == 0) continue;
+                        bool hasAttribute = false;
+                        foreach (object attribute in attributes)
+                        {
+                            if (attribute.GetType() != typeof(TestAttribute)) continue;
+                            hasAttribute = true;
+                            break;
+                        }
+                        if (!hasAttribute) continue;
+
+                        // It has the TestAttribute decorator
+                        _methods.Add(method);
+                    }
+
+                    // Fetch the test suites
+                    foreach (object attribute in type.GetCustomAttributes(typeof(SuiteAttribute), false))
+                    {
+                        if (attribute.GetType() != typeof(SuiteAttribute)) continue;
+                        // Yes, this type has our SuiteAttribute
+                        classes.Add(type);
+                        break;
+                    }
+                }
+            }
+
+
+            //IEnumerable<System.Type> types = assemblies // Returns all currenlty loaded assemblies
+            //    .SelectMany(x => x.GetTypes()) // returns all types defined in these assemblies
+            //    .Where(x => x.IsClass); // only yields classes
+            //List<MethodInfo> _methods = types
+            //    .SelectMany(x => x.GetMethods(Test.bindingFlags))
+            //    .Where(x => x.GetCustomAttributes(typeof(TestAttribute), false).FirstOrDefault() != null).ToList();
+            //List<System.Type> classes = types.Where(x => x.GetCustomAttributes(typeof(SuiteAttribute), false).FirstOrDefault() != null).ToList();
 
             methods.Clear();
             foreach (MethodInfo method in _methods)
