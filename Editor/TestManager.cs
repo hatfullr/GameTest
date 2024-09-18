@@ -71,8 +71,6 @@ namespace UnityTest
 
         private static bool ranTests = false;
 
-        private static string[] fonts;
-
         private static Settings _settings;
         private static Settings settings
         {
@@ -106,7 +104,6 @@ namespace UnityTest
             methods = new SortedDictionary<TestAttribute, MethodInfo>();
             rootFoldout = null;
             refreshing = false;
-            fonts = null;
             playButtonPressed = false;
             finishedTests = new List<Test>();
             ranTests = false;
@@ -633,7 +630,6 @@ namespace UnityTest
             }
             
             refreshing = false;
-            Debug.Log("Refreshed UnityTest Manager");
         }
 
         private void GoToEmptyScene()
@@ -729,7 +725,7 @@ namespace UnityTest
             // The main window
             EditorGUILayout.BeginVertical();
             {
-                GUI.enabled &= !updatingMethods;
+                GUI.enabled &= !updatingMethods && !refreshing;
                 // Toolbar controls
                 EditorGUILayout.BeginHorizontal(EditorStyles.toolbar);
                 {
@@ -793,12 +789,12 @@ namespace UnityTest
             }
             EditorGUILayout.EndVertical();
 
-            GUI.enabled = wasEnabled && !updatingMethods;
+            GUI.enabled = wasEnabled && !updatingMethods && !refreshing;
             GUIQueue.Draw();
             GUI.enabled = wasEnabled;
 
 
-            if (!updatingMethods)
+            if (!updatingMethods && !refreshing)
             {
                 if (playButtonPressed != playButtonWasPressed) // On the state change
                 {
@@ -882,7 +878,7 @@ namespace UnityTest
             bool wasEnabled = GUI.enabled;
             GUIContent clear = new GUIContent(EditorGUIUtility.IconContent("d_clear"));
             clear.tooltip = "Clear selected Test results";
-            GUI.enabled = state.selectedHaveResults && !updatingMethods;
+            GUI.enabled &= state.selectedHaveResults;
 
             Rect clearRect = GUILayoutUtility.GetRect(clear, EditorStyles.toolbarDropDown);
             if (EditorGUI.DropdownButton(clearRect, clear, FocusType.Passive, EditorStyles.toolbarDropDown))
@@ -904,7 +900,7 @@ namespace UnityTest
             bool wasEnabled = GUI.enabled;
             GUIContent run = new GUIContent(EditorGUIUtility.IconContent("PlayButton"));
             run.tooltip = "Run selected tests";
-            GUI.enabled = state.anySelected && !updatingMethods;
+            GUI.enabled &= state.anySelected;
             playButtonWasPressed = playButtonPressed;
             playButtonPressed = GUILayout.Toggle(playButtonPressed, run, EditorStyles.toolbarButton); // true on mouse release, false otherwise
             GUI.enabled = wasEnabled;
@@ -915,7 +911,7 @@ namespace UnityTest
             bool wasEnabled = GUI.enabled;
             GUIContent emptyScene = new GUIContent(EditorGUIUtility.IconContent("SceneLoadIn"));
             emptyScene.tooltip = "Go to empty scene";
-            GUI.enabled = !IsSceneEmpty() && !Application.isPlaying && !updatingMethods;
+            GUI.enabled &= !IsSceneEmpty() && !Application.isPlaying;
             if (GUILayout.Button(emptyScene, EditorStyles.toolbarButton))
             {
                 GoToEmptyScene();
@@ -1572,7 +1568,7 @@ namespace UnityTest
                 {
                     EditorGUILayout.LabelField(title, EditorStyles.boldLabel);
                     GUILayout.FlexibleSpace();
-                    GUI.enabled = queue.Count > 0;
+                    GUI.enabled &= queue.Count > 0;
                     if (GUILayout.Button("Clear")) queue.Clear();
                     GUI.enabled = wasEnabled;
                 }
@@ -1598,7 +1594,6 @@ namespace UnityTest
         private static void DrawQueueCurrent()
         {
             bool wasEnabled = GUI.enabled;
-            GUI.enabled = false;
             // "Current" space
             EditorGUILayout.BeginVertical();
             {
@@ -1610,7 +1605,9 @@ namespace UnityTest
 
                     EditorGUILayout.LabelField("Current", EditorStyles.boldLabel, GUILayout.Width(width));
                     GUILayout.FlexibleSpace();
+                    GUI.enabled = false;
                     GUILayout.Label("frame " + string.Format("{0,8}", TestManager.nframes) + "    " + TestManager.timer.ToString("0.0000 s"));
+                    GUI.enabled = wasEnabled;
 
                     EditorGUIUtility.labelWidth = previousLabelWidth;
                 }
@@ -1634,8 +1631,11 @@ namespace UnityTest
 
         private static void DrawQueueTest(Rect rect, Test test, bool paintResultFeatures = true)
         {
+            bool wasEnabled = false;
+            GUI.enabled = false;
             if (paintResultFeatures) Test.PaintResultFeatures(rect, test.result);
             GUI.Label(rect, test.attribute.path);
+            GUI.enabled = wasEnabled;
         }
         private static void DrawQueueTest(Test test, bool paintResultFeatures = true)
         {
