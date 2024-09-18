@@ -12,12 +12,18 @@ A testing framework for the Unity editor that helps you maintain and debug your 
 
 ## Installation
 ### Unity Package
-Under construction.
+1. Copy the GitHub repo link: `https://github.com/hatfullr/UnityTest.git`.
+2. Go to `Window > Package Manager`
+3. Click the "+" button in the top left and select "Add package from git URL..." in the dropdown.
+4. Paste the GitHub repo link into the bar.
+5. Click "Add".
+6. Open the test manager at `Window > UnityTest Manager`.
 
 ### Simple
 1. Download the `*.cs` scripts from the `Runtime` folder and place them anywhere inside your project.
 2. Download `Editor/TestManager.cs` and move it into a folder named `Editor` in the `Assets` directory of your project.
-
+3. Reload the domain.
+4. Open the test manager at `Window > UnityTest Manager`.
 
 ## Quick Start
 Unit testing is intended to make sure code runs properly even after other systems have been introduced. However, the following example keeps things simple. Suppose you have some Unity class called `Example`:
