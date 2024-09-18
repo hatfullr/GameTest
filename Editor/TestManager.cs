@@ -65,6 +65,9 @@ namespace UnityTest
         /// </summary>
         private static bool playButtonWasPressed = false;
 
+        private static bool paused = false;
+        private static bool runningTests = false;
+
         private int previousFrameNumber;
 
         private Dictionary<string, GUIStyle> styles;
@@ -365,7 +368,7 @@ namespace UnityTest
                 Repaint();
                 return;
             }
-            if (!Application.isPlaying) return;
+            if (!EditorApplication.isPlaying) return;
             if (!startCalled) Start();
             Repaint();
             if (Time.frameCount > previousFrameNumber) OnUpdate();
@@ -391,6 +394,7 @@ namespace UnityTest
             }
 
             if (queue.Count == 0) return;
+            runningTests = true;
             if (Test.isTesting) return;
             // Start the next Test in the queue
             timer = 0f;
@@ -407,10 +411,14 @@ namespace UnityTest
                 else if (test.result == Test.Result.None)
                     Debug.LogWarning("[UnityTest] <color=yellow>" + test.attribute.path + "</color>", test.GetScript());
                 else throw new System.NotImplementedException(test.result.ToString());
-
-                if (queue.Count == 0) Debug.Log("[UnityTest] Finished");
             }
             finishedTests.Add(test);
+
+            if (queue.Count == 0)
+            {
+                runningTests = false;
+                if (debug) Debug.Log("[UnityTest] Finished");
+            }
         }
 
         /// <summary>
@@ -798,9 +806,16 @@ namespace UnityTest
             {
                 if (playButtonPressed != playButtonWasPressed) // On the state change
                 {
-                    if (EditorApplication.isPlaying) EditorApplication.ExitPlaymode();
+                    if (EditorApplication.isPlaying)
+                    {
+                        if (ranTests) EditorApplication.ExitPlaymode();
+                        else
+                        {
+                            RunSelected();
+                            return;
+                        }
+                    }
                     else EditorApplication.EnterPlaymode();
-
                 }
                 else if (!playButtonPressed && playButtonWasPressed && !ranTests) RunSelected();
 
@@ -898,11 +913,18 @@ namespace UnityTest
         private void DrawPlayButton(State state)
         {
             bool wasEnabled = GUI.enabled;
-            GUIContent run = new GUIContent(EditorGUIUtility.IconContent("PlayButton"));
-            run.tooltip = "Run selected tests";
+            string image = "PlayButton";
+            if (runningTests && !paused) // we are running tests now, so give an option to pause
+            {
+                image = "PauseButton";
+            }
+
+            GUIContent content = new GUIContent(EditorGUIUtility.IconContent(image));
+
+            content.tooltip = "Run selected tests";
             GUI.enabled &= state.anySelected;
             playButtonWasPressed = playButtonPressed;
-            playButtonPressed = GUILayout.Toggle(playButtonPressed, run, EditorStyles.toolbarButton); // true on mouse release, false otherwise
+            playButtonPressed = GUILayout.Toggle(playButtonPressed, content, EditorStyles.toolbarButton); // true on mouse release, false otherwise
             GUI.enabled = wasEnabled;
         }
 
@@ -911,7 +933,7 @@ namespace UnityTest
             bool wasEnabled = GUI.enabled;
             GUIContent emptyScene = new GUIContent(EditorGUIUtility.IconContent("SceneLoadIn"));
             emptyScene.tooltip = "Go to empty scene";
-            GUI.enabled &= !IsSceneEmpty() && !Application.isPlaying;
+            GUI.enabled &= !IsSceneEmpty() && !EditorApplication.isPlaying;
             if (GUILayout.Button(emptyScene, EditorStyles.toolbarButton))
             {
                 GoToEmptyScene();
