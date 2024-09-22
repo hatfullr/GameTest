@@ -64,6 +64,8 @@ namespace UnityTest
 
         private static bool sceneWarningPrinted = false;
 
+        public System.Action onFinished;
+
 
         #region Operators
 
@@ -312,6 +314,9 @@ namespace UnityTest
             coroutines.Remove(coroutineMethod);
         }
 
+        /// <summary>
+        /// Called when the test is finished, regardless of the results. Pauses the editor if the test specifies to do so.
+        /// </summary>
         private void OnRunComplete()
         {
             TearDown();
@@ -323,6 +328,22 @@ namespace UnityTest
             coroutineGO = null;
 
             current = null;
+
+            onFinished.Invoke();
+        }
+
+        /// <summary>
+        /// Write to the Debug.Log the result of this test.
+        /// </summary>
+        public void PrintResult()
+        {
+            if (result == Result.Pass)
+                Debug.Log("[UnityTest] <color=green>" + attribute.path + "</color>", GetScript());
+            else if (result == Result.Fail)
+                Debug.LogError("[UnityTest] <color=red>" + attribute.path + "</color>", GetScript());
+            else if (result == Result.None)
+                Debug.LogWarning("[UnityTest] <color=yellow>" + attribute.path + "</color>", GetScript());
+            else throw new System.NotImplementedException(result.ToString());
         }
 
         private void CancelCoroutines()

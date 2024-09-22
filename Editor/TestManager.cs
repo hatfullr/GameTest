@@ -6,6 +6,7 @@ using System.Linq;
 using UnityEditor.SceneManagement;
 using System.IO;
 using System.Threading.Tasks;
+using System.Collections;
 
 namespace UnityTest
 {
@@ -24,8 +25,6 @@ namespace UnityTest
         private static SortedDictionary<string, Foldout> cachedFoldouts = new SortedDictionary<string, Foldout>();
         private static SortedDictionary<string, Test> cachedTests = new SortedDictionary<string, Test>();
 
-        public static List<Test> finishedTests = new List<Test>();
-
         public static Foldout rootFoldout;
 
         private Vector2 scrollPosition;
@@ -39,6 +38,7 @@ namespace UnityTest
         private const string foldoutDelimiter = "\n===| TestManagerFoldout |===\n"; // Some unique value
 
         public static Queue<Test> queue = new Queue<Test>();
+        public static Queue<Test> finishedTests = new Queue<Test>();
 
         public static float timer;
         public static int nframes;
@@ -55,21 +55,14 @@ namespace UnityTest
         private const float spinRate = 0.05f;
         private static int spinIndex = 0;
 
-        /// <summary>
-        /// current frame
-        /// </summary>
-        private static bool playButtonPressed = false;
+        private static bool runTestsOnPlayMode = false;
 
-        /// <summary>
-        /// previous frame
-        /// </summary>
-        private static bool playButtonWasPressed = false;
+        private static bool paused = false;
+        private static bool runningTests = false;
 
         private int previousFrameNumber;
 
         private Dictionary<string, GUIStyle> styles;
-
-        private static bool ranTests = false;
 
         private static Settings _settings;
         private static Settings settings
@@ -98,15 +91,14 @@ namespace UnityTest
             scrollPosition = Vector2.zero;
             nframes = 0;
             queue = new Queue<Test>();
+            finishedTests = new Queue<Test>();
             cachedTests = new SortedDictionary<string, Test>();
             cachedFoldouts = new SortedDictionary<string, Foldout>();
             tests = new SortedDictionary<TestAttribute, Test>();
             methods = new SortedDictionary<TestAttribute, MethodInfo>();
             rootFoldout = null;
             refreshing = false;
-            playButtonPressed = false;
-            finishedTests = new List<Test>();
-            ranTests = false;
+            runTestsOnPlayMode = false;
 
             Foldout.all = new Dictionary<string, Foldout>();
 
@@ -147,7 +139,7 @@ namespace UnityTest
             data += splitDelimiter;
             data += showWelcome.ToString();
             data += splitDelimiter;
-            data += playButtonPressed.ToString();
+            data += runTestsOnPlayMode.ToString();
             data += splitDelimiter;
             data += GUIQueue.GetString();
             data += splitDelimiter;
@@ -199,7 +191,7 @@ namespace UnityTest
 
             if (split.Length > i)
             {
-                try { playButtonPressed = bool.Parse(split[i]); }
+                try { runTestsOnPlayMode = bool.Parse(split[i]); }
                 catch (System.FormatException) { return; }
             }
             i++;
@@ -316,15 +308,16 @@ namespace UnityTest
         private void Start()
         {
             startCalled = true;
-            if (EditorApplication.isPlaying && playButtonPressed)
+
+            if (EditorApplication.isPlaying)
             {
-                RunSelected();
+                if (runTestsOnPlayMode) RunSelected();
+                runTestsOnPlayMode = false;
             }
         }
 
         private void OnPlayStateChanged(PlayModeStateChange change)
         {
-            //Debug.Log(change);
             if (change == PlayModeStateChange.ExitingPlayMode)
             {
                 queue.Clear();
@@ -337,12 +330,15 @@ namespace UnityTest
                 Focus();
             }
 
-
             if (change == PlayModeStateChange.EnteredEditMode)
             {
-                playButtonWasPressed = false;
-                playButtonPressed = false;
+                runningTests = false;
                 Repaint();
+            }
+
+            if (change == PlayModeStateChange.ExitingEditMode)
+            {
+                Save();
             }
         }
 
@@ -365,10 +361,10 @@ namespace UnityTest
                 Repaint();
                 return;
             }
-            if (!Application.isPlaying) return;
             if (!startCalled) Start();
-            Repaint();
-            if (Time.frameCount > previousFrameNumber) OnUpdate();
+            if (!EditorApplication.isPlaying) return;
+            if (runningTests && !paused) Repaint();
+            if (Time.frameCount > previousFrameNumber && !paused) OnUpdate();
             previousFrameNumber = Time.frameCount;
         }
 
@@ -391,26 +387,28 @@ namespace UnityTest
             }
 
             if (queue.Count == 0) return;
+            runningTests = true;
             if (Test.isTesting) return;
             // Start the next Test in the queue
             timer = 0f;
             nframes = 0;
             Test test = queue.Dequeue();
-            ranTests = true;
-            test.Run();
-            if (debug)
-            {
-                if (test.result == Test.Result.Pass)
-                    Debug.Log("[UnityTest] <color=green>" + test.attribute.path + "</color>", test.GetScript());
-                else if (test.result == Test.Result.Fail)
-                    Debug.LogError("[UnityTest] <color=red>" + test.attribute.path + "</color>", test.GetScript());
-                else if (test.result == Test.Result.None)
-                    Debug.LogWarning("[UnityTest] <color=yellow>" + test.attribute.path + "</color>", test.GetScript());
-                else throw new System.NotImplementedException(test.result.ToString());
 
-                if (queue.Count == 0) Debug.Log("[UnityTest] Finished");
+            [HideInCallstack]
+            void OnFinished()
+            {
+                if (debug) test.PrintResult();
+                finishedTests.Enqueue(test);
+                if (queue.Count == 0)
+                {
+                    runningTests = false;
+                    if (debug) Debug.Log("[UnityTest] Finished");
+                }
+                test.onFinished -= OnFinished;
             }
-            finishedTests.Add(test);
+            test.onFinished += OnFinished;
+
+            test.Run();
         }
 
         /// <summary>
@@ -731,6 +729,7 @@ namespace UnityTest
                 {
                     // Left
                     DrawPlayButton(state);
+                    DrawPauseButton();
                     DrawGoToEmptySceneButton();
 
                     bool[] result = DrawUniversalToggle(state);
@@ -760,7 +759,7 @@ namespace UnityTest
                         "Create your tests in any C# class in the Assets folder by simply writing a method with a UnityTest.Test attribute. " +
                         "See the included README for additional information. Happy testing!" + "\n\n" +
                         "If you would like to support this project, please donate at _____________________. Any amount is greatly appreciated; it keeps me fed :)" + "\n\n" +
-                        "To hide this message, press the speech bubble in the toolbar below."
+                        "To hide this message, press the speech bubble in the toolbar above."
                     , MessageType.Info);
                 }
                 GUI.enabled = wasEnabled;
@@ -796,14 +795,7 @@ namespace UnityTest
 
             if (!updatingMethods && !refreshing)
             {
-                if (playButtonPressed != playButtonWasPressed) // On the state change
-                {
-                    if (EditorApplication.isPlaying) EditorApplication.ExitPlaymode();
-                    else EditorApplication.EnterPlaymode();
-
-                }
-                else if (!playButtonPressed && playButtonWasPressed && !ranTests) RunSelected();
-
+                
                 // Doing things this way avoids annoying GUI errors complaining about groups not being ended properly.
                 if (refresh) Refresh();
                 else if (selectAll) SelectAll();
@@ -895,14 +887,72 @@ namespace UnityTest
             GUI.enabled = wasEnabled;
         }
 
+        /// <summary>
+        /// Stop running tests and clear the queues
+        /// </summary>
+        public void Stop()
+        {
+            queue.Clear();
+            paused = false;
+            runningTests = false;
+            EditorApplication.ExitPlaymode();
+        }
+
         private void DrawPlayButton(State state)
         {
             bool wasEnabled = GUI.enabled;
-            GUIContent run = new GUIContent(EditorGUIUtility.IconContent("PlayButton"));
-            run.tooltip = "Run selected tests";
+
+            string image = "PlayButton";
+            string tooltip = "Run selected tests";
+            if (runningTests)
+            {
+                image += " On";
+                tooltip = "Stop testing";
+            }
+
+            GUIContent content = new GUIContent(EditorGUIUtility.IconContent(image));
+            content.tooltip = tooltip;
+
             GUI.enabled &= state.anySelected;
-            playButtonWasPressed = playButtonPressed;
-            playButtonPressed = GUILayout.Toggle(playButtonPressed, run, EditorStyles.toolbarButton); // true on mouse release, false otherwise
+            bool previous = runningTests;
+            bool current = GUILayout.Toggle(previous, content, EditorStyles.toolbarButton);
+            GUI.enabled = wasEnabled;
+
+            if (previous != current) // The user clicked on the button
+            {
+                if (runningTests)
+                {
+                    Stop();
+                }
+                else
+                {
+                    if (EditorApplication.isPlaying) RunSelected();
+                    else
+                    {
+                        runTestsOnPlayMode = true;
+                        EditorApplication.EnterPlaymode(); // can cause recompile
+                    }
+                }
+            }
+        }
+
+        private void DrawPauseButton()
+        {
+            bool wasEnabled = GUI.enabled;
+
+            string image = "PauseButton";
+            string tooltip = "Pause testing";
+            if (paused)
+            {
+                image += " On";
+                tooltip = "Resume testing";
+            }
+
+            GUIContent content = new GUIContent(EditorGUIUtility.IconContent(image));
+            content.tooltip = tooltip;
+
+            GUI.enabled &= runningTests;
+            paused = GUILayout.Toggle(paused, content, EditorStyles.toolbarButton);
             GUI.enabled = wasEnabled;
         }
 
@@ -911,7 +961,7 @@ namespace UnityTest
             bool wasEnabled = GUI.enabled;
             GUIContent emptyScene = new GUIContent(EditorGUIUtility.IconContent("SceneLoadIn"));
             emptyScene.tooltip = "Go to empty scene";
-            GUI.enabled &= !IsSceneEmpty() && !Application.isPlaying;
+            GUI.enabled &= !IsSceneEmpty() && !EditorApplication.isPlaying;
             if (GUILayout.Button(emptyScene, EditorStyles.toolbarButton))
             {
                 GoToEmptyScene();
@@ -1544,8 +1594,8 @@ namespace UnityTest
                 // "Queue" space
                 EditorGUILayout.BeginHorizontal();
                 {
-                    DrawQueue("Queued", TestManager.queue.ToList(), queueScrollPosition);
-                    DrawQueue("Finished", TestManager.finishedTests, finishedScrollPosition, true);
+                    DrawQueue("Queued", ref TestManager.queue, queueScrollPosition);
+                    DrawQueue("Finished", ref TestManager.finishedTests, finishedScrollPosition, true);
                 }
                 EditorGUILayout.EndHorizontal();
             }
@@ -1558,7 +1608,7 @@ namespace UnityTest
             ProcessEvents();
         }
 
-        private static void DrawQueue(string title, List<Test> queue, Vector2 scrollPosition, bool paintResultFeatures = false)
+        private static void DrawQueue(string title, ref Queue<Test> queue, Vector2 scrollPosition, bool paintResultFeatures = false)
         {
             bool wasEnabled = GUI.enabled;
             EditorGUILayout.BeginVertical();
@@ -1574,14 +1624,17 @@ namespace UnityTest
                 }
                 EditorGUILayout.EndHorizontal();
 
+                
                 // Queue area
                 EditorGUILayout.BeginVertical("HelpBox", GUILayout.ExpandWidth(false));
                 {
                     scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition, false, false);
                     {
-                        GUI.enabled = false;
-                        foreach (Test test in queue) DrawQueueTest(test, paintResultFeatures);
-                        GUI.enabled = wasEnabled;
+                        foreach (Test test in queue.ToList())
+                        {
+                            Rect rect = EditorGUILayout.GetControlRect(false);
+                            DrawQueueTest(rect, test, ref queue, paintResultFeatures);
+                        }
                     }
                     EditorGUILayout.EndScrollView();
                 }
@@ -1620,28 +1673,68 @@ namespace UnityTest
                 rect.width -= EditorStyles.helpBox.padding.horizontal;
                 rect.y += EditorStyles.helpBox.padding.top;
                 rect.height -= EditorStyles.helpBox.padding.vertical;
-                Test next = null;
-                if (TestManager.queue.Count > 0) next = TestManager.queue.Peek();
-                if (Test.current == null && next != null) DrawQueueTest(rect, next, true);
-                else if (Test.current != null) DrawQueueTest(rect, Test.current, true);
+                if (Test.current != null) DrawQueueTest(rect, Test.current);
             }
             EditorGUILayout.EndVertical();
             GUI.enabled = wasEnabled;
         }
 
+        private static void DrawQueueTest(Rect rect, Test test, ref Queue<Test> queue, bool paintResultFeatures = true)
+        {
+            bool wasEnabled = GUI.enabled;
+
+            GUIStyle labelStyle = new GUIStyle(EditorStyles.label);
+            labelStyle.alignment = TextAnchor.MiddleLeft;
+            labelStyle.padding = new RectOffset(0, 0, 0, 0);
+
+            if (paintResultFeatures) Test.PaintResultFeatures(rect, test.result);
+
+            GUIContent content = new GUIContent(EditorGUIUtility.IconContent("d_clear"));
+            content.tooltip = "Remove test from queue";
+
+            GUIStyle style = new GUIStyle(EditorStyles.iconButton);
+                
+            Rect controlsRect = new Rect(rect);
+
+            // Center the button
+            controlsRect.y = rect.center.y - 0.5f * style.CalcSize(content).y;
+                
+            controlsRect.width = style.CalcSize(content).x;
+            if (GUI.Button(controlsRect, content, style)) // X button
+            {
+                // As long as this method never gets threaded, this should work...
+                Queue<Test> newQueue = new Queue<Test>();
+                for (int i = 0; i < queue.Count; i++)
+                {
+                    Test t = queue.Dequeue();
+                    if (t == test) continue;
+                    newQueue.Enqueue(t);
+                }
+                for (int i = 0; i < newQueue.Count; i++) queue.Enqueue(newQueue.Dequeue());
+            }
+            rect.width -= controlsRect.width;
+            rect.x += controlsRect.width;
+            GUI.Label(rect, test.attribute.path, labelStyle);
+            
+            GUI.enabled = wasEnabled;
+        }
+
+
         private static void DrawQueueTest(Rect rect, Test test, bool paintResultFeatures = true)
         {
             bool wasEnabled = false;
-            GUI.enabled = false;
+            //GUI.enabled = false;
+
+            GUIStyle labelStyle = new GUIStyle(EditorStyles.label);
+            labelStyle.alignment = TextAnchor.MiddleLeft;
+            labelStyle.padding = new RectOffset(0, 0, 0, 0);
+
             if (paintResultFeatures) Test.PaintResultFeatures(rect, test.result);
-            GUI.Label(rect, test.attribute.path);
+            GUI.Label(rect, test.attribute.path, labelStyle);
+
             GUI.enabled = wasEnabled;
         }
-        private static void DrawQueueTest(Test test, bool paintResultFeatures = true)
-        {
-            Rect rect = EditorGUILayout.GetControlRect(false);
-            DrawQueueTest(rect, test, paintResultFeatures);
-        }
+
 
         private static void DrawSplitter()
         {

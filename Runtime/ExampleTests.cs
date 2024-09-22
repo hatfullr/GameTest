@@ -46,28 +46,28 @@ namespace UnityTest
         }
 
 
-        [UnityTest.Test("Examples/SimpleFail")]
+        [Test("Examples/SimpleFail")]
         private void SimpleFail(GameObject testObject)
         {
-            UnityTest.Assert.IsTrue(false, "You can include a message describing this test.");
+            Assert.IsTrue(false, "You can include a message describing this test.");
         }
 
-        [UnityTest.Test("Examples/SimplePass")]
+        [Test("Examples/SimplePass")]
         private void SimplePass(GameObject testObject)
         {
-            UnityTest.Assert.IsTrue(true); // or no message
+            Assert.IsTrue(true); // or no message
         }
 
         /// <summary>
         /// You specify the exact SetUp and TearDown functions for each Unit Test, so you can make SetUp and TearDown
         /// functions for each one of them if you like.
         /// </summary>
-        [UnityTest.Test("Examples/SetUpTearDown", nameof(SetUp), nameof(TearDown), false)]
+        [Test("Examples/SetUpTearDown", nameof(SetUp), nameof(TearDown), false)]
         private void SetUpTearDown(GameObject testObject)
         {
             // Let the test fail so that it can be seen in the scene hierarchy that there is a GameObject with name "Test Parent"
             // and it has a child "ExampleTests (SetUpExample)" as defined in the SetUp script.
-            UnityTest.Assert.IsTrue(false, "SetUpTearDown is meant to fail");
+            Assert.IsTrue(false, "SetUpTearDown is meant to fail");
         }
     }
 
@@ -76,7 +76,7 @@ namespace UnityTest
     /// Each method acts like a UnitTest. The SetUp method must have the name "SetUp", and the same is true for "TearDown". SetUp is 
     /// invoked before each method, and TearDown is invoked after each method.
     /// </summary>
-    [UnityTest.Suite("Examples/TestSuite")]
+    [Suite("Examples/TestSuite")]
     public static class ExampleTestSuite
     {
 
