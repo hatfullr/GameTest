@@ -23,7 +23,22 @@ namespace UnityTest
         public MethodInfo method;
         public TestAttribute attribute { get; private set; }
 
-        public bool isExample { get; private set; } = false;
+
+        private static string packagesPath { get; } = Path.GetFullPath(Path.Join(Application.dataPath, "..", "Packages"));
+        private static string runtimeDir { get; } = Path.Join(packagesPath, "UnityTest", "Runtime");
+
+        private static string[] _internalFiles;
+        private static string[] internalFiles
+        {
+            get
+            {
+                if (_internalFiles == null)
+                {
+                    _internalFiles = Directory.GetFiles(runtimeDir, "*", SearchOption.AllDirectories);
+                }
+                return _internalFiles;
+            }
+        }
 
         public GameObject defaultGameObject
         {
@@ -138,6 +153,15 @@ namespace UnityTest
         }
 
         public bool IsInSuite() => method.DeclaringType.GetCustomAttribute(typeof(SuiteAttribute)) != null;
+
+        public bool IsExample()
+        {
+            foreach (string path in internalFiles)
+            {
+                if (attribute.sourceFile == path) return true;
+            }
+            return false;
+        }
 
         public GameObject DefaultSetUp()
         {
@@ -385,17 +409,12 @@ namespace UnityTest
         public Object GetScript()
         {
             if (script != null) return script;
-
-            isExample = false;
-
-            string pathToSearch;
-
             // Intercept trying to load the ExampleTests.cs script from the package folder
-            string internalDir = Path.Join(Path.Join(Path.Join(".", "Packages"), "UnityTest"), "Runtime");
-            if (Path.GetDirectoryName(attribute.sourceFile) == internalDir)
+            string pathToSearch;
+            if (IsExample())
             {
-                pathToSearch = Path.Join("Packages", "UnityTest", "Runtime");
-                isExample = true;
+                // Get the internal directory in the style that Unity wants it in (starts with "Packages")
+                pathToSearch = Path.GetRelativePath(Path.GetDirectoryName(packagesPath), runtimeDir);
             }
             else
             {

@@ -495,7 +495,11 @@ namespace UnityTest
             foreach (MethodInfo method in _methods)
             {
                 if (IsMethodIgnored(method)) continue;
-                methods.Add(GetAttribute(method), method);
+                try { methods.Add(GetAttribute(method), method); }
+                catch (System.ArgumentException) // tried to add duplicate key (multiple tests have the same path)
+                {
+                    Debug.LogError("Test ignored because it has the same path as another test: '" + GetAttribute(method).path + "' in '" + GetAttribute(method).sourceFile + "'");
+                }
             }
             foreach (System.Type cls in classes)
             {
@@ -514,11 +518,11 @@ namespace UnityTest
                     if (IsMethodIgnored(method)) continue;
                     if (method.Name == "SetUp" || method.Name == "TearDown") continue;
                     if (hasSetUp && hasTearDown)
-                        methods.Add(new TestAttribute(attribute.path + "/" + method.Name, "SetUp", "TearDown", attribute.pauseOnFail, attribute.sourceFile), method);
+                        methods.Add(new TestAttribute(Path.Join(attribute.path, method.Name), "SetUp", "TearDown", attribute.pauseOnFail, attribute.sourceFile), method);
                     else if (hasSetUp && !hasTearDown)
-                        methods.Add(new TestAttribute(attribute.path + "/" + method.Name, "SetUp", attribute.pauseOnFail, attribute.sourceFile), method);
+                        methods.Add(new TestAttribute(Path.Join(attribute.path, method.Name), "SetUp", attribute.pauseOnFail, attribute.sourceFile), method);
                     else
-                        methods.Add(new TestAttribute(attribute.path + "/" + method.Name, attribute.pauseOnFail, attribute.sourceFile), method);
+                        methods.Add(new TestAttribute(Path.Join(attribute.path, method.Name), attribute.pauseOnFail, attribute.sourceFile), method);
                 }
             }
         }
@@ -557,10 +561,10 @@ namespace UnityTest
             Foldout directory = rootFoldout;
 
             string currentPath = directory.path;
-            foreach (string basename in path.Split("/").SkipLast(1))
+            foreach (string basename in path.Split(new char[] { Path.PathSeparator, Path.AltDirectorySeparatorChar, '/' }).SkipLast(1))
             {
                 // We keep track of the directory path we are currently in
-                currentPath += basename;
+                currentPath = Path.Join(currentPath, basename);
 
                 if (!Foldout.all.ContainsKey(currentPath))
                 {
@@ -572,8 +576,6 @@ namespace UnityTest
                 }
 
                 directory = Foldout.all[currentPath];
-
-                currentPath += "/";
             }
 
             // After traversing the directories, we end in the correct directory needed for this test
@@ -1128,7 +1130,7 @@ namespace UnityTest
             public Foldout(string path)
             {
                 this.path = path;
-                name = path.Split("/").Last();
+                name = Path.GetFileName(path);
 
                 if (Foldout.all == null) Foldout.all = new Dictionary<string, Foldout>();
                 if (Foldout.all.ContainsKey(this.path))
@@ -1186,6 +1188,18 @@ namespace UnityTest
             }
 
             /// <summary>
+            /// Return true if this Foldout corresponds with the builtin example tests provided in UnityTest
+            /// </summary>
+            public bool IsExamples()
+            {
+                foreach (Test test in GetTests())
+                {
+                    if (test.IsExample()) return true;
+                }
+                return false;
+            }
+
+            /// <summary>
             /// Returns true if only some child Tests are selected, and false if all are not selected or all are selected.
             /// </summary>
             /// <returns></returns>
@@ -1232,7 +1246,7 @@ namespace UnityTest
             /// </summary>
             public bool IsChildOf(Foldout other)
             {
-                return string.Join("/", path.Split("/").SkipLast(1)) == other.path;
+                return string.Join(Path.PathSeparator, path.Split(new char[] { Path.PathSeparator, Path.AltDirectorySeparatorChar, '/' }).SkipLast(1)) == other.path;
             }
 
             /// <summary>
@@ -1380,10 +1394,12 @@ namespace UnityTest
                 }
                 HashSet<Foldout> children = GetChildren();
                 if (children.Count > 0 && tests.Count > 0) EditorGUILayout.Space(0.5f * EditorGUIUtility.singleLineHeight);
+
+                // Draw the child foldouts, leaving the Examples foldout for last.
                 Foldout examples = null;
                 foreach (Foldout child in children)
                 {
-                    if (child.path.Split("/").First() == "Examples")
+                    if (child.IsExamples())
                     {
                         examples = child;
                         continue;

@@ -1,3 +1,6 @@
+using System.IO;
+using UnityEngine;
+
 namespace UnityTest
 {
     /// <summary>
@@ -53,7 +56,7 @@ namespace UnityTest
             this.pauseOnFail = pauseOnFail;
             this.setUp = setUp;
             this.tearDown = tearDown;
-            this.sourceFile = sourceFile;
+            this.sourceFile = Path.GetFullPath(sourceFile);
         }
 
         /// <summary>
@@ -70,7 +73,7 @@ namespace UnityTest
             setUp = "";
             tearDown = "";
             this.pauseOnFail = pauseOnFail;
-            this.sourceFile = sourceFile;
+            this.sourceFile = Path.GetFullPath(sourceFile);
         }
 
         /// <summary>
@@ -90,9 +93,8 @@ namespace UnityTest
             this.setUp = setUp;
             tearDown = "";
             this.pauseOnFail = pauseOnFail;
-            this.sourceFile = sourceFile;
+            this.sourceFile = Path.GetFullPath(sourceFile);
         }
-
 
         public string GetString()
         {
