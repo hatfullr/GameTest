@@ -4,12 +4,15 @@ using UnityEditor;
 using System.Reflection;
 using System.IO;
 using System.Threading.Tasks;
+using System.Runtime.Serialization.Formatters.Binary;
 
 namespace UnityTest
 {
     public class TestManager
     {
         private const string delimiter = "\n===|TestManager|===\n"; // Some unique value
+
+        private static Assembly[] assemblies;
 
         /// <summary>
         /// The code methods which have a TestAttribute attached to them.
@@ -105,6 +108,7 @@ namespace UnityTest
             tests = new SortedDictionary<TestAttribute, Test>();
             methods = new SortedDictionary<TestAttribute, MethodInfo>();
             runTestsOnPlayMode = false;
+            assemblies = null;
         }
 
 
@@ -141,7 +145,7 @@ namespace UnityTest
         public void UpdateMethods()
         {
             // This hits all assemblies
-            Assembly[] assemblies = System.AppDomain.CurrentDomain.GetAssemblies();
+            if (assemblies == null) assemblies = System.AppDomain.CurrentDomain.GetAssemblies();
 
             List<MethodInfo> _methods = new List<MethodInfo>();
             List<System.Type> classes = new List<System.Type>();
@@ -270,12 +274,19 @@ namespace UnityTest
         /// </summary>
         public string GetString()
         {
+            string GetAssemblies()
+            {
+                BinaryFormatter formatter = new BinaryFormatter();
+                MemoryStream stream = new MemoryStream();
+                formatter.Serialize(stream, asm);
+            }
             return string.Join(delimiter,
                 debug,
                 previousFrameNumber,
                 timer,
                 nframes,
-                runTestsOnPlayMode
+                runTestsOnPlayMode,
+                GetAssemblies()
             );
         }
         public void FromString(string data)
