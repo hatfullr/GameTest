@@ -18,7 +18,6 @@ namespace UnityTest
     {
         public const BindingFlags bindingFlags = BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly | BindingFlags.Static;
         
-        public string name;
         public Result result;
         public MethodInfo method;
         public TestAttribute attribute { get; private set; }
@@ -107,7 +106,6 @@ namespace UnityTest
 
         public Test(TestAttribute attribute, MethodInfo method)
         {
-            name = attribute.path.Split("/").Last();
             this.attribute = attribute;
             this.method = method;
             result = Result.None;
@@ -115,40 +113,31 @@ namespace UnityTest
 
         private class CoroutineMonoBehaviour : MonoBehaviour { }
 
-        public override string ToString() => "Test(" + attribute.path + ")";
+        public override string ToString() => "Test(" + attribute.GetPath() + ")";
 
         
         public string GetString()
         {
-            string data = name;
-            data += delimiter;
-            data += attribute.GetString();
-            data += delimiter;
-            data += ((int)result).ToString();
-            data += delimiter;
-            data += _defaultGameObjectGUID;
-            data += delimiter;
-            data += selected;
-            data += delimiter;
-            data += expanded;
-            data += delimiter;
-            data += locked;
-            return data;
+            return string.Join(delimiter,
+                attribute.GetString(),
+                (int)result,
+                _defaultGameObjectGUID,
+                selected,
+                expanded,
+                locked
+            );
         }
         public static Test FromString(string s)
         {
             if (string.IsNullOrEmpty(s)) return null;
             Test newTest = new Test();
             string[] data = s.Split(delimiter);
-            newTest.name = data[0];
-            newTest.attribute = TestAttribute.FromString(data[1]);
-            newTest.result = (Result)int.Parse(data[2]);
-            newTest._defaultGameObjectGUID = data[3];
-            newTest.selected = bool.Parse(data[4]);
-            newTest.expanded = bool.Parse(data[5]);
-            newTest.locked = bool.Parse(data[6]);
-            //Debug.Log(newTest.name + " " + newTest.selected + " " + data[4]);
-            //if (newTest.selected) Debug.Log(newTest.name + " " + newTest.selected);
+            newTest.attribute = TestAttribute.FromString(data[0]);
+            newTest.result = (Result)int.Parse(data[1]);
+            newTest._defaultGameObjectGUID = data[2];
+            newTest.selected = bool.Parse(data[3]);
+            newTest.expanded = bool.Parse(data[4]);
+            newTest.locked = bool.Parse(data[5]);
             return newTest;
         }
 
@@ -176,7 +165,7 @@ namespace UnityTest
             {
                 return null;
             }
-            return new GameObject(name + " (" + method.DeclaringType + ")", method.DeclaringType);
+            return new GameObject(attribute.name + " (" + method.DeclaringType + ")", method.DeclaringType);
         }
 
         public void DefaultTearDown()
@@ -277,7 +266,7 @@ namespace UnityTest
             // If not a Suite, check the game object
             if (!IsInSuite())
             {
-                if (gameObject == null) throw new System.NullReferenceException("GameObject == null. Check your SetUp method for " + attribute.path);
+                if (gameObject == null) throw new System.NullReferenceException("GameObject == null. Check your SetUp method for " + attribute.GetPath());
                 if (gameObject.GetComponent(method.DeclaringType) == null && instantiatedDefaultGO == null)
                     throw new System.NullReferenceException("Component of type " + method.DeclaringType + " not found in the GameObject returned by the SetUp method.");
             }
@@ -362,11 +351,11 @@ namespace UnityTest
         public void PrintResult()
         {
             if (result == Result.Pass)
-                Debug.Log("[UnityTest] <color=green>" + attribute.path + "</color>", GetScript());
+                Debug.Log("[UnityTest] <color=green>" + attribute.GetPath() + "</color>", GetScript());
             else if (result == Result.Fail)
-                Debug.LogError("[UnityTest] <color=red>" + attribute.path + "</color>", GetScript());
+                Debug.LogError("[UnityTest] <color=red>" + attribute.GetPath() + "</color>", GetScript());
             else if (result == Result.None)
-                Debug.LogWarning("[UnityTest] <color=yellow>" + attribute.path + "</color>", GetScript());
+                Debug.LogWarning("[UnityTest] <color=yellow>" + attribute.GetPath() + "</color>", GetScript());
             else throw new System.NotImplementedException(result.ToString());
         }
 
@@ -601,7 +590,7 @@ namespace UnityTest
             toggleRect.width -= toggleWidth;
             if (!IsInSuite()) toggleRect.width -= scriptWidth;
 
-            List<bool> res = DrawToggle(toggleRect, name, selected, locked, showLock, false);
+            List<bool> res = DrawToggle(toggleRect, attribute.name, selected, locked, showLock, false);
             selected = res[0];
             locked = res[1];
 

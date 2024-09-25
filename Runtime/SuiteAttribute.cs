@@ -1,3 +1,5 @@
+using System.IO;
+
 namespace UnityTest
 {
     /// <summary>
@@ -11,7 +13,10 @@ namespace UnityTest
     [System.AttributeUsage(System.AttributeTargets.Class)]
     public class SuiteAttribute : System.Attribute, System.IEquatable<SuiteAttribute>, System.IComparable<SuiteAttribute>
     {
-        public string path { get; private set; }
+        /// <summary>
+        /// The test suite name which appears in the test manager. The default is the name of the suite class. Names must be unique per-file.
+        /// </summary>
+        public string name { get; private set; }
 
         /// <summary>
         /// Pause the editor when this test fails. No other subsequent tests will run. default = false.
@@ -28,34 +33,44 @@ namespace UnityTest
         /// </summary>
         /// <param name="path">A unique identifier for this test. Each '/' determines the depth in Window > Unit Test Manager.</param>
         /// <param name="pauseOnFail">Pause the editor when this test fails. No other subsequent tests will run. default = false.</param>
+        /// <param name="name">The test suite name which appears in the test manager. The default is the name of the suite class. Names must be unique per-file.</param>
         /// <param name="sourceFile">DO NOT USE. It is used by reflection techniques to locate the source file that this attribute was used in.</param>
         public SuiteAttribute(
-            string path,
             bool pauseOnFail = false,
+            [System.Runtime.CompilerServices.CallerMemberName] string name = default,
             [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = default)
         {
-            this.path = path;
             this.pauseOnFail = pauseOnFail;
+            this.name = name;
             this.sourceFile = sourceFile;
+        }
+
+        /// <summary>
+        /// Get the unique identifier for this test suite.
+        /// </summary>
+        public string GetPath()
+        {
+            string path = Utilities.GetUnityPath(sourceFile);
+            string fileName = Path.GetFileNameWithoutExtension(path);
+            return Path.Join(Path.GetDirectoryName(path), fileName, name);
         }
 
         public string GetString()
         {
-            string s = path;
-            s += TestAttribute.delimiter;
-            s += pauseOnFail.ToString();
-            s += TestAttribute.delimiter;
-            s += sourceFile;
-            return s;
+            return string.Join(TestAttribute.delimiter, 
+                name,
+                pauseOnFail.ToString(),
+                sourceFile
+            );
         }
 
         public static SuiteAttribute FromString(string s)
         {
             string[] contents = s.Split(TestAttribute.delimiter);
-            string path = contents[0];
+            string name = contents[0];
             bool pauseOnFail = bool.Parse(contents[1]);
             string sourceFile = contents[2];
-            return new SuiteAttribute(path, pauseOnFail, sourceFile);
+            return new SuiteAttribute(pauseOnFail, name, sourceFile);
         }
 
         /// <summary>
@@ -63,8 +78,8 @@ namespace UnityTest
         /// </summary>
         public void UpdateFrom(SuiteAttribute other)
         {
-            path = other.path;
             pauseOnFail = other.pauseOnFail;
+            name = other.name;
             sourceFile = other.sourceFile;
         }
 
@@ -75,7 +90,7 @@ namespace UnityTest
             return base.Equals(obj);
         }
         public bool Equals(SuiteAttribute other) => GetString() == other.GetString();
-        public int CompareTo(SuiteAttribute other) => path.CompareTo(other.path);
+        public int CompareTo(SuiteAttribute other) => GetPath().CompareTo(other.GetPath());
         public override int GetHashCode() => System.HashCode.Combine(GetString());
 
         public static bool operator ==(SuiteAttribute left, SuiteAttribute right) => Equals(left, right);

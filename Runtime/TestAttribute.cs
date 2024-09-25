@@ -1,5 +1,5 @@
+using System.Diagnostics;
 using System.IO;
-using UnityEngine;
 
 namespace UnityTest
 {
@@ -13,9 +13,9 @@ namespace UnityTest
         public const string delimiter = "\n**..-- TestAttributeDelimiter --..**\n";
 
         /// <summary>
-        /// A unique identifier for this test. Each '/' determines the depth in Window > Unit Test Manager.
+        /// The test method name which appears in the test manager. The default is the name of the method. Names must be unique per-file.
         /// </summary>
-        public string path { get; private set; }
+        public string name { get; private set; }
 
         /// <summary>
         /// Name of a static method which returns a GameObject and accepts no parameters.
@@ -40,22 +40,22 @@ namespace UnityTest
         /// <summary>
         /// This method will be added to Window > Unit Test Manager based on its path. Use '/' to create nested toggles.
         /// </summary>
-        /// <param name="path">A unique identifier for this test. Each '/' determines the depth in Window > Unit Test Manager.</param>
         /// <param name="setUp">Name of a static method which returns a GameObject and accepts no parameters.</param>
         /// <param name="tearDown">Name of a static method which returns void and accepts the GameObject returned by SetUp.</param>
         /// <param name="pauseOnFail">Pause the editor when this test fails. No other subsequent tests will run. default = false.</param>
+        /// <param name="name">The test method name which appears in the test manager. The default is the name of the method. Names must be unique per-file.</param>
         /// <param name="sourceFile">DO NOT USE. It is used by reflection techniques to locate the source file that this attribute was used in.</param>
         public TestAttribute(
-            string path,
             string setUp,
             string tearDown,
             bool pauseOnFail = false,
+            [System.Runtime.CompilerServices.CallerMemberName] string name = default,
             [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = default)
         {
-            this.path = path;
             this.pauseOnFail = pauseOnFail;
             this.setUp = setUp;
             this.tearDown = tearDown;
+            this.name = name;
             this.sourceFile = Path.GetFullPath(sourceFile);
         }
 
@@ -63,16 +63,17 @@ namespace UnityTest
         /// This method will be added to Window > Unit Test Manager based on its path. Use '/' to create nested toggles.
         /// </summary>
         /// <param name="path">A unique identifier for this test. Each '/' determines the depth in Window > Unit Test Manager.</param>
+        /// <param name="name">The test method name which appears in the test manager. The default is the name of the method. Names must be unique per-file.</param>
         /// <param name="sourceFile">DO NOT USE. It is used by reflection techniques to locate the source file that this attribute was used in.</param>
         public TestAttribute(
-            string path,
             bool pauseOnFail = false,
+            [System.Runtime.CompilerServices.CallerMemberName] string name = default,
             [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = default)
         {
-            this.path = path;
             setUp = "";
             tearDown = "";
             this.pauseOnFail = pauseOnFail;
+            this.name = name;
             this.sourceFile = Path.GetFullPath(sourceFile);
         }
 
@@ -82,43 +83,53 @@ namespace UnityTest
         /// <param name="path"><summary>A unique identifier for this test. Each '/' determines the depth in Window > Unit Test Manager.</summary></param>
         /// <param name="setUp">Name of a static method which returns a GameObject and accepts no parameters.</param>
         /// <param name="pauseOnFail">Pause the editor when this test fails. No other subsequent tests will run. default = false.</param>
+        /// <param name="name">The test method name which appears in the test manager. The default is the name of the method. Names must be unique per-file.</param>
         /// <param name="sourceFile">DO NOT USE. It is used by reflection techniques to locate the source file that this attribute was used in.</param>
         public TestAttribute(
-            string path,
             string setUp,
             bool pauseOnFail = false,
+            [System.Runtime.CompilerServices.CallerMemberName] string name = default,
             [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = default)
         {
-            this.path = path;
             this.setUp = setUp;
             tearDown = "";
             this.pauseOnFail = pauseOnFail;
+            this.name = name;
             this.sourceFile = Path.GetFullPath(sourceFile);
         }
 
+        /// <summary>
+        /// Get the unique identifier for this test.
+        /// </summary>
+        public string GetPath()
+        {
+            string path = Utilities.GetUnityPath(sourceFile);
+            string directory = Path.Join(Path.GetDirectoryName(path), Path.GetFileNameWithoutExtension(path));
+            return Path.Join(directory, name);
+        }
+
+
         public string GetString()
         {
-            string s = path;
-            s += delimiter;
-            s += setUp;
-            s += delimiter;
-            s += tearDown;
-            s += delimiter;
-            s += pauseOnFail.ToString();
-            s += delimiter;
-            s += sourceFile;
-            return s;
+            return string.Join(delimiter,
+                setUp,
+                tearDown,
+                pauseOnFail.ToString(),
+                name,
+                sourceFile
+            );
         }
 
         public static TestAttribute FromString(string s)
         {
             string[] contents = s.Split(delimiter);
-            string path = contents[0];
-            string setUp = contents[1];
-            string tearDown = contents[2];
-            bool pauseOnFail = bool.Parse(contents[3]);
-            string sourceFile = contents[4];
-            return new TestAttribute(path, setUp, tearDown, pauseOnFail, sourceFile);
+            return new TestAttribute(
+                contents[0], // setUp
+                contents[1], // tearDown
+                bool.Parse(contents[2]), // pauseOnFail
+                contents[3], // name
+                contents[4] // sourceFile
+            );
         }
 
         /// <summary>
@@ -126,10 +137,10 @@ namespace UnityTest
         /// </summary>
         public void UpdateFrom(TestAttribute other)
         {
-            path = other.path;
             setUp = other.setUp;
             tearDown = other.tearDown;
             pauseOnFail = other.pauseOnFail;
+            name = other.name;
             sourceFile = other.sourceFile;
         }
 
@@ -141,7 +152,7 @@ namespace UnityTest
             return base.Equals(obj);
         }
         public bool Equals(TestAttribute other) => GetString() == other.GetString();
-        public int CompareTo(TestAttribute other) => path.CompareTo(other.path);
+        public int CompareTo(TestAttribute other) => GetPath().CompareTo(other.GetPath());
         public override int GetHashCode() => System.HashCode.Combine(GetString());
         
         public static bool operator ==(TestAttribute left, TestAttribute right) => Equals(left, right);
