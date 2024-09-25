@@ -1,10 +1,10 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor;
+using UnityEditor.Compilation;
 using System.Reflection;
 using System.IO;
 using System.Threading.Tasks;
-using System.Runtime.Serialization.Formatters.Binary;
 
 namespace UnityTest
 {
@@ -12,7 +12,7 @@ namespace UnityTest
     {
         private const string delimiter = "\n===|TestManager|===\n"; // Some unique value
 
-        private static Assembly[] assemblies;
+        private static List<System.Reflection.Assembly> assemblies = new List<System.Reflection.Assembly>();
 
         /// <summary>
         /// The code methods which have a TestAttribute attached to them.
@@ -138,18 +138,35 @@ namespace UnityTest
         public async void StartUpdatingMethods()
         {
             onStartUpdatingMethods.Invoke();
+            UpdateAssemblies();
             await Task.Run(UpdateMethods);
             onFinishUpdatingMethods.Invoke();
         }
 
+        /// <summary>
+        /// Locate the assemblies that Unity has most recently compile, and load them into memory. This can only be called from the main thread.
+        /// </summary>
+        public void UpdateAssemblies()
+        {
+            assemblies.Clear();
+            foreach (AssembliesType type in (AssembliesType[])System.Enum.GetValues(typeof(AssembliesType))) // Hit all assembly types
+            {
+                foreach (UnityEditor.Compilation.Assembly assembly in CompilationPipeline.GetAssemblies(type))
+                {
+                    assemblies.Add(System.Reflection.Assembly.LoadFile(Path.Join(Utilities.projectPath, assembly.outputPath)));
+                }
+            }
+        }
+
+        /// <summary>
+        /// Using the assemblies located by UpdateAssemblies(), find all the test methods and test suite classes, which are stored in 
+        /// "methods" and "classes" respectively.
+        /// </summary>
         public void UpdateMethods()
         {
-            // This hits all assemblies
-            if (assemblies == null) assemblies = System.AppDomain.CurrentDomain.GetAssemblies();
-
             List<MethodInfo> _methods = new List<MethodInfo>();
             List<System.Type> classes = new List<System.Type>();
-            foreach (Assembly assembly in assemblies)
+            foreach (System.Reflection.Assembly assembly in assemblies)
             {
                 foreach (System.Type type in assembly.GetTypes())
                 {
@@ -184,15 +201,6 @@ namespace UnityTest
                     }
                 }
             }
-
-
-            //IEnumerable<System.Type> types = assemblies // Returns all currenlty loaded assemblies
-            //    .SelectMany(x => x.GetTypes()) // returns all types defined in these assemblies
-            //    .Where(x => x.IsClass); // only yields classes
-            //List<MethodInfo> _methods = types
-            //    .SelectMany(x => x.GetMethods(Test.bindingFlags))
-            //    .Where(x => x.GetCustomAttributes(typeof(TestAttribute), false).FirstOrDefault() != null).ToList();
-            //List<System.Type> classes = types.Where(x => x.GetCustomAttributes(typeof(SuiteAttribute), false).FirstOrDefault() != null).ToList();
 
             methods.Clear();
             foreach (MethodInfo method in _methods)
@@ -274,19 +282,12 @@ namespace UnityTest
         /// </summary>
         public string GetString()
         {
-            string GetAssemblies()
-            {
-                BinaryFormatter formatter = new BinaryFormatter();
-                MemoryStream stream = new MemoryStream();
-                formatter.Serialize(stream, asm);
-            }
             return string.Join(delimiter,
                 debug,
                 previousFrameNumber,
                 timer,
                 nframes,
-                runTestsOnPlayMode,
-                GetAssemblies()
+                runTestsOnPlayMode
             );
         }
         public void FromString(string data)

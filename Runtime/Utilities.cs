@@ -8,15 +8,19 @@ namespace UnityTest
     public static class Utilities
     {
         public const string editorPrefs = "UnityTest";
-
+        
         /// <summary>
-        /// Location of the "Assets" folder
+        /// Location of the "Assets" folder.
         /// </summary>
         public static string assetsPath { get; } = Path.GetFullPath(Application.dataPath);
         /// <summary>
-        /// Location of the "Packages" folder
+        /// Location of the Unity project.
         /// </summary>
-        public static string packagesPath { get; } = Path.GetFullPath(Path.Join(assetsPath, "..", "Packages"));
+        public static string projectPath { get; } = Path.GetFullPath(Path.GetDirectoryName(assetsPath));
+        /// <summary>
+        /// Location of the "Packages" folder.
+        /// </summary>
+        public static string packagesPath { get; } = Path.GetFullPath(Path.Join(projectPath, "Packages"));
         /// <summary>
         /// Location of the "Packages/UnityTest/Runtime" folder
         /// </summary>
