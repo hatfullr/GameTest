@@ -12,134 +12,88 @@ namespace UnityTest
 {
 #if UNITY_EDITOR
     /// <summary>
-    /// A unit test that will appear in the Unit Test Manager as a toggleable test. Use this class as an attribute on a method.
+    /// A unit test that will appear in the UnityTest Manager as a toggleable test. Each Test has an executable method and an attribute.
     /// </summary>
-    public class Test : System.IEquatable<Test>
+    public class Test : ScriptableObject
     {
-        public const BindingFlags bindingFlags = BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly | BindingFlags.Static;
-        
         public Result result;
+        /// <summary>
+        /// The test method to be executed.
+        /// </summary>
         public MethodInfo method;
-        public TestAttribute attribute { get; private set; }
-
-
-        private static string packagesPath { get; } = Path.GetFullPath(Path.Join(Application.dataPath, "..", "Packages"));
-        private static string runtimeDir { get; } = Path.Join(packagesPath, "UnityTest", "Runtime");
+        /// <summary>
+        /// The attribute on the method to be executed.
+        /// </summary>
+        public TestAttribute attribute;
 
         private static string[] _internalFiles;
         private static string[] internalFiles
         {
             get
             {
-                if (_internalFiles == null)
-                {
-                    _internalFiles = Directory.GetFiles(runtimeDir, "*", SearchOption.AllDirectories);
-                }
+                if (_internalFiles == null) _internalFiles = Directory.GetFiles(Utilities.runtimeDir, "*", SearchOption.AllDirectories);
                 return _internalFiles;
             }
         }
+        
+        public GameObject defaultGameObject;
 
-        public GameObject defaultGameObject
-        {
-            get
-            {
-                if (string.IsNullOrEmpty(_defaultGameObjectGUID)) return null;
-                return AssetDatabase.LoadAssetAtPath(AssetDatabase.GUIDToAssetPath(_defaultGameObjectGUID), typeof(GameObject)) as GameObject;
-            }
-            set
-            {
-                if (value == null) _defaultGameObjectGUID = null;
-                else _defaultGameObjectGUID = AssetDatabase.AssetPathToGUID(AssetDatabase.GetAssetPath(value));
-            }
-        }
+        public bool selected, locked, expanded;
 
-        /// <summary>
-        /// This is true whenever a Test is being run, uncluding during the SetUp and TearDown methods, and false otherwise.
-        /// </summary>
-        public static bool isTesting => current != null;
-
-        public bool selected;
-        public bool locked;
-
-        private string _defaultGameObjectGUID; 
         private GameObject gameObject;
         private Object script = null;
-        public bool expanded;
-        public const float scriptWidth = 150f;
-        private const string delimiter = "\n===| Test |===\n"; // Some unique delimiter
+
+
+
         private GameObject instantiatedDefaultGO = null;
+
         private static GameObject coroutineGO = null;
         private static List<System.Collections.IEnumerator> coroutines = new List<System.Collections.IEnumerator>();
         private static List<Coroutine> cos = new List<Coroutine>();
         public static Test current;
 
-        private static GUIStyle toggleStyle;
-        private static GUIStyle foldoutStyle;
-
         private static bool sceneWarningPrinted = false;
 
         public System.Action onFinished;
 
-
-        #region Operators
-
-        public override bool Equals(object obj)
-        {
-            if (obj.GetType() == typeof(Test)) return Equals(obj as Test);
-            return base.Equals(obj);
-        }
-        public bool Equals(Test other) => attribute == other.attribute;
-        public override int GetHashCode() => System.HashCode.Combine(base.GetHashCode(), GetString());
-        public static bool operator ==(Test left, Test right) => Equals(left, right);
-        public static bool operator !=(Test left, Test right) => !(left == right);
-        #endregion
-
-
+        [System.Serializable]
         public enum Result
         {
             None,
             Pass,
             Fail,
         }
-        
-        private Test() { }
 
-        public Test(TestAttribute attribute, MethodInfo method)
+
+        /// <summary>
+        /// Retrieve the Test that is saved in memory for the given TestAttribute. If no Test is found, returns a newly created Test object.
+        /// </summary>
+        /// <param name="attribute"></param>
+        /// <returns></returns>
+        public static Test Get(TestAttribute attribute)
         {
-            this.attribute = attribute;
-            this.method = method;
-            result = Result.None;
+            Test test;
+
+            // It isn't efficient, but let's try just searching through all the existing Test objects for one that has a matching TestAttribute
+            foreach (string path in Directory.GetFiles(Utilities.dataPath, "*.asset", SearchOption.TopDirectoryOnly))
+            {
+                test = AssetDatabase.LoadAssetAtPath(Utilities.GetUnityPath(path), typeof(Test)) as Test;
+                if (test.attribute != attribute) continue;
+                return test;
+            }
+
+            test = ScriptableObject.CreateInstance<Test>();
+            test.attribute = attribute;
+
+            // Save the Test asset with a unique GUID name to avoid conflicts.
+            AssetDatabase.CreateAsset(test, Utilities.GetUnityPath(Path.Join(Utilities.dataPath, System.Guid.NewGuid() + ".asset")));
+
+            return test;
         }
 
         private class CoroutineMonoBehaviour : MonoBehaviour { }
 
         public override string ToString() => "Test(" + attribute.GetPath() + ")";
-
-        
-        public string GetString()
-        {
-            return string.Join(delimiter,
-                attribute.GetString(),
-                (int)result,
-                _defaultGameObjectGUID,
-                selected,
-                expanded,
-                locked
-            );
-        }
-        public static Test FromString(string s)
-        {
-            if (string.IsNullOrEmpty(s)) return null;
-            Test newTest = new Test();
-            string[] data = s.Split(delimiter);
-            newTest.attribute = TestAttribute.FromString(data[0]);
-            newTest.result = (Result)int.Parse(data[1]);
-            newTest._defaultGameObjectGUID = data[2];
-            newTest.selected = bool.Parse(data[3]);
-            newTest.expanded = bool.Parse(data[4]);
-            newTest.locked = bool.Parse(data[5]);
-            return newTest;
-        }
 
         public bool IsInSuite() => method.DeclaringType.GetCustomAttribute(typeof(SuiteAttribute)) != null;
 
@@ -181,7 +135,7 @@ namespace UnityTest
             if (!string.IsNullOrEmpty(attribute.setUp))
             {
                 // Custom method
-                MethodInfo setUp = method.DeclaringType.GetMethod(attribute.setUp, bindingFlags);
+                MethodInfo setUp = method.DeclaringType.GetMethod(attribute.setUp, Utilities.bindingFlags);
                 object result = setUp.Invoke(null, null);
 
 
@@ -215,7 +169,7 @@ namespace UnityTest
             //Debug.Log("TearDown " + this);
             if (!string.IsNullOrEmpty(attribute.tearDown))
             {
-                MethodInfo tearDown = method.DeclaringType.GetMethod(attribute.tearDown, bindingFlags);
+                MethodInfo tearDown = method.DeclaringType.GetMethod(attribute.tearDown, Utilities.bindingFlags);
                 if (IsInSuite()) tearDown.Invoke(null, null);
                 else tearDown.Invoke(gameObject.GetComponent(method.DeclaringType), new object[] { gameObject });
             }
@@ -232,7 +186,7 @@ namespace UnityTest
             }
 
             Application.logMessageReceived += HandleLog;
-            
+
             current = this;
 
             // Check if this scene is empty
@@ -403,7 +357,7 @@ namespace UnityTest
             if (IsExample())
             {
                 // Get the internal directory in the style that Unity wants it in (starts with "Packages")
-                pathToSearch = Path.GetRelativePath(Path.GetDirectoryName(packagesPath), runtimeDir);
+                pathToSearch = Path.GetRelativePath(Path.GetDirectoryName(Utilities.packagesPath), Utilities.runtimeDir);
             }
             else
             {
@@ -439,257 +393,18 @@ namespace UnityTest
             }
             return script;
         }
-
-        public static GUIStyle GetToggleStyle()
-        {
-            if (toggleStyle == null)
-            {
-                toggleStyle = new GUIStyle(EditorStyles.iconButton);
-                toggleStyle.alignment = EditorStyles.toggle.alignment;
-                toggleStyle.fixedWidth = EditorStyles.toggle.fixedWidth;
-                toggleStyle.fixedHeight = EditorStyles.toggle.fixedHeight;
-                toggleStyle.font = EditorStyles.toggle.font;
-                toggleStyle.fontStyle = EditorStyles.toggle.fontStyle;
-                toggleStyle.fontSize = EditorStyles.toggle.fontSize;
-                toggleStyle.clipping = EditorStyles.toggle.clipping;
-                toggleStyle.border = EditorStyles.toggle.border;
-                toggleStyle.contentOffset = EditorStyles.toggle.contentOffset;
-                toggleStyle.imagePosition = EditorStyles.toggle.imagePosition;
-                toggleStyle.margin = EditorStyles.toggle.margin;
-                toggleStyle.overflow = EditorStyles.toggle.overflow;
-                toggleStyle.padding = EditorStyles.toggle.padding;
-                toggleStyle.richText = EditorStyles.toggle.richText;
-                toggleStyle.stretchHeight = EditorStyles.toggle.stretchHeight;
-                toggleStyle.stretchWidth = EditorStyles.toggle.stretchWidth;
-                toggleStyle.wordWrap = EditorStyles.toggle.wordWrap;
-
-                toggleStyle.padding.left = 0;
-            }
-            return toggleStyle;
-        }
-
-        public static GUIStyle GetFoldoutStyle()
-        {
-            if (foldoutStyle == null)
-            {
-                foldoutStyle = new GUIStyle(EditorStyles.foldout);
-                foldoutStyle.padding = new RectOffset(0, 0, 0, 0);
-                foldoutStyle.overflow = new RectOffset(0, 0, 0, 0);
-                foldoutStyle.contentOffset = Vector2.zero;
-                foldoutStyle.margin = new RectOffset(0, 0, 0, 0);
-
-            }
-            return foldoutStyle;
-        }
-
-        public static void PaintResultFeatures(Rect rect, Test.Result result)
-        {
-            if (result == Test.Result.Fail)
-            {
-                EditorGUI.DrawRect(rect, new Color(1f, 0f, 0f, 0.1f));
-            }
-        }
-
-        public static List<bool> DrawToggle(Rect rect, string name, bool selected, bool locked, bool showLock = true, bool isMixed = false)
-        {
-            bool wasMixed = EditorGUI.showMixedValue;
-            EditorGUI.showMixedValue = isMixed;
-
-            // Draw the light highlight when the toggle is selected
-            if (selected)
-            {
-                Rect r = new Rect(rect);
-                float w = EditorStyles.toggle.padding.left;
-                r.x += w;
-                r.width -= w;
-                EditorGUI.DrawRect(r, new Color(1f, 1f, 1f, 0.05f));
-            }
-
-            // Draw the lock button
-            if (showLock)
-            {
-                Rect lockRect = new Rect(rect);
-                lockRect.width = EditorStyles.toggle.CalcSize(GUIContent.none).x;
-                locked = GUI.Toggle(lockRect, locked, GUIContent.none, "IN LockButton");
-                rect.x += lockRect.width;
-                rect.width -= lockRect.width;
-            }
-
-            // Draw the toggle
-            bool wasEnabled = GUI.enabled;
-            GUI.enabled &= !locked;
-            selected = EditorGUI.ToggleLeft(rect, name, selected, GetToggleStyle());
-
-            GUI.enabled = wasEnabled;
-
-            EditorGUI.showMixedValue = wasMixed;
-
-            return new List<bool> { selected, locked };
-        }
-
-        public void Draw(Rect rect, bool showLock = true, bool showFoldout = true, bool allowExpand = true)
-        {
-            bool wasEnabled = GUI.enabled;
-
-            float toggleWidth = EditorStyles.toggle.CalcSize(GUIContent.none).x;
-
-            // Draw the expanded box first so it appears behind everything else
-            if (expanded && allowExpand && !IsInSuite())
-            {
-                float h = GUI.skin.label.CalcHeight(GUIContent.none, rect.width) + GUI.skin.label.margin.vertical;
-
-                GUIStyle boxStyle = new GUIStyle("GroupBox");
-                boxStyle.padding = GUI.skin.label.padding;
-                boxStyle.margin = new RectOffset((int)rect.x, (int)(0.5f * boxStyle.border.right), 0, 0);
-                boxStyle.padding.left = (int)(toggleWidth*2);
-                boxStyle.padding.right -= boxStyle.margin.right;
-
-                rect.y += 0.5f * boxStyle.padding.top;
-                
-                GUILayout.Space(-h); // Move the box closer to the Test foldout above
-                GUILayout.BeginHorizontal(boxStyle); // This is so we can shift the GroupBox drawing to the right
-                {
-                    GUILayout.BeginVertical();
-                    {
-                        GUILayout.Space(h);
-
-                        defaultGameObject = EditorGUI.ObjectField(
-                            EditorGUILayout.GetControlRect(true),
-                            new GUIContent("Default Prefab", "Provide a prefab from the Project folder. If the " +
-                                "default SetUp method is used in this test then it will receive an instantiated copy of this prefab."),
-                            defaultGameObject,
-                            typeof(GameObject),
-                            false
-                        ) as GameObject;
-                    }
-                    GUILayout.EndVertical();
-                }
-                GUILayout.EndHorizontal();
-            }
-
-            if (showFoldout)
-            {
-                // This prevents the foldout from grabbing focus on mouse clicks on the toggle buttons
-                Rect foldoutRect = new Rect(rect);
-                foldoutRect.width = toggleWidth;
-                expanded = allowExpand && GUI.Toggle(foldoutRect, expanded && allowExpand, GUIContent.none, GetFoldoutStyle());
-
-                Rect scriptRect = new Rect(rect);
-                scriptRect.x = rect.xMax - scriptWidth;
-                scriptRect.width = scriptWidth;
-                GUI.enabled = false;
-                float previousLabelWidth = EditorGUIUtility.labelWidth;
-                EditorGUIUtility.labelWidth = 0f;
-                EditorGUI.ObjectField(scriptRect, GUIContent.none, GetScript(), method.DeclaringType, false);
-                EditorGUIUtility.labelWidth = previousLabelWidth;
-                GUI.enabled = wasEnabled;
-            }
-
-            Rect toggleRect = new Rect(rect);
-            toggleRect.x += toggleWidth;
-            toggleRect.width -= toggleWidth;
-            if (!IsInSuite()) toggleRect.width -= scriptWidth;
-
-            List<bool> res = DrawToggle(toggleRect, attribute.name, selected, locked, showLock, false);
-            selected = res[0];
-            locked = res[1];
-
-            GUI.enabled = wasEnabled;
-        }
-    }
 #endif
 
-    /// <summary>
-    /// This object can be used in the inspector to set a default prefab to be instantiated when running a Test instead
-    /// of the default, which is to instantiate a new GameObject with an attached Component.
-    /// </summary>
-    [System.Serializable]
-    public class TestPrefab
-    {
-        [SerializeField] private string _methodName;
-        [SerializeField] private GameObject _gameObject;
-        [HideInInspector] public GameObject gameObject { get => _gameObject; }
-    }
-
-
-#if UNITY_EDITOR
-    [CustomPropertyDrawer(typeof(TestPrefab))]
-    public class TestPrefabPropertyDrawer : PropertyDrawer
-    {
-        private float xpadding = 2f;
-        private float ypadding = EditorGUIUtility.standardVerticalSpacing;
-        private float lineHeight = EditorGUIUtility.singleLineHeight;
-
-        private GUIContent[] methodNames;
-
-        private void Initialize(SerializedProperty property)
+        /// <summary>
+        /// This object can be used in the inspector to set a default prefab to be instantiated when running a Test instead
+        /// of the default, which is to instantiate a new GameObject with an attached Component.
+        /// </summary>
+        [System.Serializable]
+        public class TestPrefab
         {
-            System.Type type = property.serializedObject.targetObject.GetType();
-            string[] names = type.GetMethods(Test.bindingFlags)
-                          .Where(m => m.GetCustomAttributes(typeof(TestAttribute), true).Length > 0)
-                          .Select(m => m.Name).ToArray();
-            methodNames = new GUIContent[names.Length];
-            for (int i = 0; i < names.Length; i++)
-                methodNames[i] = new GUIContent(names[i]);
-        }
-
-        public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
-        {
-            return lineHeight;
-        }
-
-        public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
-        {
-            if (methodNames == null) Initialize(property);
-
-            SerializedProperty _gameObject = property.FindPropertyRelative(nameof(_gameObject));
-            SerializedProperty _methodName = property.FindPropertyRelative(nameof(_methodName));
-
-
-            //Debug.Log(property.propertyType);
-
-            int index = 0;
-            bool labelInOptions = false;
-            for (int i = 0; i < methodNames.Length; i++)
-            {
-                if (methodNames[i].text == _methodName.stringValue)
-                {
-                    index = i;
-                }
-                if (methodNames[i].text == label.text) labelInOptions = true;
-            }
-
-            // Create the rects to draw as though we had no prefix label (as inside ReorderableLists)
-            Rect rect1 = new Rect(position);
-            rect1.width = EditorGUIUtility.labelWidth - xpadding;
-
-            Rect rect2 = new Rect(position);
-            rect2.xMin = rect1.xMax + xpadding;
-            rect2.width = position.xMax - rect1.xMax;
-
-            if (labelInOptions && property.displayName == label.text)
-            { // If we are in a ReorderableList, then don't draw the prefix label.
-                label = GUIContent.none;
-                // For some reason the height is not right if we don't do this...
-                rect2.height = lineHeight;
-            }
-            else
-            { // Otherwise, draw a prefix label
-                Rect rect = new Rect(position);
-                rect.width = EditorGUIUtility.labelWidth - xpadding;
-                rect1.xMin = rect.xMax + xpadding;
-                rect1.width = (position.xMax - rect.xMax) * 0.5f - 2 * xpadding;
-                rect2.xMin = rect1.xMax + xpadding;
-                rect2.width = position.xMax - rect2.xMin;
-
-                EditorGUI.LabelField(rect, label);
-                label = GUIContent.none;
-            }
-            int result = EditorGUI.Popup(rect1, label, index, methodNames);
-            if (result < methodNames.Length) _methodName.stringValue = methodNames[result].text;
-            EditorGUI.ObjectField(rect2, _gameObject, GUIContent.none);
+            [SerializeField] private string _methodName;
+            [SerializeField] private GameObject _gameObject;
+            [HideInInspector] public GameObject gameObject { get => _gameObject; }
         }
     }
-#endif
-
 }

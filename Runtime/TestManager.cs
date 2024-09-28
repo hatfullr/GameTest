@@ -4,13 +4,16 @@ using UnityEditor;
 using UnityEditor.Compilation;
 using System.Reflection;
 using System.IO;
-using System.Threading.Tasks;
 
 namespace UnityTest
 {
+    /// <summary>
+    /// Holds the assemblies, Test methods, and queues. Executes the tests when instructed.
+    /// </summary>
     public class TestManager
     {
-        private const string delimiter = "\n===|TestManager|===\n"; // Some unique value
+        public const string delimiter = "\n===|TestManager|===\n"; // Some unique value
+        public const string testDelimiter = "\n!!!@@@Test@@@!!!\n"; // Some unique value
 
         private static List<System.Reflection.Assembly> assemblies = new List<System.Reflection.Assembly>();
 
@@ -30,9 +33,6 @@ namespace UnityTest
         public float timer;
         public int nframes;
 
-        public System.Action onStartUpdatingMethods;
-        public System.Action onFinishUpdatingMethods;
-
         /// <summary>
         /// When true, debug messages are printed to Console.
         /// </summary>
@@ -41,11 +41,9 @@ namespace UnityTest
         public bool paused = false;
         public bool running = false;
 
-        public uint previousFrameNumber = 0;
+        private uint previousFrameNumber = 0;
 
         public bool runTestsOnPlayMode = false;
-
-
 
         [HideInCallstack]
         public void Update()
@@ -64,18 +62,16 @@ namespace UnityTest
                 return;
             }
 
-            if (Test.isTesting)
+            if (running)
             {
-                if (!EditorApplication.isPaused && Test.current.result == Test.Result.Fail) return;
-
+                if (EditorApplication.isPaused) return;
                 timer += Time.deltaTime;
                 nframes++;
             }
+        }
 
-            if (queue.Count == 0) return;
-            running = true;
-            if (Test.isTesting) return;
-            // Start the next Test in the queue
+        private void RunNext()
+        {
             timer = 0f;
             nframes = 0;
             Test test = queue.Dequeue();
@@ -83,6 +79,7 @@ namespace UnityTest
             [HideInCallstack]
             void OnFinished()
             {
+                test.onFinished -= OnFinished;
                 if (debug) test.PrintResult();
                 finishedTests.Enqueue(test);
                 if (queue.Count == 0)
@@ -90,10 +87,20 @@ namespace UnityTest
                     running = false;
                     if (debug) Debug.Log("[UnityTest] Finished");
                 }
-                test.onFinished -= OnFinished;
+                else
+                {
+                    if (test.attribute.pauseOnFail && test.result == Test.Result.Fail)
+                    {
+                        EditorApplication.isPaused = true;
+                    }
+                    else
+                    {
+                        RunNext(); // Continue on to the next test
+                    }
+                }
             }
+            
             test.onFinished += OnFinished;
-
             test.Run();
         }
 
@@ -108,7 +115,9 @@ namespace UnityTest
             tests = new SortedDictionary<TestAttribute, Test>();
             methods = new SortedDictionary<TestAttribute, MethodInfo>();
             runTestsOnPlayMode = false;
-            assemblies = null;
+            UpdateAssemblies();
+            UpdateMethods();
+            CreateTests();
         }
 
 
@@ -125,23 +134,35 @@ namespace UnityTest
         }
 
 
-        
+        #region Test Execution
+        /// <summary>
+        /// Begin working through the queue, running each Test.
+        /// </summary>
+        public void Start()
+        {
+            running = true;
+            RunNext();
+        }
+
+        /// <summary>
+        /// Stop running tests and clear the queues
+        /// </summary>
+        public void Stop()
+        {
+            queue.Clear();
+            paused = false;
+            running = false;
+            if (EditorApplication.isPlaying) EditorApplication.ExitPlaymode();
+        }
+        #endregion
 
 
 
 
-        #region Mechanisms
+        #region Assembly and Test Management
         private TestAttribute GetAttribute(MethodInfo method) => method.GetCustomAttribute(typeof(TestAttribute), false) as TestAttribute;
 
         public bool IsMethodIgnored(MethodInfo method) => method.GetCustomAttribute(typeof(IgnoreAttribute), false) != null;
-
-        public async void StartUpdatingMethods()
-        {
-            onStartUpdatingMethods.Invoke();
-            UpdateAssemblies();
-            await Task.Run(UpdateMethods);
-            onFinishUpdatingMethods.Invoke();
-        }
 
         /// <summary>
         /// Locate the assemblies that Unity has most recently compile, and load them into memory. This can only be called from the main thread.
@@ -173,7 +194,7 @@ namespace UnityTest
                     if (!type.IsClass) continue; // only work with classes
 
                     // Fetch the test methods
-                    foreach (MethodInfo method in type.GetMethods(Test.bindingFlags))
+                    foreach (MethodInfo method in type.GetMethods(Utilities.bindingFlags))
                     {
                         // Make sure the method has the TestAttribute decorator
                         object[] attributes = method.GetCustomAttributes(typeof(TestAttribute), false);
@@ -202,114 +223,68 @@ namespace UnityTest
                 }
             }
 
-            methods.Clear();
+            List<TestAttribute> found = new List<TestAttribute>();
             foreach (MethodInfo method in _methods)
             {
                 if (IsMethodIgnored(method)) continue;
-                try { methods.Add(GetAttribute(method), method); }
-                catch (System.ArgumentException) // tried to add duplicate key (multiple tests have the same path)
-                {
-                    Debug.LogError("Test ignored because it has the same path as another test: '" + GetAttribute(method).GetPath() + "'");
-                }
+
+                TestAttribute attribute = GetAttribute(method);
+                found.Add(attribute);
+                if (methods.ContainsKey(attribute)) methods[attribute] = method; // Update the method with the current one
+                else methods.Add(attribute, method); // Add a new method
             }
+            
+
             foreach (System.Type cls in classes)
             {
                 SuiteAttribute attribute = cls.GetCustomAttribute(typeof(SuiteAttribute), false) as SuiteAttribute;
                 bool hasSetUp = false;
                 bool hasTearDown = false;
-                foreach (MethodInfo method in cls.GetMethods(Test.bindingFlags))
+                foreach (MethodInfo method in cls.GetMethods(Utilities.bindingFlags))
                 {
                     if (IsMethodIgnored(method)) continue;
                     if (method.Name == "SetUp") hasSetUp = true;
                     else if (method.Name == "TearDown") hasTearDown = true;
                 }
 
-                foreach (MethodInfo method in cls.GetMethods(Test.bindingFlags))
+                foreach (MethodInfo method in cls.GetMethods(Utilities.bindingFlags))
                 {
                     if (IsMethodIgnored(method)) continue;
                     if (method.Name == "SetUp" || method.Name == "TearDown") continue;
+                    TestAttribute attr;
+
                     if (hasSetUp && hasTearDown)
-                        methods.Add(new TestAttribute("SetUp", "TearDown", attribute.pauseOnFail, Path.Join(attribute.GetPath(), method.Name), attribute.sourceFile), method);
+                        attr = new TestAttribute("SetUp", "TearDown", attribute.pauseOnFail, Path.Join(attribute.GetPath(), method.Name), attribute.sourceFile);
                     else if (hasSetUp && !hasTearDown)
-                        methods.Add(new TestAttribute("SetUp", attribute.pauseOnFail, Path.Join(attribute.GetPath(), method.Name), attribute.sourceFile), method);
+                        attr = new TestAttribute("SetUp", attribute.pauseOnFail, Path.Join(attribute.GetPath(), method.Name), attribute.sourceFile);
                     else
-                        methods.Add(new TestAttribute(attribute.pauseOnFail, Path.Join(attribute.GetPath(), method.Name), attribute.sourceFile), method);
+                        attr = new TestAttribute(attribute.pauseOnFail, Path.Join(attribute.GetPath(), method.Name), attribute.sourceFile);
+                    found.Add(attr);
+                    if (methods.ContainsKey(attr)) methods[attr] = method;
+                    else methods.Add(attr, method);
                 }
+            }
+
+            // Ensure that methods no longer contains old, invalid items
+            foreach (TestAttribute attribute in new List<TestAttribute>(methods.Keys))
+            {
+                if (!found.Contains(attribute)) methods.Remove(attribute);
             }
         }
 
-        public SortedDictionary<TestAttribute, Test> GetTests()
+
+        /// <summary>
+        /// Populate the "tests" attribute with Test objects that are correctly linked up to their associated methods.
+        /// </summary>
+        public void CreateTests()
         {
-            SortedDictionary<TestAttribute, Test> result = new SortedDictionary<TestAttribute, Test>();
             Test newTest;
             foreach (TestAttribute attribute in methods.Keys)
             {
-                string path = attribute.GetPath();
-                if (tests.ContainsKey(attribute))
-                {
-                    newTest = tests[attribute];
-                    newTest.method = methods[attribute];
-                    newTest.selected = tests[attribute].selected;
-                }
-                else newTest = new Test(attribute, methods[attribute]);
-                result.Add(attribute, newTest);
+                newTest = Test.Get(attribute);
+                newTest.method = methods[attribute];
+                tests.Add(attribute, newTest);
             }
-            return result;
-        }
-
-        public void CreateTests()
-        {
-            tests.Clear();
-            tests = GetTests();
-        }
-
-        /// <summary>
-        /// Stop running tests and clear the queues
-        /// </summary>
-        public void Stop()
-        {
-            queue.Clear();
-            paused = false;
-            running = false;
-            EditorApplication.ExitPlaymode();
-        }
-        #endregion
-
-
-        #region Persistence Methods
-        /// <summary>
-        /// Return the data as a string
-        /// </summary>
-        public string GetString()
-        {
-            return string.Join(delimiter,
-                debug,
-                previousFrameNumber,
-                timer,
-                nframes,
-                runTestsOnPlayMode
-            );
-        }
-        public void FromString(string data)
-        {
-            if (string.IsNullOrEmpty(data)) return;
-
-            string[] c = data.Split(delimiter);
-
-            try { debug = bool.Parse(c[0]); }
-            catch (System.Exception e) { if (!(e is System.FormatException || e is System.IndexOutOfRangeException)) throw e; }
-
-            try { previousFrameNumber = uint.Parse(c[1]); }
-            catch (System.Exception e) { if (!(e is System.FormatException || e is System.IndexOutOfRangeException)) throw e; }
-
-            try { timer = float.Parse(c[2]); }
-            catch (System.Exception e) { if (!(e is System.FormatException || e is System.IndexOutOfRangeException)) throw e; }
-
-            try { nframes = int.Parse(c[3]); }
-            catch (System.Exception e) { if (!(e is System.FormatException || e is System.IndexOutOfRangeException)) throw e; }
-
-            try { runTestsOnPlayMode = bool.Parse(c[4]); }
-            catch (System.Exception e) { if (!(e is System.FormatException || e is System.IndexOutOfRangeException)) throw e; }
         }
         #endregion
     }

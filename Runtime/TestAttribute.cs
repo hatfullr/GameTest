@@ -7,35 +7,31 @@ namespace UnityTest
     /// This method will be included in Window > Unit Test Manager. It must return void and accept a GameObject, which has this method's
     /// Component attached. The GameObject is created by the SetUp function. Use UnityEngine.Assert to process tests.
     /// </summary>
-    [System.AttributeUsage(System.AttributeTargets.Method)]
-    public class TestAttribute : System.Attribute, System.IEquatable<TestAttribute>, System.IComparable<TestAttribute>
+    [System.AttributeUsage(System.AttributeTargets.Method), System.Serializable]
+    public class TestAttribute : System.Attribute, System.IComparable<TestAttribute>
     {
-        public const string delimiter = "\n**..-- TestAttributeDelimiter --..**\n";
+        //public const string delimiter = "\n**..-- TestAttributeDelimiter --..**\n";
 
         /// <summary>
         /// The test method name which appears in the test manager. The default is the name of the method. Names must be unique per-file.
         /// </summary>
-        public string name { get; private set; }
-
+        public string name;
         /// <summary>
         /// Name of a static method which returns a GameObject and accepts no parameters.
         /// </summary>
-        public string setUp { get; private set; }
-
+        public string setUp;
         /// <summary>
         /// Name of a static method which returns void and accepts the GameObject returned by SetUp.
         /// </summary>
-        public string tearDown { get; private set; }
-
+        public string tearDown;
         /// <summary>
         /// Pause the editor when this test fails. No other subsequent tests will run. default = false.
         /// </summary>
-        public bool pauseOnFail { get; private set; }
-
+        public bool pauseOnFail;
         /// <summary>
         /// DO NOT MODIFY. This is the path to the source file that this attribute was used in. It is set by a reflection technique.
         /// </summary>
-        public string sourceFile { get; private set; }
+        public string sourceFile;
 
         /// <summary>
         /// This method will be added to Window > Unit Test Manager based on its path. Use '/' to create nested toggles.
@@ -109,53 +105,19 @@ namespace UnityTest
         }
 
 
-        public string GetString()
-        {
-            return string.Join(delimiter,
-                setUp,
-                tearDown,
-                pauseOnFail.ToString(),
-                name,
-                sourceFile
-            );
-        }
-
-        public static TestAttribute FromString(string s)
-        {
-            string[] contents = s.Split(delimiter);
-            return new TestAttribute(
-                contents[0], // setUp
-                contents[1], // tearDown
-                bool.Parse(contents[2]), // pauseOnFail
-                contents[3], // name
-                contents[4] // sourceFile
-            );
-        }
-
-        /// <summary>
-        /// Copy the properties of other into this attribute, overwriting values.
-        /// </summary>
-        public void UpdateFrom(TestAttribute other)
-        {
-            setUp = other.setUp;
-            tearDown = other.tearDown;
-            pauseOnFail = other.pauseOnFail;
-            name = other.name;
-            sourceFile = other.sourceFile;
-        }
-
-
         #region Operators
-        public override bool Equals(object obj)
-        {
-            if (obj.GetType() == typeof(TestAttribute)) return Equals(obj as TestAttribute);
-            return base.Equals(obj);
-        }
-        public bool Equals(TestAttribute other) => GetString() == other.GetString();
+        public override string ToString() => "TestAttribute(" + GetPath() + ")";
         public int CompareTo(TestAttribute other) => GetPath().CompareTo(other.GetPath());
-        public override int GetHashCode() => System.HashCode.Combine(GetString());
-        
-        public static bool operator ==(TestAttribute left, TestAttribute right) => Equals(left, right);
+
+        public override bool Equals(object other)
+        {
+            if (GetType() != other.GetType()) return false;
+            return this == (other as TestAttribute);
+        }
+
+        public override int GetHashCode() => (sourceFile + name + setUp + tearDown + pauseOnFail).GetHashCode();
+
+        public static bool operator ==(TestAttribute left, TestAttribute right) => left.sourceFile == right.sourceFile && left.name == right.name && left.setUp == right.setUp && left.tearDown == right.tearDown && left.pauseOnFail == right.pauseOnFail;
         public static bool operator !=(TestAttribute left, TestAttribute right) => !(left == right);
         #endregion
     }

@@ -5,25 +5,13 @@ namespace UnityTest
 {
     public class Queue : System.Collections.Queue
     {
-        private const string delimiter = ".:!Queue!:."; // Some unique identifier
-
         public List<Test> tests { get; private set; } = new List<Test>();
 
-        public Queue(Test[] tests)
+        public Queue(Test[] tests = null)
         {
+            if (tests == null) tests = new Test[0];
             foreach (Test test in tests) Enqueue(test);
             this.tests = new List<Test>(tests);
-        }
-
-        public Queue(string data = null)
-        {
-            if (!string.IsNullOrEmpty(data))
-            {
-                foreach (string d in data.Split(delimiter))
-                {
-                    Enqueue(Test.FromString(d));
-                }
-            }
         }
 
         /// <summary>
@@ -48,19 +36,6 @@ namespace UnityTest
         }
 
         /// <summary>
-        /// For saving.
-        /// </summary>
-        public string GetString()
-        {
-            string[] strings = new string[tests.Count];
-            for (int i = 0; i < tests.Count; i++)
-            {
-                strings[i] = tests[i].GetString();
-            }
-            return string.Join(delimiter, strings);
-        }
-
-        /// <summary>
         /// Make this Queue and the other Queue equivalent.
         /// </summary>
         public void Sync(Queue other)
@@ -76,24 +51,11 @@ namespace UnityTest
             while (Count > 0)
             {
                 Test t = base.Dequeue() as Test;
-                if (t == test) continue;
+                if (t.attribute == test.attribute) continue;
                 newQueue.Enqueue(t);
             }
             while (newQueue.Count > 0) base.Enqueue(newQueue.Dequeue());
             tests.Remove(test);
-        }
-
-        public void RemoveAt(int index)
-        {
-            Queue newQueue = new Queue();
-            for (int i = 0; i < Count; i++)
-            {
-                Test t = base.Dequeue() as Test;
-                if (i == index) continue;
-                newQueue.Enqueue(t);
-            }
-            while (newQueue.Count > 0) base.Enqueue(newQueue.Dequeue());
-            tests.RemoveAt(index);
         }
     }
 }

@@ -1,5 +1,7 @@
 using System.Collections.Generic;
 using System.IO;
+using System.Reflection;
+using UnityEditor;
 using UnityEngine;
 
 
@@ -8,7 +10,10 @@ namespace UnityTest
     public static class Utilities
     {
         public const string editorPrefs = "UnityTest";
-        
+        public const string guidPrefs = "UnityTest/GUIDs";
+        public const char guidDelimiter = '\n';
+        public const BindingFlags bindingFlags = BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly | BindingFlags.Static;
+
         /// <summary>
         /// Location of the "Assets" folder.
         /// </summary>
@@ -22,13 +27,19 @@ namespace UnityTest
         /// </summary>
         public static string packagesPath { get; } = Path.GetFullPath(Path.Join(projectPath, "Packages"));
         /// <summary>
-        /// Location of the "Packages/UnityTest/Runtime" folder
+        /// Location of the "Packages/UnityTest/Runtime" folder.
         /// </summary>
         public static string runtimeDir { get; } = Path.GetFullPath(Path.Join(packagesPath, "UnityTest", "Runtime"));
+        /// <summary>
+        /// Location of the "Packages/UnityTest/Runtime/Data" folder.
+        /// </summary>
+        public static string dataPath { get; } = Path.GetFullPath(Path.Join(runtimeDir, "Data"));
+
         /// <summary>
         /// The file located at "Packages/UnityTest/Runtime/ExampleTests.cs"
         /// </summary>
         public static string exampleTestsFile { get; } = Path.GetFullPath(Path.Join(runtimeDir, "ExampleTests.cs"));
+        
 
         public static bool IsSceneEmpty()
         {
@@ -126,8 +137,6 @@ namespace UnityTest
             }
             return false;
         }
-
-
 
         /// <summary>
         /// Signifies that a path is not located in either the "Assets" or "Packages" folder of a project.

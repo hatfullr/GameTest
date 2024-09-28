@@ -2,15 +2,35 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor;
 using UnityEditor.SceneManagement;
-using System.IO;
-using System.Threading.Tasks;
+using System.Linq;
 
 namespace UnityTest
 {
     public class TestManagerUI : EditorWindow, IHasCustomMenu
     {
+        public const string windowTitle = "UnityTest Manager";
+        public const float minHeight = 300f;
+        private const string delimiter = "\n===|TestManagerUIHeader|===\n";  // Some unique value
+        private const string foldoutDelimiter = "\n===|TestManagerUIFoldout|===\n"; // Some unique value
+        private const float spinRate = 0.05f;
+        public const float scriptWidth = 150f;
+
+        private static TestManagerUI _Instance;
+        public static TestManagerUI Instance
+        {
+            get
+            {
+                if (_Instance == null)
+                {
+                    _Instance = EditorWindow.GetWindow(typeof(TestManagerUI)) as TestManagerUI;
+                    _Instance.titleContent = new GUIContent(windowTitle);
+                }
+                return _Instance;
+            }
+        }
+
         private TestManager _manager;
-        private TestManager manager
+        public TestManager manager
         {
             get
             {
@@ -39,32 +59,23 @@ namespace UnityTest
             }
         }
 
-        public static HashSet<Foldout> foldouts { get; private set; } = new HashSet<Foldout>();
+        public HashSet<Foldout> foldouts { get; private set; } = new HashSet<Foldout>();
 
         private Vector2 scrollPosition;
 
         private bool refreshing = false;
 
-        public const float minHeight = 300f;
+        public float indentWidth;
+        public int indentLevel;
 
-        private const string headerDelimiter = "\n===|TestManagerUIHeader|===\n";  // Some unique value
-        private const string delimiter = "\n===|TestManagerUI|===\n"; // Some unique value
-        private const string splitDelimiter = "\n===|TestSplit|===\n"; // Some unique value
-        private const string foldoutDelimiter = "\n===|TestManagerUIFoldout|===\n"; // Some unique value
+        private bool showWelcome = true;
 
-        public static float indentWidth;
-        public static int indentLevel;
+        private float spinStartTime = 0f;
+        private int spinIndex = 0;
+        private bool loadingWheelVisible = false;
 
-        private static bool debug = true;
-        private static bool showWelcome = true;
-
-        private static float spinStartTime = 0f;
-        private const float spinRate = 0.05f;
-        private static int spinIndex = 0;
-        private static bool loadingWheelVisible = false;
-
-        private static Settings _settings;
-        public static Settings settings
+        private Settings _settings;
+        public Settings settings
         {
             get
             {
@@ -73,15 +84,14 @@ namespace UnityTest
             }
         }
 
-        private static bool startCalled;
-        private static bool assemblyReloading = false;
+        private static GUIStyle toggleStyle;
+        private static GUIStyle foldoutStyle;
 
         private void DoReset()
         {
             EditorPrefs.SetString(Utilities.editorPrefs, null);
 
             manager.Reset();
-            OnDisable();
             guiQueue.Reset();
 
             _settings = null;
@@ -93,9 +103,9 @@ namespace UnityTest
             refreshing = false;
             loadingWheelVisible = false;
             foldouts = new HashSet<Foldout>();
-            assemblyReloading = false;
-            
-            OnEnable();
+
+            Load();
+            Debug.Log("Reset " + windowTitle);
         }
 
         public void AddItemsToMenu(GenericMenu menu)
@@ -106,53 +116,147 @@ namespace UnityTest
         [MenuItem("Window/UnityTest Manager")]
         public static void ShowWindow()
         {
-            EditorWindow window = EditorWindow.GetWindow(typeof(TestManagerUI));
-            window.titleContent = new GUIContent("UnityTest Manager");
+            Instance.titleContent = new GUIContent("UnityTest Manager");
         }
 
+        /// <summary>
+        /// Called after ShowWindow but before OnEnable, and only when the window is opened.
+        /// </summary>
+        void Awake()
+        {
+            Load();
+        }
 
+        /// <summary>
+        /// Called before AssemblyReloadEvents.afterAssemblyReload, and whenever the user opens the window.
+        /// </summary>
         void OnEnable()
         {
-            AssemblyReloadEvents.beforeAssemblyReload += BeforeAssemblyReload;
-            AssemblyReloadEvents.afterAssemblyReload += AfterAssemblyReload;
-            
+            AssemblyReloadEvents.beforeAssemblyReload += Save;
+            AssemblyReloadEvents.afterAssemblyReload += Load;
             EditorApplication.playModeStateChanged += OnPlayStateChanged;
-            manager.onStartUpdatingMethods += StartLoadingWheel;
-            manager.onFinishUpdatingMethods += OnMethodsUpdated;
 
-            if (!assemblyReloading)
+            if (EditorApplication.isPlaying)
             {
-                manager.StartUpdatingMethods();
-                //Load();
-                //manager.CreateTests();
-                //CreateFoldouts();
-                //StopLoadingWheel();
-                //Repaint();
+                if (manager.runTestsOnPlayMode) RunSelected();
+                manager.runTestsOnPlayMode = false;
             }
         }
+
+        /// <summary>
+        /// Called when the window is closed, before OnDestroy(), as well as right before assembly reload.
+        /// </summary>
         void OnDisable()
         {
-            AssemblyReloadEvents.beforeAssemblyReload -= BeforeAssemblyReload;
-            AssemblyReloadEvents.afterAssemblyReload -= AfterAssemblyReload;
-
+            AssemblyReloadEvents.beforeAssemblyReload -= Save;
+            AssemblyReloadEvents.afterAssemblyReload -= Load;
             EditorApplication.playModeStateChanged -= OnPlayStateChanged;
-            manager.onStartUpdatingMethods -= StartLoadingWheel;
-            manager.onFinishUpdatingMethods -= OnMethodsUpdated;
-
-            Save();
         }
 
-        private void BeforeAssemblyReload()
+        /// <summary>
+        /// Called only when the window is closed.
+        /// </summary>
+        void OnDestroy()
         {
             Save();
-            assemblyReloading = true;
         }
 
-        private void AfterAssemblyReload()
+        private void Refresh()
         {
-            assemblyReloading = false;
-            manager.StartUpdatingMethods(); // We do everything else in OnMethodsUpdated, after checking the assemblies for tests
+            refreshing = true;
+            Repaint();
+            Save();
+            Load();
+            Repaint();
+            refreshing = false;
         }
+
+
+
+        #region Persistence Methods
+        /// <summary>
+        /// Save the object to EditorPrefs.
+        /// </summary>
+        private void Save()
+        {
+            EditorPrefs.SetString(Utilities.editorPrefs, GetString());
+        }
+
+        /// <summary>
+        /// Parse the string saved by Save() in the EditorPrefs
+        /// </summary>
+        private void Load()
+        {
+            manager.Reset();
+            CreateFoldouts();
+
+            // Load relevant information that isn't related to the tests
+            if (EditorPrefs.HasKey(Utilities.editorPrefs)) FromString(EditorPrefs.GetString(Utilities.editorPrefs));
+        }
+
+
+        /// <summary>
+        /// Construct a string to save in the EditorPrefs. Tests themselves cannot be saved because we lack their MethodInfo objects (not serializable).
+        /// Foldout.expanded needs to be saved so we can remember which Foldouts are expanded.
+        /// </summary>
+        private string GetString()
+        {
+            return string.Join(delimiter,
+                showWelcome,
+                manager.debug,
+                guiQueue.GetString(),
+                string.Join(foldoutDelimiter, foldouts.Select(x => x.GetString()))
+            );
+        }
+
+        /// <summary>
+        /// Set values from a data string that was saved in EditorPrefs.
+        /// </summary>
+        private void FromString(string data)
+        {
+            string[] c = data.Split(delimiter);
+            try { showWelcome = bool.Parse(c[0]); }
+            catch (System.Exception e) { if (!(e is System.FormatException || e is System.IndexOutOfRangeException)) throw e; }
+            try { manager.debug = bool.Parse(c[1]); }
+            catch (System.Exception e) { if (!(e is System.FormatException || e is System.IndexOutOfRangeException)) throw e; }
+            try { guiQueue.FromString(c[2]); }
+            catch (System.Exception e) { if (!(e is System.FormatException || e is System.IndexOutOfRangeException)) throw e; }
+            try
+            {
+                Foldout foldout = null;
+                foreach (string dat in c[3].Split(foldoutDelimiter))
+                {
+                    foldout = null;
+                    try { foldout = Foldout.FromString(dat); }
+                    catch(System.Exception e) { if (!(e is System.FormatException || e is System.IndexOutOfRangeException)) throw e; }
+                    if (foldout == null) continue;
+
+                    bool contains = false;
+                    foreach (Foldout f in foldouts)
+                    {
+                        if (f.path == foldout.path)
+                        {
+                            f.CopyFrom(foldout);
+                            contains = true;
+                            break;
+                        }
+                    }
+                    if (!contains) foldouts.Add(foldout);
+                }
+            }
+            catch (System.Exception e) { if (!(e is System.FormatException || e is System.IndexOutOfRangeException)) throw e; }
+        }
+
+
+
+
+        #endregion
+
+
+
+
+
+
 
         private void StartLoadingWheel()
         {
@@ -165,82 +269,29 @@ namespace UnityTest
             loadingWheelVisible = false;
         }
 
-
-        private void CreateFoldout(TestAttribute attribute)
-        {
-            string path = attribute.GetPath();
-
-            Test newTest;
-            //if (manager.cachedTests.ContainsKey(path)) newTest = manager.cachedTests[path];
-            if (manager.tests.ContainsKey(attribute)) newTest = manager.tests[attribute];
-            else newTest = manager.tests[attribute];
-
-            Foldout directory = rootFoldout;
-            foreach (string p in Utilities.IterateDirectories(Path.GetDirectoryName(path), true))
-            {
-                Foldout newFoldout;
-                if (Foldout.ExistsAtPath(p)) newFoldout = Foldout.GetAtPath(p);
-                else
-                {
-                    newFoldout = new Foldout(p);
-                    foldouts.Add(newFoldout);
-                }
-                directory = newFoldout;
-            }
-            // After traversing the directories, we end in the correct directory needed for this test
-            directory.Add(newTest);
-        }
-
         private void CreateFoldouts()
         {
             if (foldouts == null) foldouts = new HashSet<Foldout>();
 
-            // For all the attributes, create Foldouts and Tests
-            foreach (TestAttribute attribute in manager.methods.Keys)
+            // Tests have already been created.
+            foreach (Test test in manager.tests.Values)
             {
-                if (Foldout.ExistsAtPath(attribute.GetPath())) continue;
-                CreateFoldout(attribute);
-            }
-        }
-
-        private async void Refresh()
-        {
-            refreshing = true;
-
-            var oldMethods = manager.methods;
-            spinStartTime = Time.realtimeSinceStartup;
-            await Task.Run(manager.UpdateMethods);
-            Repaint();
-
-            bool needUpdate = false;
-            foreach (TestAttribute attribute in manager.methods.Keys)
-            {
-                if (!manager.methods.ContainsKey(attribute))
+                // Ensure that Foldouts are created at each level to support this Test
+                Foldout final = null;
+                foreach (string p in Utilities.IterateDirectories(test.attribute.GetPath(), true))
                 {
-                    needUpdate = true;
-                    break;
-                }
-            }
-            if (!needUpdate)
-            {
-                foreach (TestAttribute attribute in oldMethods.Keys)
-                {
-                    if (!manager.methods.ContainsKey(attribute))
+                    if (Foldout.ExistsAtPath(p)) final = Foldout.GetAtPath(p);
+                    else
                     {
-                        needUpdate = true;
-                        break;
+                        final = new Foldout(p);
+                        foldouts.Add(final);
                     }
                 }
+                final.tests.Add(test);
             }
-
-            if (needUpdate)
-            {
-                // Hard refresh of everything
-                OnEnable();
-            }
-
-            refreshing = false;
         }
+
+
 
         private void GoToEmptyScene()
         {
@@ -268,24 +319,6 @@ namespace UnityTest
 
         private void DeselectAll() => rootFoldout.Deselect(); // Simulate a press
 
-
-
-
-
-        /// <summary>
-        /// Implementing my own Start function because we need it
-        /// </summary>
-        private void Start()
-        {
-            startCalled = true;
-
-            if (EditorApplication.isPlaying)
-            {
-                if (manager.runTestsOnPlayMode) RunSelected();
-                manager.runTestsOnPlayMode = false;
-            }
-        }
-
         private void OnPlayStateChanged(PlayModeStateChange change)
         {
             manager.OnPlayStateChanged(change);
@@ -302,33 +335,22 @@ namespace UnityTest
                 Repaint();
                 return;
             }
-            if (!startCalled) Start();
             if (!EditorApplication.isPlaying) return;
             manager.Update();
             if (manager.running && !manager.paused) Repaint(); // keeps the frame counter and timer up-to-date
         }
 
-        
-
-        /// <summary>
-        /// Called after the manager is finished checking assemblies for tests.
-        /// </summary>
-        private void OnMethodsUpdated()
-        {
-            Load();
-            manager.CreateTests();
-            CreateFoldouts();
-            StopLoadingWheel();
-            Repaint();
-        }
 
 
-        
+
+
+
+
         #region Drawing Methods
         void OnGUI()
         {
             State state = new State(rootFoldout);
-            
+
             bool refresh = false;
             bool selectAll = false;
             bool deselectAll = false;
@@ -502,7 +524,7 @@ namespace UnityTest
             GUI.enabled = wasEnabled;
         }
 
-        
+
 
         private void DrawPlayButton(State state)
         {
@@ -579,9 +601,9 @@ namespace UnityTest
         private void DrawDebugButton()
         {
             GUIContent debugContent = new GUIContent(EditorGUIUtility.IconContent("d_DebuggerDisabled"));
-            if (debug) debugContent.image = EditorGUIUtility.IconContent("d_DebuggerAttached").image;
+            if (manager.debug) debugContent.image = EditorGUIUtility.IconContent("d_DebuggerAttached").image;
             debugContent.tooltip = "Enable/disable debug messages";
-            debug = GUILayout.Toggle(debug, debugContent, EditorStyles.toolbarButton);
+            manager.debug = GUILayout.Toggle(manager.debug, debugContent, EditorStyles.toolbarButton);
         }
 
         private bool DrawRefreshButton()
@@ -603,7 +625,7 @@ namespace UnityTest
         /// </summary>
         private void ShowResetConfirmation()
         {
-            if (EditorPrefs.GetString(Utilities.editorPrefs) == GetString(manager.GetTests())) return; // no data to lose
+            //if (EditorPrefs.GetString(Utilities.editorPrefs) == GetString(manager.GetTests())) return; // no data to lose
             if (!EditorUtility.DisplayDialog("Reset UnityTest Manager?", "Are you sure? This will clear all saved information about tests, GameObjects, etc. " +
                 "If you have encountered a bug, first try closing the UnityTest Manager and opening it again.",
                 "Yes", "No"
@@ -612,139 +634,243 @@ namespace UnityTest
             // User clicked "OK"
             DoReset();
         }
+
         #endregion
 
 
-
-        #region Persistence Methods
-        /// <summary>
-        /// Construct a string to save in the EditorPrefs
-        /// </summary>
-        private string GetString(SortedDictionary<TestAttribute, Test> tests)
+        #region Test drawing
+        public static GUIStyle GetToggleStyle()
         {
-            string GetHeader()
+            if (toggleStyle == null)
             {
-                return string.Join(headerDelimiter,
-                    showWelcome,
-                    manager.GetString(),
-                    guiQueue.GetString()
-                );
+                toggleStyle = new GUIStyle(EditorStyles.iconButton);
+                toggleStyle.alignment = EditorStyles.toggle.alignment;
+                toggleStyle.fixedWidth = EditorStyles.toggle.fixedWidth;
+                toggleStyle.fixedHeight = EditorStyles.toggle.fixedHeight;
+                toggleStyle.font = EditorStyles.toggle.font;
+                toggleStyle.fontStyle = EditorStyles.toggle.fontStyle;
+                toggleStyle.fontSize = EditorStyles.toggle.fontSize;
+                toggleStyle.clipping = EditorStyles.toggle.clipping;
+                toggleStyle.border = EditorStyles.toggle.border;
+                toggleStyle.contentOffset = EditorStyles.toggle.contentOffset;
+                toggleStyle.imagePosition = EditorStyles.toggle.imagePosition;
+                toggleStyle.margin = EditorStyles.toggle.margin;
+                toggleStyle.overflow = EditorStyles.toggle.overflow;
+                toggleStyle.padding = EditorStyles.toggle.padding;
+                toggleStyle.richText = EditorStyles.toggle.richText;
+                toggleStyle.stretchHeight = EditorStyles.toggle.stretchHeight;
+                toggleStyle.stretchWidth = EditorStyles.toggle.stretchWidth;
+                toggleStyle.wordWrap = EditorStyles.toggle.wordWrap;
+
+                toggleStyle.padding.left = 0;
             }
-
-            string GetTestsString()
-            {
-                if (tests.Count == 0) return null;
-                List<Test> ts = new List<Test>(tests.Values);
-                string[] strings = new string[ts.Count];
-                for (int i = 0; i < ts.Count; i++) strings[i] = ts[i].GetString();
-                return string.Join(delimiter, strings);
-            }
-
-            string GetFoldoutString()
-            {
-                if (foldouts == null) return null;
-                List<Foldout> _foldouts = new List<Foldout>(foldouts);
-                string[] strings = new string[_foldouts.Count];
-                for (int i = 0; i < _foldouts.Count; i++) strings[i] = _foldouts[i].GetString();
-                return string.Join(foldoutDelimiter, strings);
-            }
-
-            string header = GetHeader();
-            string testData = GetTestsString();
-            string foldoutsData = GetFoldoutString();
-
-            string data = "";
-            if (!string.IsNullOrEmpty(header)) data += header;
-            data += splitDelimiter;
-
-            if (!string.IsNullOrEmpty(testData)) data += testData;
-            data += splitDelimiter;
-
-            if (!string.IsNullOrEmpty(foldoutsData)) data += foldoutsData;
-
-            return data;
+            return toggleStyle;
         }
 
-
-        private void FromString(string data)
+        public static GUIStyle GetFoldoutStyle()
         {
-            void ParseHeader(string s)
+            if (foldoutStyle == null)
             {
-                string[] c = s.Split(headerDelimiter);
-                showWelcome = bool.Parse(c[0]);
-                manager.FromString(c[1]);
-                guiQueue.FromString(c[2]);
+                foldoutStyle = new GUIStyle(EditorStyles.foldout);
+                foldoutStyle.padding = new RectOffset(0, 0, 0, 0);
+                foldoutStyle.overflow = new RectOffset(0, 0, 0, 0);
+                foldoutStyle.contentOffset = Vector2.zero;
+                foldoutStyle.margin = new RectOffset(0, 0, 0, 0);
+
+            }
+            return foldoutStyle;
+        }
+
+        public static void PaintResultFeatures(Rect rect, Test.Result result)
+        {
+            if (result == Test.Result.Fail)
+            {
+                EditorGUI.DrawRect(rect, new Color(1f, 0f, 0f, 0.1f));
+            }
+        }
+
+        public static List<bool> DrawToggle(Rect rect, string name, bool selected, bool locked, bool showLock = true, bool isMixed = false)
+        {
+            bool wasMixed = EditorGUI.showMixedValue;
+            EditorGUI.showMixedValue = isMixed;
+
+            // Draw the light highlight when the toggle is selected
+            if (selected)
+            {
+                Rect r = new Rect(rect);
+                float w = EditorStyles.toggle.padding.left;
+                r.x += w;
+                r.width -= w;
+                EditorGUI.DrawRect(r, new Color(1f, 1f, 1f, 0.05f));
             }
 
-            void ParseTests(string s)
+            // Draw the lock button
+            if (showLock)
             {
-                manager.tests.Clear();
-                foreach (string item in s.Split(delimiter))
+                Rect lockRect = new Rect(rect);
+                lockRect.width = EditorStyles.toggle.CalcSize(GUIContent.none).x;
+                locked = GUI.Toggle(lockRect, locked, GUIContent.none, "IN LockButton");
+                rect.x += lockRect.width;
+                rect.width -= lockRect.width;
+            }
+
+            // Draw the toggle
+            bool wasEnabled = GUI.enabled;
+            GUI.enabled &= !locked;
+            selected = EditorGUI.ToggleLeft(rect, name, selected, GetToggleStyle());
+
+            GUI.enabled = wasEnabled;
+
+            EditorGUI.showMixedValue = wasMixed;
+
+            return new List<bool> { selected, locked };
+        }
+
+        public static void DrawTest(Rect rect, Test test, bool showLock = true, bool showFoldout = true, bool allowExpand = true)
+        {
+            bool wasEnabled = GUI.enabled;
+
+            float toggleWidth = EditorStyles.toggle.CalcSize(GUIContent.none).x;
+
+            // Draw the expanded box first so it appears behind everything else
+            if (test.expanded && allowExpand && !test.IsInSuite())
+            {
+                float h = GUI.skin.label.CalcHeight(GUIContent.none, rect.width) + GUI.skin.label.margin.vertical;
+
+                GUIStyle boxStyle = new GUIStyle("GroupBox");
+                boxStyle.padding = GUI.skin.label.padding;
+                boxStyle.margin = new RectOffset((int)rect.x, (int)(0.5f * boxStyle.border.right), 0, 0);
+                boxStyle.padding.left = (int)(toggleWidth * 2);
+                boxStyle.padding.right -= boxStyle.margin.right;
+
+                rect.y += 0.5f * boxStyle.padding.top;
+
+                GUILayout.Space(-h); // Move the box closer to the Test foldout above
+                GUILayout.BeginHorizontal(boxStyle); // This is so we can shift the GroupBox drawing to the right
                 {
-                    Test newTest = Test.FromString(item);
-                    if (newTest == null) continue;
-                    manager.tests.Add(newTest.attribute, newTest);
+                    GUILayout.BeginVertical();
+                    {
+                        GUILayout.Space(h);
+
+                        test.defaultGameObject = EditorGUI.ObjectField(
+                            EditorGUILayout.GetControlRect(true),
+                            new GUIContent("Default Prefab", "Provide a prefab from the Project folder. If the " +
+                                "default SetUp method is used in this test then it will receive an instantiated copy of this prefab."),
+                            test.defaultGameObject,
+                            typeof(GameObject),
+                            false
+                        ) as GameObject;
+                    }
+                    GUILayout.EndVertical();
                 }
+                GUILayout.EndHorizontal();
             }
 
-            void ParseFoldouts(string s)
+            if (showFoldout)
             {
-                foldouts.Clear();
+                // This prevents the foldout from grabbing focus on mouse clicks on the toggle buttons
+                Rect foldoutRect = new Rect(rect);
+                foldoutRect.width = toggleWidth;
+                test.expanded = allowExpand && GUI.Toggle(foldoutRect, test.expanded && allowExpand, GUIContent.none, GetFoldoutStyle());
 
-                List<string> added = new List<string>();
-                foreach (string foldoutData in s.Split(foldoutDelimiter))
+                Rect scriptRect = new Rect(rect);
+                scriptRect.x = rect.xMax - scriptWidth;
+                scriptRect.width = scriptWidth;
+                GUI.enabled = false;
+                float previousLabelWidth = EditorGUIUtility.labelWidth;
+                EditorGUIUtility.labelWidth = 0f;
+                EditorGUI.ObjectField(scriptRect, GUIContent.none, test.GetScript(), test.method.DeclaringType, false);
+                EditorGUIUtility.labelWidth = previousLabelWidth;
+                GUI.enabled = wasEnabled;
+            }
+
+            Rect toggleRect = new Rect(rect);
+            toggleRect.x += toggleWidth;
+            toggleRect.width -= toggleWidth;
+            if (!test.IsInSuite()) toggleRect.width -= scriptWidth;
+
+            List<bool> res = DrawToggle(toggleRect, test.attribute.name, test.selected, test.locked, showLock, false);
+            test.selected = res[0];
+            test.locked = res[1];
+
+            GUI.enabled = wasEnabled;
+        }
+
+
+        [CustomPropertyDrawer(typeof(Test.TestPrefab))]
+        public class TestPrefabPropertyDrawer : PropertyDrawer
+        {
+            private const float xpadding = 2f;
+            private float lineHeight = EditorGUIUtility.singleLineHeight;
+
+            private GUIContent[] methodNames;
+
+            private void Initialize(SerializedProperty property)
+            {
+                System.Type type = property.serializedObject.targetObject.GetType();
+                string[] names = type.GetMethods(Utilities.bindingFlags)
+                              .Where(m => m.GetCustomAttributes(typeof(TestAttribute), true).Length > 0)
+                              .Select(m => m.Name).ToArray();
+                methodNames = new GUIContent[names.Length];
+                for (int i = 0; i < names.Length; i++)
+                    methodNames[i] = new GUIContent(names[i]);
+            }
+
+            public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
+            {
+                return lineHeight;
+            }
+
+            public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
+            {
+                if (methodNames == null) Initialize(property);
+
+                SerializedProperty _gameObject = property.FindPropertyRelative(nameof(_gameObject));
+                SerializedProperty _methodName = property.FindPropertyRelative(nameof(_methodName));
+
+
+                //Debug.Log(property.propertyType);
+
+                int index = 0;
+                bool labelInOptions = false;
+                for (int i = 0; i < methodNames.Length; i++)
                 {
-                    if (Foldout.Exists(foldoutData)) continue;
-                    foldouts.Add(Foldout.CreateFromData(foldoutData));
+                    if (methodNames[i].text == _methodName.stringValue)
+                    {
+                        index = i;
+                    }
+                    if (methodNames[i].text == label.text) labelInOptions = true;
                 }
-            }
 
-            // The string always has 3 splitDelimiters
-            string[] sections = data.Split(splitDelimiter);
-            if (sections.Length != 3) return; // expected length
+                // Create the rects to draw as though we had no prefix label (as inside ReorderableLists)
+                Rect rect1 = new Rect(position);
+                rect1.width = EditorGUIUtility.labelWidth - xpadding;
 
-            try { ParseHeader(sections[0]); }
-            catch (System.FormatException) { }
+                Rect rect2 = new Rect(position);
+                rect2.xMin = rect1.xMax + xpadding;
+                rect2.width = position.xMax - rect1.xMax;
 
-            try { ParseTests(sections[1]); }
-            catch (System.FormatException) { }
+                if (labelInOptions && property.displayName == label.text)
+                { // If we are in a ReorderableList, then don't draw the prefix label.
+                    label = GUIContent.none;
+                    // For some reason the height is not right if we don't do this...
+                    rect2.height = lineHeight;
+                }
+                else
+                { // Otherwise, draw a prefix label
+                    Rect rect = new Rect(position);
+                    rect.width = EditorGUIUtility.labelWidth - xpadding;
+                    rect1.xMin = rect.xMax + xpadding;
+                    rect1.width = (position.xMax - rect.xMax) * 0.5f - 2 * xpadding;
+                    rect2.xMin = rect1.xMax + xpadding;
+                    rect2.width = position.xMax - rect2.xMin;
 
-            try { ParseFoldouts(sections[2]); }
-            catch (System.FormatException) { }
-        }
-
-
-
-        /// <summary>
-        /// Save the object to EditorPrefs.
-        /// </summary>
-        private void Save()
-        {
-            EditorPrefs.SetString(Utilities.editorPrefs, GetString(manager.tests));
-        }
-
-        /// <summary>
-        /// Parse the string saved by Save() in the EditorPrefs
-        /// </summary>
-        private void Load()
-        {
-            string data = EditorPrefs.GetString(Utilities.editorPrefs, GetString(manager.GetTests()));
-            // Overwrite the created tests with their appropriate saved values
-            FromString(data);
-
-
-            // If a test was removed since last load, we need to update our Foldouts accordingly
-            HashSet<string> expected = new HashSet<string>(); // HashSet = unique values only
-            foreach (Test test in manager.tests.Values) //manager.cachedTests.Values)
-            {
-                expected.Add(Path.GetDirectoryName(test.attribute.GetPath()));
-            }
-
-            
-            foreach (Foldout foldout in new List<Foldout>(foldouts))
-            {
-                if (expected.Contains(foldout.path)) continue;
-                foldouts.Remove(foldout);
+                    EditorGUI.LabelField(rect, label);
+                    label = GUIContent.none;
+                }
+                int result = EditorGUI.Popup(rect1, label, index, methodNames);
+                if (result < methodNames.Length) _methodName.stringValue = methodNames[result].text;
+                EditorGUI.ObjectField(rect2, _gameObject, GUIContent.none);
             }
         }
         #endregion

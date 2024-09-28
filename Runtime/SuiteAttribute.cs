@@ -10,8 +10,8 @@ namespace UnityTest
     /// If SetUp is present, it is called before each method is executed. If TearDown is present (must have SetUp present), it
     /// is called after each method is executed.
     /// </summary>
-    [System.AttributeUsage(System.AttributeTargets.Class)]
-    public class SuiteAttribute : System.Attribute, System.IEquatable<SuiteAttribute>, System.IComparable<SuiteAttribute>
+    [System.AttributeUsage(System.AttributeTargets.Class), System.Serializable]
+    public class SuiteAttribute : System.Attribute, System.IComparable<SuiteAttribute>
     {
         /// <summary>
         /// The test suite name which appears in the test manager. The default is the name of the suite class. Names must be unique per-file.
@@ -31,7 +31,6 @@ namespace UnityTest
         /// <summary>
         /// This method will be added to Window > Unit Test Manager based on its path. Use '/' to create nested toggles.
         /// </summary>
-        /// <param name="path">A unique identifier for this test. Each '/' determines the depth in Window > Unit Test Manager.</param>
         /// <param name="pauseOnFail">Pause the editor when this test fails. No other subsequent tests will run. default = false.</param>
         /// <param name="name">The test suite name which appears in the test manager. The default is the name of the suite class. Names must be unique per-file.</param>
         /// <param name="sourceFile">DO NOT USE. It is used by reflection techniques to locate the source file that this attribute was used in.</param>
@@ -55,46 +54,17 @@ namespace UnityTest
             return Path.Join(Path.GetDirectoryName(path), fileName, name);
         }
 
-        public string GetString()
-        {
-            return string.Join(TestAttribute.delimiter, 
-                name,
-                pauseOnFail.ToString(),
-                sourceFile
-            );
-        }
-
-        public static SuiteAttribute FromString(string s)
-        {
-            string[] contents = s.Split(TestAttribute.delimiter);
-            string name = contents[0];
-            bool pauseOnFail = bool.Parse(contents[1]);
-            string sourceFile = contents[2];
-            return new SuiteAttribute(pauseOnFail, name, sourceFile);
-        }
-
-        /// <summary>
-        /// Copy the properties of other into this attribute, overwriting values.
-        /// </summary>
-        public void UpdateFrom(SuiteAttribute other)
-        {
-            pauseOnFail = other.pauseOnFail;
-            name = other.name;
-            sourceFile = other.sourceFile;
-        }
-
         #region Operators
-        public override bool Equals(object obj)
+        public override bool Equals(object other)
         {
-            if (obj.GetType() == typeof(SuiteAttribute)) return Equals(obj as SuiteAttribute);
-            return base.Equals(obj);
+            if (GetType() != other.GetType()) return false;
+            return this == (other as SuiteAttribute);
         }
-        public bool Equals(SuiteAttribute other) => GetString() == other.GetString();
-        public int CompareTo(SuiteAttribute other) => GetPath().CompareTo(other.GetPath());
-        public override int GetHashCode() => System.HashCode.Combine(GetString());
-
-        public static bool operator ==(SuiteAttribute left, SuiteAttribute right) => Equals(left, right);
+        public override int GetHashCode() => (sourceFile + name + pauseOnFail).GetHashCode();
+        public static bool operator ==(SuiteAttribute left, SuiteAttribute right) => left.GetPath() == right.GetPath() && left.pauseOnFail == right.pauseOnFail;
         public static bool operator !=(SuiteAttribute left, SuiteAttribute right) => !(left == right);
+        public int CompareTo(SuiteAttribute other) => GetPath().CompareTo(other.GetPath());
+
         #endregion
     }
 }

@@ -195,7 +195,7 @@ namespace UnityTest
             labelStyle.alignment = TextAnchor.MiddleLeft;
             labelStyle.padding = new RectOffset(0, 0, 0, 0);
 
-            if (paintResultFeatures) Test.PaintResultFeatures(rect, test.result);
+            if (paintResultFeatures) TestManagerUI.PaintResultFeatures(rect, test.result);
 
             GUIContent content = new GUIContent(EditorGUIUtility.IconContent("d_clear"));
             content.tooltip = "Remove test from queue";
@@ -229,7 +229,7 @@ namespace UnityTest
             labelStyle.alignment = TextAnchor.MiddleLeft;
             labelStyle.padding = new RectOffset(0, 0, 0, 0);
 
-            if (paintResultFeatures) Test.PaintResultFeatures(rect, test.result);
+            if (paintResultFeatures) TestManagerUI.PaintResultFeatures(rect, test.result);
             GUI.Label(rect, test.attribute.GetPath(), labelStyle);
 
             GUI.enabled = wasEnabled;

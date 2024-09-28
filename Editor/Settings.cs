@@ -29,7 +29,7 @@ namespace UnityTest
 
         public void SetTest(Test test)
         {
-            if (test == this.test) return;
+            if (test.attribute == this.test.attribute) return;
 
             // Search the Data for this test's class
             currentSuite = Suite.Get(test.method.DeclaringType);
@@ -80,8 +80,6 @@ namespace UnityTest
                 Focus();
             }
         }
-
-        //public void Toggle() => SetVisible(!visible);
 
         void OnGUI()
         {
