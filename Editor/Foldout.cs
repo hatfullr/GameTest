@@ -45,7 +45,7 @@ namespace UnityTest
                 Rect controlRect = EditorGUILayout.GetControlRect(false);
 
                 // Draw the test result indicators
-                if (!expanded) TestManagerUI.PaintResultFeatures(controlRect, GetTotalResult());
+                if (!expanded) controlRect = TestManagerUI.PaintResultFeatures(controlRect, GetTotalResult());
 
                 // Setup the indented area
                 Rect indentedRect;
@@ -65,22 +65,20 @@ namespace UnityTest
 
                 // Draw the Foldout control
                 bool wasExpanded = expanded;
-                expanded = EditorGUI.Foldout(indentedRect, expanded, string.Empty, EditorStyles.foldout);
+                expanded = EditorGUI.Foldout(indentedRect, expanded, string.Empty, Style.Get("Foldout"));
 
                 // Check if the user just expanded the Foldout while holding down the Alt key
                 if (Event.current.alt && expanded != wasExpanded) ExpandAll(expanded);
 
-                float toggleWidth = EditorStyles.toggle.CalcSize(GUIContent.none).x;
-
                 // scan to the right by the toggle width to give space to the Foldout control
-                indentedRect.x += toggleWidth;
-                indentedRect.width -= toggleWidth;
+                indentedRect.x += Style.GetWidth("Test/Foldout");
+                indentedRect.width -= Style.GetWidth("Test/Foldout");
 
                 bool drawSuite = isSuite && tests.Count > 0;
 
                 // If we're going to draw a suite, then we need to draw the settings cog and the object reference on the right side,
                 // so room is made for that here. We finish drawing those controls later, after drawing the toggle.
-                if (drawSuite) indentedRect.width -= TestManagerUI.scriptWidth + toggleWidth;
+                if (drawSuite) indentedRect.width -= Style.TestManagerUI.scriptWidth + Style.GetWidth("Test/Suite/SettingsButton");
 
                 // We need to separate out the user's actual actions from the button's state
                 // The toggle is only "selected" when it is not mixed. If it is mixed, then selected = false.
@@ -116,19 +114,16 @@ namespace UnityTest
                 if (drawSuite) // Finish drawing the suite
                 {
                     indentedRect.x += indentedRect.width;
-                    indentedRect.width = toggleWidth;
+                    indentedRect.width = Style.GetWidth("Test/Suite/SettingsButton");
 
-                    GUIStyle iconButtonStyle = EditorGUIUtility.GetBuiltinSkin(EditorSkin.Inspector).FindStyle("IconButton");
-                    GUIContent moveGroupButton = EditorGUIUtility.IconContent("_Popup");
-
-                    if (GUI.Button(indentedRect, moveGroupButton, iconButtonStyle))
+                    if (GUI.Button(indentedRect, Style.GetIcon("Test/Suite/SettingsButton"), Style.Get("Test/Suite/SettingsButton")))
                     {
                         TestManagerUI.Instance.settings.SetTest(tests[0]);
                         TestManagerUI.Instance.settings.SetVisible(true);
                     }
 
                     indentedRect.x += indentedRect.width;
-                    indentedRect.width = TestManagerUI.scriptWidth;
+                    indentedRect.width = Style.TestManagerUI.scriptWidth;
                     bool wasEnabled = GUI.enabled;
                     GUI.enabled = false;
                     EditorGUI.ObjectField(indentedRect, GUIContent.none, tests[0].GetScript(), tests[0].method.DeclaringType, false);
@@ -150,7 +145,7 @@ namespace UnityTest
             foreach (Test test in tests)
             {
                 Rect rect = EditorGUILayout.GetControlRect(false);
-                TestManagerUI.PaintResultFeatures(rect, test.result);
+                rect = TestManagerUI.PaintResultFeatures(rect, test);
                 rect.x += indent;
                 rect.width -= indent;
                 TestManagerUI.DrawTest(rect, test, true, !test.IsInSuite(), true);
@@ -171,7 +166,7 @@ namespace UnityTest
         {
             selected = true;
             foreach (Test test in tests)
-                if (!test.locked) test.selected = true;
+                if (!test.locked) test.selected = selected;
             foreach (Foldout foldout in GetChildren()) foldout.Select();
         }
         /// <summary>
@@ -181,7 +176,7 @@ namespace UnityTest
         {
             selected = false;
             foreach (Test test in tests)
-                if (!test.locked) test.selected = false;
+                if (!test.locked) test.selected = selected;
             foreach (Foldout foldout in GetChildren()) foldout.Deselect();
         }
         /// <summary>
@@ -190,7 +185,7 @@ namespace UnityTest
         public void Lock()
         {
             locked = true;
-            foreach (Test test in tests) test.locked = true;
+            foreach (Test test in tests) test.locked = locked;
             foreach (Foldout foldout in GetChildren()) foldout.Lock();
         }
         /// <summary>
@@ -199,7 +194,7 @@ namespace UnityTest
         public void Unlock()
         {
             locked = false;
-            foreach (Test test in tests) test.locked = false;
+            foreach (Test test in tests) test.locked = locked;
             foreach (Foldout foldout in GetChildren()) foldout.Unlock();
         }
         /// <summary>

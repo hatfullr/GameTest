@@ -294,9 +294,9 @@ namespace UnityTest
             if (coroutineGO != null) Object.DestroyImmediate(coroutineGO);
             coroutineGO = null;
 
-            current = null;
-
             onFinished.Invoke();
+
+            current = null;
         }
 
         /// <summary>

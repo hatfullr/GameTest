@@ -10,67 +10,134 @@ namespace UnityTest
     /// <summary>
     /// Holds the assemblies, Test methods, and queues. Executes the tests when instructed.
     /// </summary>
-    public class TestManager
+    public static class TestManager
     {
-        public const string delimiter = "\n===|TestManager|===\n"; // Some unique value
-        public const string testDelimiter = "\n!!!@@@Test@@@!!!\n"; // Some unique value
+        public const string editorPref = "UnityTestManager";
+        //public const string delimiter = "\n===|TestManager|===\n"; // Some unique value
+        //public const string testDelimiter = "\n!!!@@@Test@@@!!!\n"; // Some unique value
 
         private static List<System.Reflection.Assembly> assemblies = new List<System.Reflection.Assembly>();
 
         /// <summary>
         /// The code methods which have a TestAttribute attached to them.
         /// </summary>
-        public SortedDictionary<TestAttribute, MethodInfo> methods = new SortedDictionary<TestAttribute, MethodInfo>();
+        public static SortedDictionary<TestAttribute, MethodInfo> methods = new SortedDictionary<TestAttribute, MethodInfo>();
 
         /// <summary>
         /// The Test objects associated with the methods that have a TestAttribute attached to them.
         /// </summary>
-        public SortedDictionary<TestAttribute, Test> tests = new SortedDictionary<TestAttribute, Test>();
+        public static SortedDictionary<TestAttribute, Test> tests = new SortedDictionary<TestAttribute, Test>();
 
-        public Queue queue = new Queue();
-        public Queue finishedTests = new Queue();
+        public static Queue queue = new Queue();
+        public static Queue finishedTests = new Queue();
 
-        public float timer;
-        public int nframes;
+        public static float timer;
+        public static uint nframes;
 
         /// <summary>
         /// When true, debug messages are printed to Console.
         /// </summary>
-        public bool debug = true;
+        public static bool debug = true;
 
-        public bool paused = false;
-        public bool running = false;
+        public static bool paused = false;
+        public static bool running = false;
 
-        private uint previousFrameNumber = 0;
-
-        public bool runTestsOnPlayMode = false;
+        private static uint previousFrameNumber = 0;
 
         [HideInCallstack]
-        public void Update()
+        public static void OnEnable()
+        {
+            Load();
+            AssemblyReloadEvents.beforeAssemblyReload += Save;
+            AssemblyReloadEvents.afterAssemblyReload += Load;
+            EditorApplication.playModeStateChanged += OnPlayStateChanged;
+        }
+
+        public static void OnDisable()
+        {
+            AssemblyReloadEvents.beforeAssemblyReload -= Save;
+            AssemblyReloadEvents.afterAssemblyReload -= AfterAssemblyReload;
+            EditorApplication.playModeStateChanged -= OnPlayStateChanged;
+            Save();
+        }
+
+        private static void AfterAssemblyReload()
+        {
+            Load();
+            if (running && queue.Count == 0) Start();
+        }
+
+        [HideInCallstack]
+        public static void Update()
         {
             if (Time.frameCount > previousFrameNumber && !paused) OnUpdate();
             previousFrameNumber = (uint)Time.frameCount;
         }
 
         [HideInCallstack]
-        private void OnUpdate()
+        private static void OnUpdate()
         {
-            if (!EditorApplication.isPlaying)
-            {
-                // Make sure the queue is cleared in this case
-                queue.Clear();
-                return;
-            }
-
             if (running)
             {
                 if (EditorApplication.isPaused) return;
-                timer += Time.deltaTime;
-                nframes++;
+
+                if (Test.current == null) // No test is currently running
+                {
+                    if (queue.Count > 0) // Start the next test if there is one
+                    {
+                        RunNext();
+                        return;
+                    }
+                }
+                else
+                {
+                    timer += Time.deltaTime;
+                    nframes++;
+                }
             }
         }
 
-        private void RunNext()
+        public static void Save()
+        {
+            EditorPrefs.SetString(editorPref, GetString());
+        }
+
+        public static void Load()
+        {
+            FromString(EditorPrefs.GetString(editorPref));
+        }
+
+        private static string GetString()
+        {
+            return string.Join('\n',
+                timer,
+                nframes,
+                debug,
+                paused,
+                running,
+                previousFrameNumber
+            );
+        }
+
+        private static void FromString(string data)
+        {
+            if (string.IsNullOrEmpty(data)) return;
+            string[] c = data.Split('\n');
+            try { timer = float.Parse(c[0]); }
+            catch (System.Exception e) { if (!(e is System.FormatException || e is System.IndexOutOfRangeException)) throw e; }
+            try { nframes = uint.Parse(c[1]); }
+            catch (System.Exception e) { if (!(e is System.FormatException || e is System.IndexOutOfRangeException)) throw e; }
+            try { debug = bool.Parse(c[2]); }
+            catch (System.Exception e) { if (!(e is System.FormatException || e is System.IndexOutOfRangeException)) throw e; }
+            try { paused = bool.Parse(c[3]); }
+            catch (System.Exception e) { if (!(e is System.FormatException || e is System.IndexOutOfRangeException)) throw e; }
+            try { running = bool.Parse(c[4]); }
+            catch (System.Exception e) { if (!(e is System.FormatException || e is System.IndexOutOfRangeException)) throw e; }
+            try { previousFrameNumber = uint.Parse(c[5]); }
+            catch (System.Exception e) { if (!(e is System.FormatException || e is System.IndexOutOfRangeException)) throw e; }
+        }
+
+        private static void RunNext()
         {
             timer = 0f;
             nframes = 0;
@@ -79,24 +146,19 @@ namespace UnityTest
             [HideInCallstack]
             void OnFinished()
             {
+                Debug.Log("On Finished");
                 test.onFinished -= OnFinished;
                 if (debug) test.PrintResult();
                 finishedTests.Enqueue(test);
+                
+                if (test.attribute.pauseOnFail && test.result == Test.Result.Fail)
+                {
+                    EditorApplication.isPaused = true;
+                }
+
                 if (queue.Count == 0)
                 {
-                    running = false;
-                    if (debug) Debug.Log("[UnityTest] Finished");
-                }
-                else
-                {
-                    if (test.attribute.pauseOnFail && test.result == Test.Result.Fail)
-                    {
-                        EditorApplication.isPaused = true;
-                    }
-                    else
-                    {
-                        RunNext(); // Continue on to the next test
-                    }
+                    Stop();
                 }
             }
             
@@ -104,7 +166,7 @@ namespace UnityTest
             test.Run();
         }
 
-        public void Reset()
+        public static void Reset()
         {
             debug = true;
             previousFrameNumber = 0;
@@ -114,14 +176,13 @@ namespace UnityTest
             finishedTests = new Queue();
             tests = new SortedDictionary<TestAttribute, Test>();
             methods = new SortedDictionary<TestAttribute, MethodInfo>();
-            runTestsOnPlayMode = false;
             UpdateAssemblies();
             UpdateMethods();
             CreateTests();
         }
 
 
-        public void OnPlayStateChanged(PlayModeStateChange change)
+        public static void OnPlayStateChanged(PlayModeStateChange change)
         {
             if (change == PlayModeStateChange.ExitingPlayMode)
             {
@@ -138,17 +199,26 @@ namespace UnityTest
         /// <summary>
         /// Begin working through the queue, running each Test.
         /// </summary>
-        public void Start()
+        public static void Start()
         {
+            Debug.Log("Start called");
             running = true;
-            RunNext();
+
+            foreach (Test test in tests.Values)
+                if (test.selected) queue.Enqueue(test);
+
+            if (!EditorApplication.isPlaying)
+            {
+                EditorApplication.EnterPlaymode(); // can cause recompile
+            }
         }
 
         /// <summary>
         /// Stop running tests and clear the queues
         /// </summary>
-        public void Stop()
+        public static void Stop()
         {
+            if (debug) Debug.Log("[UnityTest] Finished");
             queue.Clear();
             paused = false;
             running = false;
@@ -160,14 +230,14 @@ namespace UnityTest
 
 
         #region Assembly and Test Management
-        private TestAttribute GetAttribute(MethodInfo method) => method.GetCustomAttribute(typeof(TestAttribute), false) as TestAttribute;
+        private static TestAttribute GetAttribute(MethodInfo method) => method.GetCustomAttribute(typeof(TestAttribute), false) as TestAttribute;
 
-        public bool IsMethodIgnored(MethodInfo method) => method.GetCustomAttribute(typeof(IgnoreAttribute), false) != null;
+        public static bool IsMethodIgnored(MethodInfo method) => method.GetCustomAttribute(typeof(IgnoreAttribute), false) != null;
 
         /// <summary>
         /// Locate the assemblies that Unity has most recently compile, and load them into memory. This can only be called from the main thread.
         /// </summary>
-        public void UpdateAssemblies()
+        public static void UpdateAssemblies()
         {
             assemblies.Clear();
             foreach (AssembliesType type in (AssembliesType[])System.Enum.GetValues(typeof(AssembliesType))) // Hit all assembly types
@@ -183,7 +253,7 @@ namespace UnityTest
         /// Using the assemblies located by UpdateAssemblies(), find all the test methods and test suite classes, which are stored in 
         /// "methods" and "classes" respectively.
         /// </summary>
-        public void UpdateMethods()
+        public static void UpdateMethods()
         {
             List<MethodInfo> _methods = new List<MethodInfo>();
             List<System.Type> classes = new List<System.Type>();
@@ -276,7 +346,7 @@ namespace UnityTest
         /// <summary>
         /// Populate the "tests" attribute with Test objects that are correctly linked up to their associated methods.
         /// </summary>
-        public void CreateTests()
+        public static void CreateTests()
         {
             Test newTest;
             foreach (TestAttribute attribute in methods.Keys)

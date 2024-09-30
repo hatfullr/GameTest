@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
-using UnityEditor;
 using UnityEngine;
 
 
@@ -9,6 +8,8 @@ namespace UnityTest
 {
     public static class Utilities
     {
+        public const string debugTag = "[UnityTest] ";
+
         public const string editorPrefs = "UnityTest";
         public const string guidPrefs = "UnityTest/GUIDs";
         public const char guidDelimiter = '\n';

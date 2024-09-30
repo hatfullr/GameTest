@@ -44,7 +44,6 @@ namespace UnityTest
             foreach (Test test in other.tests) Enqueue(test);
         }
 
-
         public void Remove(Test test)
         {
             Queue newQueue = new Queue();
@@ -56,6 +55,34 @@ namespace UnityTest
             }
             while (newQueue.Count > 0) base.Enqueue(newQueue.Dequeue());
             tests.Remove(test);
+        }
+
+        public string GetString()
+        {
+            string[] strings = new string[Count];
+            for (int i = 0; i < Count; i++)
+            {
+                strings[i] = tests[i].attribute.GetPath();
+            }
+            return string.Join('\n', strings);
+        }
+
+        public static Queue FromString(string data)
+        {
+            Queue queue = new Queue();
+            if (string.IsNullOrEmpty(data)) return queue;
+
+            string[] strings = data.Split('\n');
+            foreach (string s in strings)
+            {
+                foreach (Test test in TestManager.tests.Values)
+                {
+                    if (test.attribute.GetPath() != s) continue;
+                    queue.Enqueue(test);
+                    break;
+                }
+            }
+            return queue;
         }
     }
 }

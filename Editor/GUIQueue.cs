@@ -1,5 +1,6 @@
 using UnityEditor;
 using UnityEngine;
+using System.Collections.Generic;
 
 namespace UnityTest
 {
@@ -8,24 +9,30 @@ namespace UnityTest
     /// </summary>
     public class GUIQueue
     {
-        public const float minHeight = 200f;
         private const string delimiter = "-~!@ delim @!~-";
 
         private Vector2 queueScrollPosition, finishedScrollPosition;
 
-        private float height = minHeight;
+        private float height = Style.GUIQueue.minHeight;
 
         private Rect splitterRect, mainRect;
         private bool dragging;
         private bool hideMain = false;
         private Vector2 dragPos;
 
-        private TestManager manager;
-
-        public GUIQueue(TestManager manager, string data = null)
+        public GUIQueue(string data = null)
         {
-            this.manager = manager;
             FromString(data);
+        }
+
+        public string GetString()
+        {
+            return string.Join(delimiter,
+                height,
+                hideMain,
+                TestManager.queue.GetString(),
+                TestManager.finishedTests.GetString()
+            );
         }
 
         public void FromString(string data)
@@ -33,18 +40,14 @@ namespace UnityTest
             if (string.IsNullOrEmpty(data)) return;
 
             string[] split = data.Split(delimiter);
-
             try { height = float.Parse(split[0]); }
-            catch (System.Exception e)
-            {
-                if (!(e is System.FormatException || e is System.IndexOutOfRangeException)) throw e;
-            }
-
+            catch (System.Exception e) { if (!(e is System.FormatException || e is System.IndexOutOfRangeException)) throw e; }
             try { hideMain = bool.Parse(split[1]); }
-            catch (System.Exception e)
-            {
-                if (!(e is System.FormatException || e is System.IndexOutOfRangeException)) throw e;
-            }
+            catch (System.Exception e) { if (!(e is System.FormatException || e is System.IndexOutOfRangeException)) throw e; }
+            try { TestManager.queue = Queue.FromString(split[2]); }
+            catch (System.Exception e) { if (!(e is System.FormatException || e is System.IndexOutOfRangeException)) throw e; }
+            try { TestManager.finishedTests = Queue.FromString(split[3]); }
+            catch (System.Exception e) { if (!(e is System.FormatException || e is System.IndexOutOfRangeException)) throw e; }
         }
 
         public void Reset()
@@ -53,17 +56,11 @@ namespace UnityTest
             mainRect = new Rect();
             queueScrollPosition = Vector2.zero;
             finishedScrollPosition = Vector2.zero;
-            height = minHeight;
+            height = Style.GUIQueue.minHeight;
             hideMain = false;
         }
 
-        public string GetString()
-        {
-            return string.Join(delimiter,
-                height,
-                hideMain
-            );
-        }
+        
 
         public void Draw()
         {
@@ -84,14 +81,11 @@ namespace UnityTest
 
                 EditorGUILayout.Space();
 
-                // Get the width here so we can properly size the controls to come
-                Rect previous = GUILayoutUtility.GetLastRect();
-
                 // "Queue" space
                 EditorGUILayout.BeginHorizontal();
                 {
-                    DrawQueue("Queued", manager.queue, queueScrollPosition);
-                    DrawQueue("Finished", manager.finishedTests, finishedScrollPosition, true);
+                    DrawQueue("Queued", TestManager.queue, queueScrollPosition);
+                    DrawQueue("Finished", TestManager.finishedTests, finishedScrollPosition, true);
                 }
                 EditorGUILayout.EndHorizontal();
             }
@@ -112,7 +106,7 @@ namespace UnityTest
                 // header labels for the queue
                 EditorGUILayout.BeginHorizontal();
                 {
-                    EditorGUILayout.LabelField(title, EditorStyles.boldLabel);
+                    EditorGUILayout.LabelField(title, Style.Get("GUIQueue/Queue/Title"));
                     GUILayout.FlexibleSpace();
                     if (queue != null)
                     {
@@ -131,13 +125,13 @@ namespace UnityTest
 
 
                 // Queue area
-                EditorGUILayout.BeginVertical("HelpBox", GUILayout.ExpandWidth(false));
+                EditorGUILayout.BeginVertical(Style.Get("GUIQueue/Queue"));
                 {
                     scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition, false, false);
                     {
                         if (queue != null)
                         {
-                            foreach (Test test in queue.tests)
+                            foreach (Test test in new List<Test>(queue.tests))
                             {
                                 Rect rect = EditorGUILayout.GetControlRect(false);
                                 DrawQueueTest(rect, test, queue, paintResultFeatures);
@@ -162,59 +156,64 @@ namespace UnityTest
                 {
                     float previousLabelWidth = EditorGUIUtility.labelWidth;
                     EditorGUIUtility.labelWidth = 0f;
-                    float width = EditorStyles.boldLabel.CalcSize(new GUIContent("Current")).x;
+                    EditorGUILayout.LabelField("Current", Style.Get("GUIQueue/Queue/Title"), GUILayout.Width(Style.GetWidth("GUIQueue/Queue/Title", "Current")));
 
-                    EditorGUILayout.LabelField("Current", EditorStyles.boldLabel, GUILayout.Width(width));
                     GUILayout.FlexibleSpace();
+
                     GUI.enabled = false;
-                    GUILayout.Label("frame " + string.Format("{0,8}", manager.nframes) + "    " + manager.timer.ToString("0.0000 s"));
+                    GUILayout.Label("frame " + string.Format("{0,8}", TestManager.nframes) + "    " + TestManager.timer.ToString("0.0000 s"));
                     GUI.enabled = wasEnabled;
 
                     EditorGUIUtility.labelWidth = previousLabelWidth;
                 }
                 EditorGUILayout.EndHorizontal();
 
+                GUIStyle box = Style.Get("GUIQueue/Queue");
                 Rect rect = EditorGUILayout.GetControlRect(false);
-                rect.height += EditorStyles.helpBox.padding.vertical;
-                GUI.Box(rect, GUIContent.none, "HelpBox");
-                rect.x += EditorStyles.helpBox.padding.left;
-                rect.width -= EditorStyles.helpBox.padding.horizontal;
-                rect.y += EditorStyles.helpBox.padding.top;
-                rect.height -= EditorStyles.helpBox.padding.vertical;
+                rect.height += box.padding.vertical;
+                GUI.Box(rect, GUIContent.none, box);
+                rect.x += box.padding.left;
+                rect.width -= box.padding.horizontal;
+                rect.y += box.padding.top;
+                rect.height -= box.padding.vertical;
                 if (Test.current != null) DrawQueueTest(rect, Test.current);
             }
             EditorGUILayout.EndVertical();
             GUI.enabled = wasEnabled;
         }
 
+
+
         private void DrawQueueTest(Rect rect, Test test, Queue queue, bool paintResultFeatures = true)
         {
             bool wasEnabled = GUI.enabled;
+            
+            if (paintResultFeatures) rect = TestManagerUI.PaintResultFeatures(rect, test.result);
 
-            GUIStyle labelStyle = new GUIStyle(EditorStyles.label);
-            labelStyle.alignment = TextAnchor.MiddleLeft;
-            labelStyle.padding = new RectOffset(0, 0, 0, 0);
-
-            if (paintResultFeatures) TestManagerUI.PaintResultFeatures(rect, test.result);
-
-            GUIContent content = new GUIContent(EditorGUIUtility.IconContent("d_clear"));
-            content.tooltip = "Remove test from queue";
-
-            GUIStyle style = new GUIStyle(EditorStyles.iconButton);
+            GUIContent content = Style.GetIcon("GUIQueue/Test/Remove/Button", "Remove test from queue");
+            GUIStyle style = Style.Get("GUIQueue/Test/Remove/Button");
 
             Rect controlsRect = new Rect(rect);
 
             // Center the button
             controlsRect.y = rect.center.y - 0.5f * style.CalcSize(content).y;
 
-            controlsRect.width = style.CalcSize(content).x;
-            if (GUI.Button(controlsRect, content, style)) // X button
-            {
-                queue.Remove(test);
-            }
+            controlsRect.width = Style.GetWidth(style, content);
+            if (GUI.Button(controlsRect, content, style)) queue.Remove(test); // X button
             rect.width -= controlsRect.width;
             rect.x += controlsRect.width;
-            GUI.Label(rect, test.attribute.GetPath(), labelStyle);
+
+            string s = test.attribute.GetPath();
+            GUIStyle testStyle = Style.Get("GUIQueue/Test");
+            float width = Style.GetWidth(testStyle, s);
+
+            if (width >= rect.width) // If the text is overflowing, cut it off on the left side instead of the right side. Makes it easier to read.
+            {
+                testStyle = new GUIStyle(testStyle);
+                testStyle.alignment = TextAnchor.MiddleRight;
+            }
+
+            GUI.Label(rect, s, testStyle);
 
             GUI.enabled = wasEnabled;
         }
@@ -222,36 +221,26 @@ namespace UnityTest
 
         private void DrawQueueTest(Rect rect, Test test, bool paintResultFeatures = true)
         {
-            bool wasEnabled = false;
-            //GUI.enabled = false;
-
-            GUIStyle labelStyle = new GUIStyle(EditorStyles.label);
-            labelStyle.alignment = TextAnchor.MiddleLeft;
-            labelStyle.padding = new RectOffset(0, 0, 0, 0);
-
-            if (paintResultFeatures) TestManagerUI.PaintResultFeatures(rect, test.result);
-            GUI.Label(rect, test.attribute.GetPath(), labelStyle);
-
-            GUI.enabled = wasEnabled;
+            if (paintResultFeatures) rect = TestManagerUI.PaintResultFeatures(rect, test.result);
+            GUI.Label(rect, test.attribute.GetPath(), Style.Get("GUIQueue/Test"));
         }
 
 
         private void DrawSplitter()
         {
-            GUIStyle style = new GUIStyle("PreToolbar");
-            GUILayout.BeginHorizontal(style);
+            GUILayout.BeginHorizontal(Style.Get("GUIQueue/Toolbar"));
             {
                 GUIContent label = new GUIContent("Tests");
-                GUIStyle labelStyle = new GUIStyle("ToolbarBoldLabel");
-                GUILayout.Label(label, labelStyle, GUILayout.Width(labelStyle.CalcSize(label).x));
+                GUIStyle labelStyle = Style.Get("GUIQueue/Toolbar/BoldLabel");
+                GUILayout.Label(label, labelStyle, GUILayout.Width(Style.GetWidth(labelStyle, label)));
 
-                GUILayout.BeginHorizontal("ToolbarLabel", GUILayout.ExpandWidth(true));
+                GUILayout.BeginHorizontal(Style.Get("GUIQueue/Toolbar/Label"), GUILayout.ExpandWidth(true));
                 {
                     GUILayout.Space(GUI.skin.box.padding.left);
                     GUILayout.BeginVertical();
                     {
                         GUILayout.FlexibleSpace();
-                        GUILayout.Box(GUIContent.none, "WindowBottomResize", GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
+                        GUILayout.Box(GUIContent.none, Style.Get("GUIQueue/Toolbar/Splitter"), GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
                         GUILayout.FlexibleSpace();
                     }
                     GUILayout.EndVertical();
@@ -273,10 +262,11 @@ namespace UnityTest
                 //EditorGUI.DrawRect(cursorRect, Color.red); // for debugging
 
                 // "triple dot" menu
-                GUIContent options = new GUIContent(EditorGUIUtility.IconContent("pane options"));
+                GUIContent options = Style.GetIcon("GUIQueue/Toolbar/Options");
 
-                Rect optionsRect = GUILayoutUtility.GetRect(options, EditorStyles.toolbarButton, GUILayout.Width(EditorStyles.toolbarButton.CalcSize(options).x));
-                if (EditorGUI.DropdownButton(optionsRect, options, FocusType.Passive, EditorStyles.toolbarButton))
+                GUIStyle optionsStyle = Style.Get("GUIQueue/Toolbar/Button");
+                Rect optionsRect = GUILayoutUtility.GetRect(options, optionsStyle, GUILayout.Width(Style.GetWidth(optionsStyle, options)));
+                if (EditorGUI.DropdownButton(optionsRect, options, FocusType.Passive, optionsStyle))
                 {
                     GenericMenu menu = new GenericMenu();
                     menu.AddItem(new GUIContent("Reset"), false, Reset);
@@ -307,14 +297,14 @@ namespace UnityTest
             {
                 float delta = (Event.current.mousePosition.y + 0.5f * splitterRect.height) - dragPos.y;
 
-                hideMain = Event.current.mousePosition.y > mainRect.yMax - 0.5f * minHeight;
+                hideMain = Event.current.mousePosition.y > mainRect.yMax - 0.5f * Style.GUIQueue.minHeight;
 
                 if (!hideMain)
                 {
-                    float newHeight = Mathf.Max(mainRect.yMax - (dragPos.y + delta), minHeight);
+                    float newHeight = Mathf.Max(mainRect.yMax - (dragPos.y + delta), Style.GUIQueue.minHeight);
 
                     // Make sure that the main window maintains a minimum height
-                    if (mainRect.yMax - (newHeight + splitterRect.height) > TestManagerUI.minHeight)
+                    if (mainRect.yMax - (newHeight + splitterRect.height) > Style.TestManagerUI.minHeight)
                         height = newHeight;
                 }
 
