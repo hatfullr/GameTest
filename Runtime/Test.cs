@@ -166,7 +166,6 @@ namespace UnityTest
 
         private void TearDown()
         {
-            //Debug.Log("TearDown " + this);
             if (!string.IsNullOrEmpty(attribute.tearDown))
             {
                 MethodInfo tearDown = method.DeclaringType.GetMethod(attribute.tearDown, Utilities.bindingFlags);
@@ -181,7 +180,7 @@ namespace UnityTest
         {
             if (!EditorApplication.isPlaying)
             {
-                Debug.LogWarning("Cannot run Unit Tests outside of Play mode!");
+                Utilities.LogWarning("Cannot run Unit Tests outside of Play mode!");
                 return;
             }
 
@@ -207,7 +206,7 @@ namespace UnityTest
                 }
                 if (!ignore)
                 {
-                    Debug.LogWarning("You are not in an empty scene. Unit Test results might be misleading. Perhaps your previous TearDown function " +
+                    Utilities.LogWarning("You are not in an empty scene. Unit Test results might be misleading. Perhaps your previous TearDown function " +
                         "didn't correctly remove all the GameObjects, or you used Destroy instead of DestroyImmediate. Otherwise this might be intended behavior for " +
                         "the custom tests you wrote, in which case you can ignore this error.");
                     sceneWarningPrinted = true;
@@ -239,7 +238,7 @@ namespace UnityTest
                 else
                 {
                     try { StartCoroutine(method.Invoke(gameObject.GetComponent(method.DeclaringType), new object[] { gameObject }) as System.Collections.IEnumerator); }
-                    catch (TargetException) { Debug.LogError("TargetException was thrown (1). Please submit a bug report."); }
+                    catch (TargetException) { Utilities.LogError("TargetException was thrown (1). Please submit a bug report."); }
                 }
             }
             else
@@ -252,7 +251,7 @@ namespace UnityTest
                 else
                 {
                     try { method.Invoke(gameObject.GetComponent(method.DeclaringType), new object[] { gameObject }); } // probably of type void
-                    catch (TargetException) { Debug.LogError("TargetException was thrown (2). Please submit a bug report."); }
+                    catch (TargetException) { Utilities.LogError("TargetException was thrown (2). Please submit a bug report."); }
                 }
                 OnRunComplete();
             }
@@ -284,6 +283,7 @@ namespace UnityTest
         /// <summary>
         /// Called when the test is finished, regardless of the results. Pauses the editor if the test specifies to do so.
         /// </summary>
+        [HideInCallstack]
         private void OnRunComplete()
         {
             TearDown();
@@ -300,17 +300,18 @@ namespace UnityTest
         }
 
         /// <summary>
-        /// Write to the Debug.Log the result of this test.
+        /// Write to the Utilities.Log the result of this test.
         /// </summary>
+        [HideInCallstack]
         public void PrintResult()
         {
-            if (result == Result.Pass)
-                Debug.Log("[UnityTest] <color=green>" + attribute.GetPath() + "</color>", GetScript());
-            else if (result == Result.Fail)
-                Debug.LogError("[UnityTest] <color=red>" + attribute.GetPath() + "</color>", GetScript());
-            else if (result == Result.None)
-                Debug.LogWarning("[UnityTest] <color=yellow>" + attribute.GetPath() + "</color>", GetScript());
+            string message = attribute.GetPath();
+            if (result == Result.Pass) message = string.Join(' ', Utilities.ColorString("(Passed)", Utilities.green), message);
+            else if (result == Result.Fail) message = string.Join(' ', Utilities.ColorString("(Failed)", Utilities.red), message);
+            else if (result == Result.None) message = string.Join(' ', "(Finished)", message);
             else throw new System.NotImplementedException(result.ToString());
+            
+            Utilities.Log(message, GetScript());
         }
 
         private void CancelCoroutines()
@@ -386,7 +387,7 @@ namespace UnityTest
                 }
             }
 
-            if (matched == null) Debug.LogError("Failed to find script '" + method.DeclaringType.FullName + "' in '" + pathToSearch + "'");
+            if (matched == null) Utilities.LogError("Failed to find script '" + method.DeclaringType.FullName + "' in '" + pathToSearch + "'");
             else
             {
                 script = AssetDatabase.LoadAssetAtPath(AssetDatabase.GUIDToAssetPath(matched), typeof(MonoScript));

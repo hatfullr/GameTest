@@ -38,7 +38,11 @@ namespace UnityTest
             if (tooltip != null)
             {
                 GUIContent icon = new GUIContent(icons[iconName]);
-                icon.tooltip = tooltip;
+                if (Utilities.isDarkTheme && !icon.image.name.StartsWith("d_"))
+                {
+                    icon.image = EditorGUIUtility.IconContent("d_" + icon.image.name).image;
+                }
+                if (icon.tooltip != null) icon.tooltip = tooltip;
                 return icon;
             }
             return icons[iconName];
@@ -225,65 +229,65 @@ namespace UnityTest
                 #region TestManagerUI
                 #region Loading Wheel
                 case "TestManagerUI/LoadingWheel/0":
-                    c = new GUIContent(EditorGUIUtility.IconContent("d_WaitSpin00"));
+                    c = new GUIContent(EditorGUIUtility.IconContent("WaitSpin00"));
                     break;
                 case "TestManagerUI/LoadingWheel/1":
-                    c = new GUIContent(EditorGUIUtility.IconContent("d_WaitSpin01"));
+                    c = new GUIContent(EditorGUIUtility.IconContent("WaitSpin01"));
                     break;
                 case "TestManagerUI/LoadingWheel/2":
-                    c = new GUIContent(EditorGUIUtility.IconContent("d_WaitSpin02"));
+                    c = new GUIContent(EditorGUIUtility.IconContent("WaitSpin02"));
                     break;
                 case "TestManagerUI/LoadingWheel/3":
-                    c = new GUIContent(EditorGUIUtility.IconContent("d_WaitSpin03"));
+                    c = new GUIContent(EditorGUIUtility.IconContent("WaitSpin03"));
                     break;
                 case "TestManagerUI/LoadingWheel/4":
-                    c = new GUIContent(EditorGUIUtility.IconContent("d_WaitSpin04"));
+                    c = new GUIContent(EditorGUIUtility.IconContent("WaitSpin04"));
                     break;
                 case "TestManagerUI/LoadingWheel/5":
-                    c = new GUIContent(EditorGUIUtility.IconContent("d_WaitSpin05"));
+                    c = new GUIContent(EditorGUIUtility.IconContent("WaitSpin05"));
                     break;
                 case "TestManagerUI/LoadingWheel/6":
-                    c = new GUIContent(EditorGUIUtility.IconContent("d_WaitSpin06"));
+                    c = new GUIContent(EditorGUIUtility.IconContent("WaitSpin06"));
                     break;
                 case "TestManagerUI/LoadingWheel/7":
-                    c = new GUIContent(EditorGUIUtility.IconContent("d_WaitSpin07"));
+                    c = new GUIContent(EditorGUIUtility.IconContent("WaitSpin07"));
                     break;
                 case "TestManagerUI/LoadingWheel/8":
-                    c = new GUIContent(EditorGUIUtility.IconContent("d_WaitSpin08"));
+                    c = new GUIContent(EditorGUIUtility.IconContent("WaitSpin08"));
                     break;
                 case "TestManagerUI/LoadingWheel/9":
-                    c = new GUIContent(EditorGUIUtility.IconContent("d_WaitSpin09"));
+                    c = new GUIContent(EditorGUIUtility.IconContent("WaitSpin09"));
                     break;
                 case "TestManagerUI/LoadingWheel/10":
-                    c = new GUIContent(EditorGUIUtility.IconContent("d_WaitSpin10"));
+                    c = new GUIContent(EditorGUIUtility.IconContent("WaitSpin10"));
                     break;
                 case "TestManagerUI/LoadingWheel/11":
-                    c = new GUIContent(EditorGUIUtility.IconContent("d_WaitSpin11"));
+                    c = new GUIContent(EditorGUIUtility.IconContent("WaitSpin11"));
                     break;
                 #endregion Loading Wheel
 
                 #region Toolbar
                 case "TestManagerUI/Toolbar/Toggle/On":
-                    c = new GUIContent(EditorGUIUtility.IconContent("d_toggle_on"));
+                    c = new GUIContent(EditorGUIUtility.IconContent("toggle_on"));
                     break;
                 case "TestManagerUI/Toolbar/Toggle/On/Hover":
-                    c = new GUIContent(EditorGUIUtility.IconContent("d_toggle_on_hover"));
+                    c = new GUIContent(EditorGUIUtility.IconContent("toggle_on_hover"));
                     break;
                 case "TestManagerUI/Toolbar/Toggle/Off":
-                    c = new GUIContent(EditorGUIUtility.IconContent("d_toggle_bg"));
+                    c = new GUIContent(EditorGUIUtility.IconContent("toggle_bg"));
                     break;
                 case "TestManagerUI/Toolbar/Toggle/Off/Hover":
-                    c = new GUIContent(EditorGUIUtility.IconContent("d_toggle_bg_hover"));
+                    c = new GUIContent(EditorGUIUtility.IconContent("toggle_bg_hover"));
                     break;
                 case "TestManagerUI/Toolbar/Toggle/Mixed":
-                    c = new GUIContent(EditorGUIUtility.IconContent("d_toggle_mixed_bg"));
+                    c = new GUIContent(EditorGUIUtility.IconContent("toggle_mixed_bg"));
                     break;
                 case "TestManagerUI/Toolbar/Toggle/Mixed/Hover":
-                    c = new GUIContent(EditorGUIUtility.IconContent("d_toggle_mixed_bg_hover"));
+                    c = new GUIContent(EditorGUIUtility.IconContent("toggle_mixed_bg_hover"));
                     break;
 
                 case "TestManagerUI/Toolbar/Clear":
-                    c = new GUIContent(EditorGUIUtility.IconContent("d_clear"));
+                    c = new GUIContent(EditorGUIUtility.IconContent("clear"));
                     c.tooltip = "Clear selected Test results";
                     break;
 
@@ -311,11 +315,11 @@ namespace UnityTest
                     break;
 
                 case "TestManagerUI/Toolbar/Debug/Off":
-                    c = new GUIContent(EditorGUIUtility.IconContent("d_DebuggerDisabled"));
+                    c = new GUIContent(EditorGUIUtility.IconContent("DebuggerDisabled"));
                     c.tooltip = "Enable/disable debug messages";
                     break;
                 case "TestManagerUI/Toolbar/Debug/On":
-                    c = new GUIContent(EditorGUIUtility.IconContent("d_DebuggerAttached"));
+                    c = new GUIContent(EditorGUIUtility.IconContent("DebuggerAttached"));
                     c.tooltip = "Enable/disable debug messages";
                     break;
 
@@ -345,7 +349,7 @@ namespace UnityTest
                     c.tooltip = "Failed";
                     break;
                 case "Test/ClearResult":
-                    c = new GUIContent(EditorGUIUtility.IconContent("d_clear"));
+                    c = new GUIContent(EditorGUIUtility.IconContent("clear"));
                     c.tooltip = "Clear test result";
                     break;
                 case "Test/Suite/SettingsButton":
@@ -358,7 +362,7 @@ namespace UnityTest
                     c = new GUIContent(EditorGUIUtility.IconContent("pane options"));
                     break;
                 case "GUIQueue/Test/Remove/Button":
-                    c = new GUIContent(EditorGUIUtility.IconContent("d_clear"));
+                    c = new GUIContent(EditorGUIUtility.IconContent("clear"));
                     break;
                 #endregion
                 default:

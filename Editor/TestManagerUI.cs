@@ -89,7 +89,7 @@ namespace UnityTest
             foldouts = new HashSet<Foldout>();
 
             Load();
-            Debug.Log(Utilities.debugTag + "Reset " + Style.TestManagerUI.windowTitle);
+            Utilities.Log("Reset " + Style.TestManagerUI.windowTitle);
         }
 
         public void AddItemsToMenu(GenericMenu menu)
@@ -277,7 +277,7 @@ namespace UnityTest
         private void GoToEmptyScene()
         {
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene);
-            Debug.Log(Utilities.debugTag + "Created an empty scene");
+            Utilities.Log("Entered an empty scene");
         }
 
         private void RunSelected()
@@ -326,6 +326,7 @@ namespace UnityTest
         #region Drawing Methods
         void OnGUI()
         {
+            Utilities.isDarkTheme = GUI.skin.name == "DarkSkin";
             State state = new State(rootFoldout);
 
             bool refresh = false;
@@ -554,7 +555,7 @@ namespace UnityTest
         private void DrawDebugButton()
         {
             GUIContent debugContent = Style.GetIcon("TestManagerUI/Toolbar/Debug/Off");
-            if (TestManager.debug) Style.GetIcon("TestManagerUI/Toolbar/Debug/On");
+            if (TestManager.debug) debugContent = Style.GetIcon("TestManagerUI/Toolbar/Debug/On");
             TestManager.debug = GUILayout.Toggle(TestManager.debug, debugContent, Style.Get("TestManagerUI/Toolbar/Debug"));
         }
 

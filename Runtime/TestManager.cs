@@ -137,6 +137,7 @@ namespace UnityTest
             catch (System.Exception e) { if (!(e is System.FormatException || e is System.IndexOutOfRangeException)) throw e; }
         }
 
+        [HideInCallstack]
         private static void RunNext()
         {
             timer = 0f;
@@ -146,9 +147,8 @@ namespace UnityTest
             [HideInCallstack]
             void OnFinished()
             {
-                Debug.Log("On Finished");
                 test.onFinished -= OnFinished;
-                if (debug) test.PrintResult();
+                test.PrintResult();
                 finishedTests.Enqueue(test);
                 
                 if (test.attribute.pauseOnFail && test.result == Test.Result.Fail)
@@ -201,7 +201,8 @@ namespace UnityTest
         /// </summary>
         public static void Start()
         {
-            Debug.Log("Start called");
+            finishedTests.Clear();
+
             running = true;
 
             foreach (Test test in tests.Values)
@@ -211,6 +212,10 @@ namespace UnityTest
             {
                 EditorApplication.EnterPlaymode(); // can cause recompile
             }
+            else
+            {
+                if (debug) Utilities.Log("Starting");
+            }
         }
 
         /// <summary>
@@ -218,7 +223,7 @@ namespace UnityTest
         /// </summary>
         public static void Stop()
         {
-            if (debug) Debug.Log("[UnityTest] Finished");
+            if (debug) Utilities.Log("Finished", null, null);
             queue.Clear();
             paused = false;
             running = false;

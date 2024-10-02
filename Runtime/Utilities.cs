@@ -8,7 +8,7 @@ namespace UnityTest
 {
     public static class Utilities
     {
-        public const string debugTag = "[UnityTest] ";
+        public const string debugTag = "[UnityTest]";
 
         public const string editorPrefs = "UnityTest";
         public const string guidPrefs = "UnityTest/GUIDs";
@@ -40,7 +40,20 @@ namespace UnityTest
         /// The file located at "Packages/UnityTest/Runtime/ExampleTests.cs"
         /// </summary>
         public static string exampleTestsFile { get; } = Path.GetFullPath(Path.Join(runtimeDir, "ExampleTests.cs"));
-        
+
+        /// <summary>
+        /// True if the editor is using the theme called "DarkSkin". Otherwise, false.
+        /// </summary>
+        public static bool isDarkTheme = true;
+
+        /// <summary>
+        /// HTML color green. Adapts to DarkSkin and LightSkin.
+        /// </summary>
+        public static string green { get { if (isDarkTheme) return "#50C878"; return "#164f00"; } }
+        /// <summary>
+        /// HTML color red. Adapts to DarkSkin and LightSkin.
+        /// </summary>
+        public static string red { get { if (isDarkTheme) return "red"; return "red"; } }
 
         public static bool IsSceneEmpty()
         {
@@ -103,8 +116,6 @@ namespace UnityTest
             throw new InvalidUnityPath(path);
         }
 
-
-
         /// <summary>
         /// Returns true if the given child path is located in any subdirectory of parent, or if it is located in parent itself.
         /// Returns false if the parent and child paths are the same, or if the child is not located within the parent.
@@ -138,6 +149,54 @@ namespace UnityTest
             }
             return false;
         }
+
+        public static string ColorString(string text, string color)
+        {
+            if (string.IsNullOrEmpty(text)) return null;
+            return "<color=" + color + ">" + text + "</color>";
+        }
+
+        [HideInCallstack]
+        private static string GetLogString(string message, string color = null)
+        {
+            string tag = "<size=10>" + debugTag + "</size>";
+            if (!string.IsNullOrEmpty(color)) tag = ColorString(tag, color);
+            return string.Join(' ', tag, message);
+        }
+
+
+        /// <summary>
+        /// Print a log message to the console, intended for debug messages.
+        /// </summary>
+        [HideInCallstack] public static void Log(string message, Object context, string color) => Debug.LogFormat(LogType.Log, LogOption.NoStacktrace, context, "{0}", GetLogString(message, color));
+        [HideInCallstack] public static void Log(string message, Object context) => Log(message, context, null);
+        [HideInCallstack] public static void Log(string message, string color) => Log(message, null, color);
+        [HideInCallstack] public static void Log(string message) => Log(message, null, null);
+
+        /// <summary>
+        /// Print a warning message to the console.
+        /// </summary>
+        [HideInCallstack] public static void LogWarning(string message, Object context, string color) => Debug.LogWarning(GetLogString(message, color), context);
+        [HideInCallstack] public static void LogWarning(string message, Object context) => LogWarning(message, context, null);
+        [HideInCallstack] public static void LogWarning(string message, string color) => LogWarning(message, null, color);
+        [HideInCallstack] public static void LogWarning(string message) => LogWarning(message, null, null);
+
+
+        /// <summary>
+        /// Print a warning message to the console.
+        /// </summary>
+        [HideInCallstack] public static void LogError(string message, Object context, string color) => Debug.LogError(GetLogString(message, color), context);
+        [HideInCallstack] public static void LogError(string message, Object context) => LogError(message, context, null);
+        [HideInCallstack] public static void LogError(string message, string color) => LogError(message, null, color);
+        [HideInCallstack] public static void LogError(string message) => LogError(message, null, null);
+
+        /// <summary>
+        /// Print an exception to the console. The color cannot be changed.
+        /// </summary>
+        [HideInCallstack] public static void LogException(System.Exception exception, Object context) => Debug.LogException(exception, context);
+        [HideInCallstack] public static void LogException(System.Exception exception) => Debug.LogException(exception);
+        
+
 
         /// <summary>
         /// Signifies that a path is not located in either the "Assets" or "Packages" folder of a project.

@@ -329,7 +329,7 @@ namespace UnityTest
         {
             AssertionException e = new AssertionException(message);
             e.Source = Test.current.attribute.sourceFile;
-            Debug.LogException(e, Test.current.GetScript());
+            Utilities.LogException(e, Test.current.GetScript());
         }
 
 
