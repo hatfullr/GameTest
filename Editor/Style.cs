@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.TextCore.Text;
 
 namespace UnityTest
 {
@@ -49,6 +50,14 @@ namespace UnityTest
         }
 
         /// <summary>
+        /// Re-initialize all styles. Helpful for making minor modifications and then resetting afterward.
+        /// </summary>
+        public static void Reset()
+        {
+            styles.Clear();
+        }
+
+        /// <summary>
         /// Get the pixel width of the given GUIContent as used with the given GUIStyle.
         /// </summary>
         public static float GetWidth(GUIStyle style) => style.CalcSize(GUIContent.none).x;
@@ -64,6 +73,21 @@ namespace UnityTest
         public static Rect GetRect(GUIStyle style, string content) => GetRect(style, new GUIContent(content));
         public static Rect GetRect(string style, string content) => GetRect(Get(style), new GUIContent(content));
 
+
+        /// <summary>
+        /// For the given style, calculate the width that the given text would be. If that width exceeds the width of the given rect,
+        /// then the text would overflow if placed inside that rect. By default the text will then be cut off on the right-hand side.
+        /// That default can be changed using the given alignment. If the text fits inside the rect without problems, nothing is changed.
+        /// </summary>
+        public static GUIStyle GetTextOverflowAlignmentStyle(Rect rect, GUIStyle style, string text, TextAnchor alignment)
+        {
+            if (GetWidth(style, text) >= rect.width) // If the text is overflowing, cut it off on the left side instead of the right side. Makes it easier to read.
+            {
+                style = new GUIStyle(style);
+                style.alignment = alignment;
+            }
+            return style;
+        }
 
         private static void InitializeStyle(string style)
         {
@@ -132,7 +156,7 @@ namespace UnityTest
                 case "Test/Toggle":
                     s = new GUIStyle(EditorStyles.iconButton);
                     GUIStyle s2 = new GUIStyle(EditorStyles.toggle);
-                    s.alignment = s2.alignment;
+                    s.alignment = TextAnchor.MiddleLeft; //s2.alignment;
                     s.fixedWidth = s2.fixedWidth;
                     s.fixedHeight = s2.fixedHeight;
                     s.font = s2.font;
@@ -145,7 +169,7 @@ namespace UnityTest
                     s.margin = s2.margin;
                     s.overflow = s2.overflow;
                     s.padding = s2.padding;
-                    s.richText = s2.richText;
+                    s.richText = true; // enables searches to highlight matching text
                     s.stretchHeight = s2.stretchHeight;
                     s.stretchWidth = s2.stretchWidth;
                     s.wordWrap = s2.wordWrap;
@@ -205,7 +229,7 @@ namespace UnityTest
                     s = new GUIStyle(EditorStyles.toolbarButton);
                     break;
                 case "GUIQueue/Queue":
-                    s = new GUIStyle("HelpBox");
+                    s = new GUIStyle(EditorStyles.helpBox);
                     break;
                 case "GUIQueue/Queue/Title":
                     s = new GUIStyle(EditorStyles.boldLabel);

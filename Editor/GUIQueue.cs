@@ -80,12 +80,12 @@ namespace UnityTest
                 DrawQueueCurrent();
 
                 EditorGUILayout.Space();
-
                 // "Queue" space
-                EditorGUILayout.BeginHorizontal();
+                Rect rect = EditorGUILayout.BeginHorizontal();
                 {
-                    DrawQueue("Queued", TestManager.queue, queueScrollPosition);
-                    DrawQueue("Finished", TestManager.finishedTests, finishedScrollPosition, true);
+                    //EditorGUI.DrawRect(rect, Color.red);
+                    DrawQueue(0.5f * rect.width, "Queued", TestManager.queue, queueScrollPosition);
+                    DrawQueue(0.5f * rect.width, "Finished", TestManager.finishedTests, finishedScrollPosition, true);
                 }
                 EditorGUILayout.EndHorizontal();
             }
@@ -98,16 +98,19 @@ namespace UnityTest
             ProcessEvents();
         }
 
-        private void DrawQueue(string title, Queue queue, Vector2 scrollPosition, bool paintResultFeatures = false)
+        private void DrawQueue(float width, string title, Queue queue, Vector2 scrollPosition, bool paintResultFeatures = false)
         {
             bool wasEnabled = GUI.enabled;
-            EditorGUILayout.BeginVertical();
+            EditorGUILayout.BeginVertical(GUILayout.Width(width));
             {
                 // header labels for the queue
-                EditorGUILayout.BeginHorizontal();
+                EditorGUILayout.BeginHorizontal(GUILayout.Width(width));
                 {
-                    EditorGUILayout.LabelField(title, Style.Get("GUIQueue/Queue/Title"));
+                    GUIStyle style = Style.Get("GUIQueue/Queue/Title");
+                    EditorGUILayout.LabelField(title, style, GUILayout.Width(Style.GetWidth(style, title)));
+                    
                     GUILayout.FlexibleSpace();
+
                     if (queue != null)
                     {
                         GUI.enabled &= queue.Count > 0;
@@ -123,18 +126,18 @@ namespace UnityTest
                 }
                 EditorGUILayout.EndHorizontal();
 
+                
 
                 // Queue area
-                EditorGUILayout.BeginVertical(Style.Get("GUIQueue/Queue"));
+                EditorGUILayout.BeginVertical(Style.Get("GUIQueue/Queue"), GUILayout.Width(width));
                 {
-                    scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition, false, false);
+                    scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition, false, false, GUILayout.Width(width));
                     {
                         if (queue != null)
                         {
                             foreach (Test test in new List<Test>(queue.tests))
                             {
-                                Rect rect = EditorGUILayout.GetControlRect(false);
-                                DrawQueueTest(rect, test, queue, paintResultFeatures);
+                                DrawQueueTest(EditorGUILayout.GetControlRect(false), test, queue, paintResultFeatures);
                             }
                         }
                     }
@@ -204,16 +207,7 @@ namespace UnityTest
             rect.x += controlsRect.width;
 
             string s = test.attribute.GetPath();
-            GUIStyle testStyle = Style.Get("GUIQueue/Test");
-            float width = Style.GetWidth(testStyle, s);
-
-            if (width >= rect.width) // If the text is overflowing, cut it off on the left side instead of the right side. Makes it easier to read.
-            {
-                testStyle = new GUIStyle(testStyle);
-                testStyle.alignment = TextAnchor.MiddleRight;
-            }
-
-            GUI.Label(rect, s, testStyle);
+            GUI.Label(rect, s, Style.GetTextOverflowAlignmentStyle(rect, Style.Get("GUIQueue/Test"), s, TextAnchor.MiddleRight));
 
             GUI.enabled = wasEnabled;
         }
@@ -258,7 +252,7 @@ namespace UnityTest
                     cursorRect.xMin = 0f;
                 }
 
-                EditorGUIUtility.AddCursorRect(cursorRect, MouseCursor.SplitResizeUpDown);
+                Utilities.SetCursorInRect(cursorRect, MouseCursor.SplitResizeUpDown);
                 //EditorGUI.DrawRect(cursorRect, Color.red); // for debugging
 
                 // "triple dot" menu
@@ -281,19 +275,19 @@ namespace UnityTest
         {
             if (Event.current == null) return;
 
-            if (Event.current.rawType == EventType.MouseDown && splitterRect.Contains(Event.current.mousePosition))
+            if (Utilities.IsMouseButtonPressed() && Utilities.IsMouseOverRect(splitterRect))
             {
                 dragging = true;
                 dragPos = Event.current.mousePosition;
             }
-            else if (Event.current.rawType == EventType.MouseUp)
+            else if (Utilities.IsMouseButtonReleased())
             {
                 dragging = false;
                 EditorWindow.GetWindow<TestManagerUI>().Repaint();
             }
 
 
-            if (dragging && Event.current.rawType == EventType.MouseDrag)
+            if (dragging && Utilities.IsMouseDragging())
             {
                 float delta = (Event.current.mousePosition.y + 0.5f * splitterRect.height) - dragPos.y;
 

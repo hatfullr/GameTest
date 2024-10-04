@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
+using UnityEditor;
 using UnityEngine;
 
 
@@ -54,6 +55,9 @@ namespace UnityTest
         /// HTML color red. Adapts to DarkSkin and LightSkin.
         /// </summary>
         public static string red { get { if (isDarkTheme) return "red"; return "red"; } }
+
+        public static float searchBarMinWidth = 80f;
+        public static float searchBarMaxWidth = 300f;
 
         public static bool IsSceneEmpty()
         {
@@ -149,6 +153,24 @@ namespace UnityTest
             }
             return false;
         }
+
+        /// <summary>
+        /// Returns true if the mouse is currently hovering over the given Rect, and false otherwise.
+        /// </summary>
+        public static bool IsMouseOverRect(Rect rect)
+        {
+            if (Event.current != null) return rect.Contains(Event.current.mousePosition) && GUI.enabled;
+            return false;
+        }
+
+        /// <summary>
+        /// When the mouse cursor is hovering over the given rect, the mouse cursor will change to the type specified.
+        /// </summary>
+        public static void SetCursorInRect(Rect rect, MouseCursor cursor) => EditorGUIUtility.AddCursorRect(rect, cursor);
+
+        public static bool IsMouseButtonPressed() { if (Event.current == null) return false; return Event.current.rawType == EventType.MouseDown; }
+        public static bool IsMouseButtonReleased() { if (Event.current == null) return false; return Event.current.rawType == EventType.MouseUp; }
+        public static bool IsMouseDragging() { if (Event.current == null) return false; return Event.current.rawType == EventType.MouseDrag; }
 
         public static string ColorString(string text, string color)
         {

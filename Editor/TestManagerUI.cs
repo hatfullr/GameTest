@@ -3,6 +3,7 @@ using UnityEngine;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using System.Linq;
+using System.Text.RegularExpressions;
 
 namespace UnityTest
 {
@@ -61,6 +62,11 @@ namespace UnityTest
         private int spinIndex = 0;
         private bool loadingWheelVisible = false;
 
+        private string search = null;
+        private UnityEditor.IMGUI.Controls.SearchField searchField;
+
+        public System.Action onLostFocus, onFocus;
+
         private Settings _settings;
         public Settings settings
         {
@@ -71,27 +77,7 @@ namespace UnityTest
             }
         }
 
-        private void DoReset()
-        {
-            EditorPrefs.SetString(Utilities.editorPrefs, null);
-
-            TestManager.Reset();
-            guiQueue.Reset();
-
-            _settings = null;
-            showWelcome = true;
-            indentLevel = 0;
-            indentWidth = 0f;
-            scrollPosition = Vector2.zero;
-            _rootFoldout = null;
-            refreshing = false;
-            loadingWheelVisible = false;
-            foldouts = new HashSet<Foldout>();
-
-            Load();
-            Utilities.Log("Reset " + Style.TestManagerUI.windowTitle);
-        }
-
+        #region Unity UI
         public void AddItemsToMenu(GenericMenu menu)
         {
             menu.AddItem(new GUIContent("Reset"), false, ShowResetConfirmation);
@@ -102,7 +88,10 @@ namespace UnityTest
         {
             Instance.titleContent = new GUIContent("UnityTest Manager");
         }
+        #endregion Unity UI
 
+
+        #region Events
         /// <summary>
         /// Called after ShowWindow but before OnEnable, and only when the window is opened.
         /// </summary>
@@ -116,6 +105,8 @@ namespace UnityTest
         /// </summary>
         void OnEnable()
         {
+            searchField = new UnityEditor.IMGUI.Controls.SearchField(); // Unity demands we do this in OnEnable and nowhere else
+
             AssemblyReloadEvents.beforeAssemblyReload += Save;
             AssemblyReloadEvents.afterAssemblyReload += Load;
             EditorApplication.playModeStateChanged += OnPlayStateChanged;
@@ -141,6 +132,61 @@ namespace UnityTest
             Save();
         }
 
+        void OnLostFocus()
+        {
+            if (onLostFocus != null) onLostFocus();
+        }
+
+        void OnFocus()
+        {
+            if (onFocus != null) onFocus();
+        }
+
+        [HideInCallstack]
+        void Update()
+        {
+            if (loadingWheelVisible)
+            {
+                Repaint();
+                return;
+            }
+            if (!EditorApplication.isPlaying) return;
+            TestManager.Update();
+            if (TestManager.running && !TestManager.paused) Repaint(); // keeps the frame counter and timer up-to-date
+        }
+
+        private void OnPlayStateChanged(PlayModeStateChange change)
+        {
+            if (change == PlayModeStateChange.EnteredPlayMode && Utilities.IsSceneEmpty()) Focus();
+        }
+        #endregion Events
+
+
+        #region Methods
+        private void DoReset()
+        {
+            EditorPrefs.SetString(Utilities.editorPrefs, null);
+
+            TestManager.Reset();
+            guiQueue.Reset();
+
+            _settings = null;
+            showWelcome = true;
+            indentLevel = 0;
+            indentWidth = 0f;
+            scrollPosition = Vector2.zero;
+            _rootFoldout = null;
+            refreshing = false;
+            loadingWheelVisible = false;
+            spinStartTime = 0f;
+            spinIndex = 0;
+            foldouts = new HashSet<Foldout>();
+            search = null;
+
+            Load();
+            Utilities.Log("Reset " + Style.TestManagerUI.windowTitle);
+        }
+
         private void Refresh()
         {
             refreshing = true;
@@ -151,9 +197,64 @@ namespace UnityTest
             refreshing = false;
         }
 
+        private void CreateFoldouts()
+        {
+            if (foldouts == null) foldouts = new HashSet<Foldout>();
+
+            // Tests have already been created.
+            foreach (Test test in TestManager.tests.Values)
+            {
+                // Ensure that Foldouts are created at each level to support this Test
+                Foldout final = null;
+                foreach (string p in Utilities.IterateDirectories(test.attribute.GetPath(), true))
+                {
+                    if (Foldout.ExistsAtPath(p)) final = Foldout.GetAtPath(p);
+                    else
+                    {
+                        final = new Foldout(p);
+                        foldouts.Add(final);
+                    }
+                }
+                final.tests.Add(test);
+            }
+        }
+
+        private void GoToEmptyScene()
+        {
+            EditorSceneManager.NewScene(NewSceneSetup.EmptyScene);
+            Utilities.Log("Entered an empty scene");
+        }
+
+        private void RunSelected()
+        {
+            TestManager.Start();
+        }
+
+        private void ResetSelected()
+        {
+            foreach (Test test in rootFoldout.GetTests())
+                if (test.selected) test.Reset();
+        }
+        private void ResetAll()
+        {
+            foreach (Test test in TestManager.tests.Values) test.Reset();
+        }
+
+        private void SelectAll() => rootFoldout.Select(); // Simulate a press
+
+        private void DeselectAll() => rootFoldout.Deselect(); // Simulate a press
+
+        /// <summary>
+        /// Using the string set by the user in the UI, search for tests with similar names.
+        /// </summary>
+        private void Search()
+        {
+
+        }
+        #endregion Methods
 
 
-        #region Persistence Methods
+        #region Persistence
         /// <summary>
         /// Save the object to EditorPrefs.
         /// </summary>
@@ -185,6 +286,7 @@ namespace UnityTest
             return string.Join(delimiter,
                 showWelcome,
                 TestManager.debug,
+                search,
                 guiQueue.GetString(),
                 string.Join(foldoutDelimiter, foldouts.Select(x => x.GetString()))
             );
@@ -200,12 +302,14 @@ namespace UnityTest
             catch (System.Exception e) { if (!(e is System.FormatException || e is System.IndexOutOfRangeException)) throw e; }
             try { TestManager.debug = bool.Parse(c[1]); }
             catch (System.Exception e) { if (!(e is System.FormatException || e is System.IndexOutOfRangeException)) throw e; }
-            try { guiQueue.FromString(c[2]); }
+            try { search = c[2]; }
+            catch (System.Exception e) { if (!(e is System.FormatException || e is System.IndexOutOfRangeException)) throw e; }
+            try { guiQueue.FromString(c[3]); }
             catch (System.Exception e) { if (!(e is System.FormatException || e is System.IndexOutOfRangeException)) throw e; }
             try
             {
                 Foldout foldout = null;
-                foreach (string dat in c[3].Split(foldoutDelimiter))
+                foreach (string dat in c[4].Split(foldoutDelimiter))
                 {
                     foldout = null;
                     try { foldout = Foldout.FromString(dat); }
@@ -227,103 +331,10 @@ namespace UnityTest
             }
             catch (System.Exception e) { if (!(e is System.FormatException || e is System.IndexOutOfRangeException)) throw e; }
         }
+        #endregion Persistence
 
 
-
-
-        #endregion
-
-
-
-
-
-
-
-        private void StartLoadingWheel()
-        {
-            spinStartTime = Time.realtimeSinceStartup;
-            loadingWheelVisible = true;
-        }
-
-        private void StopLoadingWheel()
-        {
-            loadingWheelVisible = false;
-        }
-
-        private void CreateFoldouts()
-        {
-            if (foldouts == null) foldouts = new HashSet<Foldout>();
-
-            // Tests have already been created.
-            foreach (Test test in TestManager.tests.Values)
-            {
-                // Ensure that Foldouts are created at each level to support this Test
-                Foldout final = null;
-                foreach (string p in Utilities.IterateDirectories(test.attribute.GetPath(), true))
-                {
-                    if (Foldout.ExistsAtPath(p)) final = Foldout.GetAtPath(p);
-                    else
-                    {
-                        final = new Foldout(p);
-                        foldouts.Add(final);
-                    }
-                }
-                final.tests.Add(test);
-            }
-        }
-
-
-
-        private void GoToEmptyScene()
-        {
-            EditorSceneManager.NewScene(NewSceneSetup.EmptyScene);
-            Utilities.Log("Entered an empty scene");
-        }
-
-        private void RunSelected()
-        {
-            TestManager.Start();
-        }
-
-        private void ResetSelected()
-        {
-            foreach (Test test in rootFoldout.GetTests())
-                if (test.selected) test.Reset();
-        }
-        private void ResetAll()
-        {
-            foreach (Test test in TestManager.tests.Values) test.Reset();
-        }
-
-        private void SelectAll() => rootFoldout.Select(); // Simulate a press
-
-        private void DeselectAll() => rootFoldout.Deselect(); // Simulate a press
-
-        private void OnPlayStateChanged(PlayModeStateChange change)
-        {
-            if (change == PlayModeStateChange.EnteredPlayMode && Utilities.IsSceneEmpty()) Focus();
-        }
-
-        [HideInCallstack]
-        void Update()
-        {
-            if (loadingWheelVisible)
-            {
-                Repaint();
-                return;
-            }
-            if (!EditorApplication.isPlaying) return;
-            TestManager.Update();
-            if (TestManager.running && !TestManager.paused) Repaint(); // keeps the frame counter and timer up-to-date
-        }
-
-
-
-
-
-
-
-        #region Drawing Methods
+        #region UI
         void OnGUI()
         {
             Utilities.isDarkTheme = GUI.skin.name == "DarkSkin";
@@ -357,7 +368,7 @@ namespace UnityTest
                     GUILayout.FlexibleSpace();
                     // Right
 
-
+                    DrawSearchBar();
                     DrawWelcomeButton();
                     DrawDebugButton();
                     refresh = DrawRefreshButton();
@@ -394,8 +405,8 @@ namespace UnityTest
                     scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition, false, false, GUI.skin.horizontalScrollbar, GUI.skin.verticalScrollbar, Style.Get("TestManagerUI/TestView"));
                     if (rootFoldout != null)
                     {
-                        indentLevel = 0;
-                        foreach (Foldout child in rootFoldout.GetChildren(false)) child.Draw();
+                        if (string.IsNullOrEmpty(search)) DrawNormalMode();
+                        else DrawSearchMode();
                     }
                     EditorGUILayout.EndScrollView();
                 }
@@ -416,6 +427,62 @@ namespace UnityTest
                 else if (selectAll) SelectAll();
                 else if (deselectAll) DeselectAll();
             }
+        }
+
+        /// <summary>
+        /// Draw the tests as nested foldouts in a hierarchy according to their individual paths.
+        /// </summary>
+        private void DrawNormalMode()
+        {
+            indentLevel = 0;
+            foreach (Foldout child in rootFoldout.GetChildren(false)) child.Draw();
+        }
+
+        /// <summary>
+        /// Shows the tests as their full paths when text is present in the search bar. Only shows the tests matching the search regex.
+        /// </summary>
+        private void DrawSearchMode()
+        {
+            indentLevel = 0;
+
+            Regex re = new Regex(search, RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.IgnorePatternWhitespace);
+
+            string path, final;
+            MatchCollection matches;
+            Rect rect;
+            foreach (Test test in rootFoldout.GetTests().OrderBy(x => x.attribute.GetPath()))
+            {
+                path = test.attribute.GetPath();
+                matches = re.Matches(path);
+                if (matches.Count == 0) continue;
+
+                // Modify the color or something of the regex matches to show where the matches happened
+                final = "";
+                for (int i = 0; i < matches.Count; i++)
+                {
+                    if (i == 0) final += path[..matches[i].Index];
+                    else final += path[(matches[i - 1].Index + matches[i - 1].Length)..matches[i].Index];
+                    final += "<b>" + path[matches[i].Index..(matches[i].Index + matches[i].Length)] + "</b>";
+                }
+                final += path[(matches[matches.Count - 1].Index + matches[matches.Count - 1].Length)..];
+                rect = EditorGUILayout.GetControlRect(false);
+                rect = PaintResultFeatures(rect, test);
+                DrawTest(rect, test, true, !test.IsInSuite(), true, final);
+            }
+        }
+
+        /// <summary>
+        /// Draw the search bar, using the min and max widths defined in Utilities.searchBarMinWidth and Utilities.searchBarMaxWidth.
+        /// </summary>
+        private void DrawSearchBar()
+        {
+            if (searchField == null) return;
+            string newSearch = searchField.OnToolbarGUI(search, GUILayout.MinWidth(Utilities.searchBarMinWidth), GUILayout.MaxWidth(Utilities.searchBarMaxWidth));
+
+            Rect rect = GUILayoutUtility.GetLastRect();
+            if (Utilities.IsMouseButtonReleased() && !Utilities.IsMouseOverRect(rect)) EditorGUI.FocusTextInControl(null);
+
+            search = newSearch;
         }
 
         /// <summary>
@@ -448,8 +515,7 @@ namespace UnityTest
 
             Rect rect = GUILayoutUtility.GetRect(toggle, toggleStyle);
 
-            bool hover = false;
-            if (Event.current != null) hover = rect.Contains(Event.current.mousePosition) && GUI.enabled;
+            bool hover = Utilities.IsMouseOverRect(rect);
 
             // Change the style of the toggle button according to the current state
             if (state.anySelected && !state.allSelected)
@@ -584,10 +650,21 @@ namespace UnityTest
             DoReset();
         }
 
-        #endregion
+        private void StartLoadingWheel()
+        {
+            spinStartTime = Time.realtimeSinceStartup;
+            loadingWheelVisible = true;
+        }
+
+        private void StopLoadingWheel()
+        {
+            loadingWheelVisible = false;
+        }
 
 
-        #region Test drawing
+
+
+        #region Tests
 
         /// <summary>
         /// Show only the background color change and the result status icon on the right. The clear result button is not drawn.
@@ -595,7 +672,6 @@ namespace UnityTest
         public static Rect PaintResultFeatures(Rect rect, Test.Result result)
         {
             GUIContent image = Style.GetIcon("Test/Result/" + result.ToString());
-            GUIContent clearImage = Style.GetIcon("Test/ClearResult");
 
             Color color = Color.clear;
             if (result == Test.Result.Fail) color = new Color(1f, 0f, 0f, 0.1f);
@@ -682,7 +758,7 @@ namespace UnityTest
             bool wasEnabled = GUI.enabled;
             GUI.enabled &= !locked;
             //EditorGUI.DrawRect(rect, Color.green);
-            selected = EditorGUI.ToggleLeft(rect, name, selected, Style.Get("Test/Toggle"));
+            selected = EditorGUI.ToggleLeft(rect, name, selected, Style.GetTextOverflowAlignmentStyle(rect, Style.Get("Test/Toggle"), name, TextAnchor.MiddleRight));
 
             GUI.enabled = wasEnabled;
 
@@ -691,7 +767,7 @@ namespace UnityTest
             return new List<bool> { selected, locked };
         }
 
-        public static void DrawTest(Rect rect, Test test, bool showLock = true, bool showFoldout = true, bool allowExpand = true)
+        public static void DrawTest(Rect rect, Test test, bool showLock = true, bool showFoldout = true, bool allowExpand = true, string name = null)
         {
             bool wasEnabled = GUI.enabled;
 
@@ -752,7 +828,10 @@ namespace UnityTest
             toggleRect.x += toggleWidth;
             toggleRect.width -= toggleWidth;
             if (!test.IsInSuite()) toggleRect.width -= Style.TestManagerUI.scriptWidth;
-            List<bool> res = DrawToggle(toggleRect, test.attribute.name, test.selected, test.locked, showLock, false);
+
+            if (string.IsNullOrEmpty(name)) name = test.attribute.name;
+            //EditorGUI.DrawRect(toggleRect, Color.red);
+            List<bool> res = DrawToggle(toggleRect, name, test.selected, test.locked, showLock, false);
             test.selected = res[0];
             test.locked = res[1];
 
@@ -836,6 +915,8 @@ namespace UnityTest
                 EditorGUI.ObjectField(rect2, _gameObject, GUIContent.none);
             }
         }
-        #endregion
+        #endregion Tests
+
+        #endregion UI
     }
 }
