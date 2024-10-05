@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
-using UnityEngine.TextCore.Text;
 
 namespace UnityTest
 {
@@ -73,6 +72,80 @@ namespace UnityTest
         public static Rect GetRect(GUIStyle style, string content) => GetRect(style, new GUIContent(content));
         public static Rect GetRect(string style, string content) => GetRect(Get(style), new GUIContent(content));
 
+        /// <summary>
+        /// For a given Rect, return a rect that has been adjusted by the padding of the given GUIStyle.
+        /// </summary>
+        public static Rect GetPaddedRect(Rect rect, GUIStyle style) => GetHorizontallyPaddedRect(GetVerticallyPaddedRect(rect, style), style);
+
+        public static Rect GetVerticallyPaddedRect(Rect rect, GUIStyle style)
+        {
+            Rect result = new Rect(rect);
+            result.height -= style.padding.vertical;
+            result.y += style.padding.top;
+            return result;
+        }
+
+        public static Rect GetHorizontallyPaddedRect(Rect rect, GUIStyle style)
+        {
+            Rect result = new Rect(rect);
+            result.width -= style.padding.horizontal;
+            result.x += style.padding.left;
+            return result;
+        }
+
+        public static Rect ApplyMargins(Rect rect, GUIStyle style)
+        {
+            rect.x += style.margin.left;
+            rect.y += style.margin.top;
+            rect.width -= style.margin.horizontal;
+            rect.height -= style.margin.vertical;
+            return rect;
+        }
+
+        /// <summary>
+        /// Reposition the inner rect relative to the outer rect
+        /// </summary>
+        public static Rect AlignRect(Rect inner, Rect outer, TextAnchor alignment = TextAnchor.MiddleCenter)
+        {
+            switch (alignment)
+            {
+                case TextAnchor.LowerLeft:
+                    inner.position = new Vector2(outer.x, outer.yMax - inner.height);
+                    break;
+                case TextAnchor.LowerCenter:
+                    inner.center = new Vector2(outer.center.x, outer.yMax - inner.height);
+                    break;
+                case TextAnchor.LowerRight:
+                    inner.position = new Vector2(outer.xMax - inner.width, outer.yMax - inner.height);
+                    break;
+
+                case TextAnchor.MiddleLeft:
+                    inner.position = new Vector2(outer.x, outer.center.y - 0.5f * inner.height);
+                    break;
+                case TextAnchor.MiddleCenter:
+                    inner.center = outer.center;
+                    break;
+                case TextAnchor.MiddleRight:
+                    inner.position = new Vector2(outer.xMax - inner.width, outer.center.y - 0.5f * inner.height);
+                    break;
+
+                case TextAnchor.UpperLeft:
+                    inner.position = outer.position;
+                    break;
+                case TextAnchor.UpperCenter:
+                    inner.position = new Vector2(outer.center.x - 0.5f * inner.width, outer.y);
+                    break;
+                case TextAnchor.UpperRight:
+                    inner.position = new Vector2(outer.xMax - inner.width, outer.y);
+                    break;
+
+                default:
+                    throw new System.NotImplementedException("Unrecognized TextAnchor value: " + alignment);
+            }
+
+            return inner;
+        }
+
 
         /// <summary>
         /// For the given style, calculate the width that the given text would be. If that width exceeds the width of the given rect,
@@ -126,6 +199,9 @@ namespace UnityTest
                     s = new GUIStyle(EditorStyles.toolbarButton);
                     break;
                 case "TestManagerUI/Toolbar/Pause":
+                    s = new GUIStyle(EditorStyles.toolbarButton);
+                    break;
+                case "TestManagerUI/Toolbar/Skip":
                     s = new GUIStyle(EditorStyles.toolbarButton);
                     break;
                 case "TestManagerUI/Toolbar/GoToEmptyScene":
@@ -185,10 +261,14 @@ namespace UnityTest
                     break;
                 case "Test/Result":
                     s = new GUIStyle(GUIStyle.none);
+                    s.padding.right = 4;
+                    s.padding.bottom = 2;
                     break;
                 case "Test/ClearResult":
                     s = new GUIStyle(EditorStyles.iconButton);
                     s.fixedHeight = Get("Test/Toggle").fixedHeight;
+                    s.padding.top = 1; // The default icon seems to be 1 pixel off for some reason
+                    s.padding.bottom = 0;
                     break;
                 case "Test/Suite/SettingsButton":
                     s = new GUIStyle(EditorGUIUtility.GetBuiltinSkin(EditorSkin.Inspector).FindStyle("IconButton"));
@@ -219,7 +299,7 @@ namespace UnityTest
                 case "GUIQueue/Test":
                     s = new GUIStyle(EditorStyles.label);
                     s.alignment = TextAnchor.MiddleLeft;
-                    s.padding = new RectOffset(0, 0, 0, 0);
+                    //s.padding = new RectOffset(0, 0, 0, 0);
                     s.clipping = TextClipping.Clip;
                     break;
                 case "GUIQueue/Toolbar/BoldLabel":
@@ -230,12 +310,18 @@ namespace UnityTest
                     break;
                 case "GUIQueue/Queue":
                     s = new GUIStyle(EditorStyles.helpBox);
+                    //s.padding = new RectOffset(0, 0, 0, 0);
                     break;
                 case "GUIQueue/Queue/Title":
                     s = new GUIStyle(EditorStyles.boldLabel);
                     break;
+                case "GUIQueue/Queue/Clear":
+                    s = new GUIStyle(GUI.skin.button);
+                    break;
                 case "GUIQueue/Test/Remove/Button":
-                    s = new GUIStyle(EditorStyles.iconButton);
+                    s = new GUIStyle(EditorStyles.label);
+                    s.padding = new RectOffset(0, 0, 0, 0);
+                    s.margin = new RectOffset(0, 0, 0, 0);
                     break;
                 #endregion GUIQueue
 
@@ -331,6 +417,11 @@ namespace UnityTest
                 case "TestManagerUI/Toolbar/Pause/On":
                     c = new GUIContent(EditorGUIUtility.IconContent("PauseButton On"));
                     c.tooltip = "Resume testing";
+                    break;
+
+                case "TestManagerUI/Toolbar/Skip":
+                    c = new GUIContent(EditorGUIUtility.IconContent("StepButton"));
+                    c.tooltip = "Stop the current test and skip to the next";
                     break;
 
                 case "TestManagerUI/Toolbar/GoToEmptyScene":

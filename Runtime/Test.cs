@@ -26,6 +26,8 @@ namespace UnityTest
         /// </summary>
         public TestAttribute attribute;
 
+        [HideInInspector] public bool skipped;
+
         private static string[] _internalFiles;
         private static string[] internalFiles
         {
@@ -284,10 +286,10 @@ namespace UnityTest
         /// Called when the test is finished, regardless of the results. Pauses the editor if the test specifies to do so.
         /// </summary>
         [HideInCallstack]
-        private void OnRunComplete()
+        public void OnRunComplete()
         {
             TearDown();
-            if (result == Result.None) result = Result.Pass;
+            if (result == Result.None && !skipped) result = Result.Pass;
 
             Application.logMessageReceived -= HandleLog;
 
@@ -314,7 +316,7 @@ namespace UnityTest
             Utilities.Log(message, GetScript());
         }
 
-        private void CancelCoroutines()
+        public void CancelCoroutines()
         {
             if (coroutineGO != null)
             {

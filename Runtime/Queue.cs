@@ -84,5 +84,13 @@ namespace UnityTest
             }
             return queue;
         }
+
+        public Queue Reversed()
+        {
+            Queue newQueue = new Queue();
+            for (int i = Count - 1; i >= 0; i--)
+                newQueue.Enqueue(tests[i]);
+            return newQueue;
+        }
     }
 }

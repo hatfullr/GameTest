@@ -1,6 +1,7 @@
 using UnityEditor;
 using UnityEngine;
 using System.Collections.Generic;
+using UnityEngine.UI;
 
 namespace UnityTest
 {
@@ -81,11 +82,13 @@ namespace UnityTest
 
                 EditorGUILayout.Space();
                 // "Queue" space
-                Rect rect = EditorGUILayout.BeginHorizontal();
+                Rect rect = EditorGUILayout.BeginHorizontal();//GUILayout.ExpandHeight(true));
                 {
-                    //EditorGUI.DrawRect(rect, Color.red);
-                    DrawQueue(0.5f * rect.width, "Queued", TestManager.queue, queueScrollPosition);
-                    DrawQueue(0.5f * rect.width, "Finished", TestManager.finishedTests, finishedScrollPosition, true);
+                    Rect left = new Rect(rect.x, rect.y, 0.5f * rect.width, rect.height);
+                    Rect right = new Rect(rect.x + 0.5f * rect.width, rect.y, 0.5f * rect.width, rect.height);
+
+                    queueScrollPosition = DrawQueue(left, "Queued", TestManager.queue, queueScrollPosition);
+                    finishedScrollPosition = DrawQueue(right, "Finished", TestManager.finishedTests.Reversed(), finishedScrollPosition, true);
                 }
                 EditorGUILayout.EndHorizontal();
             }
@@ -98,17 +101,19 @@ namespace UnityTest
             ProcessEvents();
         }
 
-        private void DrawQueue(float width, string title, Queue queue, Vector2 scrollPosition, bool paintResultFeatures = false)
+        private Vector2 DrawQueue(Rect rect, string title, Queue queue, Vector2 scrollPosition, bool paintResultFeatures = false)
         {
             bool wasEnabled = GUI.enabled;
-            EditorGUILayout.BeginVertical(GUILayout.Width(width));
+            EditorGUILayout.BeginVertical(GUILayout.MaxWidth(rect.width));
             {
                 // header labels for the queue
-                EditorGUILayout.BeginHorizontal(GUILayout.Width(width));
+                EditorGUILayout.BeginHorizontal(GUILayout.MaxWidth(rect.width));
                 {
                     GUIStyle style = Style.Get("GUIQueue/Queue/Title");
-                    EditorGUILayout.LabelField(title, style, GUILayout.Width(Style.GetWidth(style, title)));
-                    
+                    Rect r = EditorGUILayout.GetControlRect(false);
+                    r.width = Style.GetWidth(style, title);
+                    GUI.Label(r, title, style);
+
                     GUILayout.FlexibleSpace();
 
                     if (queue != null)
@@ -126,40 +131,44 @@ namespace UnityTest
                 }
                 EditorGUILayout.EndHorizontal();
 
-                
+
 
                 // Queue area
-                EditorGUILayout.BeginVertical(Style.Get("GUIQueue/Queue"), GUILayout.Width(width));
+                EditorGUILayout.BeginVertical(Style.Get("GUIQueue/Queue"), GUILayout.MaxWidth(rect.width));
                 {
-                    scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition, false, false, GUILayout.Width(width));
+                    scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition, GUIStyle.none, GUI.skin.verticalScrollbar, GUILayout.MaxWidth(rect.width));
                     {
                         if (queue != null)
                         {
                             foreach (Test test in new List<Test>(queue.tests))
                             {
-                                DrawQueueTest(EditorGUILayout.GetControlRect(false), test, queue, paintResultFeatures);
+                                DrawQueueTest(GUILayoutUtility.GetRect(GUIContent.none, Style.Get("GUIQueue/Test")), test, queue, paintResultFeatures);
                             }
                         }
                     }
                     EditorGUILayout.EndScrollView();
                 }
                 EditorGUILayout.EndVertical();
+
+                GUILayout.Space(Style.Get("GUIQueue/Queue").margin.bottom);
             }
             EditorGUILayout.EndVertical();
+
             GUI.enabled = wasEnabled;
+            return scrollPosition;
         }
 
         private void DrawQueueCurrent()
         {
             bool wasEnabled = GUI.enabled;
             // "Current" space
-            EditorGUILayout.BeginVertical();
+            GUILayout.BeginVertical();
             {
-                EditorGUILayout.BeginHorizontal();
+                GUILayout.BeginHorizontal();
                 {
                     float previousLabelWidth = EditorGUIUtility.labelWidth;
-                    EditorGUIUtility.labelWidth = 0f;
-                    EditorGUILayout.LabelField("Current", Style.Get("GUIQueue/Queue/Title"), GUILayout.Width(Style.GetWidth("GUIQueue/Queue/Title", "Current")));
+                    //EditorGUIUtility.labelWidth = 0f;
+                    GUILayout.Label("Current", Style.Get("GUIQueue/Queue/Title"), GUILayout.Width(Style.GetWidth("GUIQueue/Queue/Title", "Current")));
 
                     GUILayout.FlexibleSpace();
 
@@ -169,10 +178,10 @@ namespace UnityTest
 
                     EditorGUIUtility.labelWidth = previousLabelWidth;
                 }
-                EditorGUILayout.EndHorizontal();
+                GUILayout.EndHorizontal();
 
                 GUIStyle box = Style.Get("GUIQueue/Queue");
-                Rect rect = EditorGUILayout.GetControlRect(false);
+                Rect rect = GUILayoutUtility.GetRect(GUIContent.none, box);
                 rect.height += box.padding.vertical;
                 GUI.Box(rect, GUIContent.none, box);
                 rect.x += box.padding.left;
@@ -181,11 +190,9 @@ namespace UnityTest
                 rect.height -= box.padding.vertical;
                 if (Test.current != null) DrawQueueTest(rect, Test.current);
             }
-            EditorGUILayout.EndVertical();
+            GUILayout.EndVertical();
             GUI.enabled = wasEnabled;
         }
-
-
 
         private void DrawQueueTest(Rect rect, Test test, Queue queue, bool paintResultFeatures = true)
         {
@@ -198,11 +205,8 @@ namespace UnityTest
 
             Rect controlsRect = new Rect(rect);
 
-            // Center the button
-            controlsRect.y = rect.center.y - 0.5f * style.CalcSize(content).y;
-
             controlsRect.width = Style.GetWidth(style, content);
-            if (GUI.Button(controlsRect, content, style)) queue.Remove(test); // X button
+            if (GUI.Button(Style.ApplyMargins(controlsRect, style), content, style)) queue.Remove(test); // X button
             rect.width -= controlsRect.width;
             rect.x += controlsRect.width;
 

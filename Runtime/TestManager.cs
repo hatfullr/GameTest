@@ -166,6 +166,21 @@ namespace UnityTest
             test.Run();
         }
 
+        /// <summary>
+        /// Stop running the current test and move to the next.
+        /// </summary>
+        [HideInCallstack]
+        public static void Skip()
+        {
+            if (Test.current == null) throw new System.Exception("Cannot skip because there is no current Test");
+            Test.current.skipped = true;
+
+            Test.current.CancelCoroutines();
+            Test.current.OnRunComplete();
+
+            Test.current = null;
+        }
+
         public static void Reset()
         {
             debug = true;

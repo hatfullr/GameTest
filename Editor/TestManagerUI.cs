@@ -355,6 +355,7 @@ namespace UnityTest
                     // Left
                     DrawPlayButton(state);
                     DrawPauseButton();
+                    DrawSkipButton();
                     DrawGoToEmptySceneButton();
 
                     bool[] result = DrawUniversalToggle(state);
@@ -606,6 +607,15 @@ namespace UnityTest
             GUI.enabled = wasEnabled;
         }
 
+        private void DrawSkipButton()
+        {
+            bool wasEnabled = GUI.enabled;
+            GUIContent content = Style.GetIcon("TestManagerUI/Toolbar/Skip");
+            GUI.enabled &= TestManager.running && Test.current != null;
+            if (GUILayout.Button(content, Style.Get("TestManagerUI/Toolbar/Skip"))) TestManager.Skip();
+            GUI.enabled = wasEnabled;
+        }
+
         private void DrawGoToEmptySceneButton()
         {
             bool wasEnabled = GUI.enabled;
@@ -679,11 +689,11 @@ namespace UnityTest
 
             EditorGUI.DrawRect(rect, color);
 
-            Rect newRect = new Rect(rect);
-            newRect.width = Style.GetWidth("Test/Result", image);
-            newRect.x = rect.xMax - newRect.width;
-            rect.width -= newRect.width;
-            EditorGUI.LabelField(newRect, image, Style.Get("Test/Result"));
+            GUIStyle resultStyle = Style.Get("Test/Result");
+            Rect resultRect = new Rect(Vector2.zero, resultStyle.CalcSize(image));
+            resultRect = Style.AlignRect(resultRect, rect, TextAnchor.MiddleRight);
+            rect.width -= resultRect.width;
+            EditorGUI.LabelField(resultRect, image, resultStyle);
 
             return rect;
         }
@@ -707,16 +717,20 @@ namespace UnityTest
             // Reserve space for the two objects
             Rect newRect = new Rect(rect);
             newRect.width = Style.GetWidth("Test/Result", image) + Style.GetWidth("Test/ClearResult", clearImage);
-            newRect.x = rect.xMax - newRect.width;
+            newRect = Style.AlignRect(newRect, rect, TextAnchor.MiddleRight);
             rect.width -= newRect.width;
 
             Rect r1 = new Rect(newRect);
             r1.width *= 0.5f;
-            Rect r2 = new Rect(newRect);
-            r2.width *= 0.5f;
-            r2.x = r1.xMax;
+            Rect r2 = new Rect(r1);
+            r2.x += r1.width;
+            r2.width = newRect.width - r1.width;
 
-            GUI.Label(r1, image, Style.Get("Test/Result"));
+            GUIStyle style = new GUIStyle(Style.Get("Test/Result"));
+            style.padding = new RectOffset(0, 0, 0, 0);
+            style.margin = new RectOffset(0, 0, 0, 0);
+
+            GUI.Label(r1, image, style);
 
             GUI.enabled = test.result != Test.Result.None;
             if (GUI.Button(r2, clearImage, Style.Get("Test/ClearResult"))) test.Reset();
@@ -739,19 +753,6 @@ namespace UnityTest
                 locked = GUI.Toggle(lockRect, locked, GUIContent.none, Style.Get("Test/Lock"));
                 rect.x += lockRect.width;
                 rect.width -= lockRect.width;
-            }
-
-            // Draw the light highlight when the toggle is selected
-            if (selected)
-            {
-                Rect r = new Rect(rect);
-
-                // Skip over the toggle button
-                float w = Style.GetWidth("Test/Toggle");
-                r.x += w;
-                r.width -= w;
-                
-                EditorGUI.DrawRect(r, new Color(1f, 1f, 1f, 0.05f));
             }
 
             // Draw the toggle
