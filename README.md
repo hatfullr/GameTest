@@ -54,7 +54,7 @@ public class Example : MonoBehaviour
         number++;
     }
 
-    [Test("Method")] // Create a unit test with the name "Method"
+    [Test] // Create a unit test with the name "TestMethod"
     private void TestMethod(GameObject gameObject)
     {
         Example script = gameObject.GetComponent<Example>(); // Get the Example component
@@ -66,4 +66,11 @@ public class Example : MonoBehaviour
 ```
 Open the test manager at `Window > UnityTest Manager`, check the box where you see "Method" and press the play button in the top left of the window (not the main editor play button). The editor will then enter Play mode and run the test by instantiating a `GameObject` with an attached `Example` component, and then calling `TestMethod` on it.
 
-If it appears as though nothing happened, then the test ran successfully. If you prefer a more detailed report, enable "debug" mode by clicking the bug icon in the top right of the window.
+## Debugging
+When a test fails, it will throw an exception that is visible in the console log. Unfortunately, double-clicking the message will not deliver you to the line of code where the test failed. To get there, follow these steps:
+1. In the console, click the "triple dot" button in the top-right.
+2. Turn on "Strip logging callstack". This removes any clutter from the stack trace in the console that might have come from `UnityTest`.
+3. Click the message in the console.
+4. Find the link to your script in the stack trace and click it.
+
+Unfortunately, this is the best solution currently possible in Unity, at least until Unity adds an API for the console window.

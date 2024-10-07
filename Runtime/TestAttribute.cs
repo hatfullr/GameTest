@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.IO;
 
 namespace UnityTest
@@ -34,7 +33,7 @@ namespace UnityTest
         public string sourceFile;
 
         /// <summary>
-        /// This method will be added to Window > Unit Test Manager based on its path. Use '/' to create nested toggles.
+        /// This method will be added to Window > UnityTest Manager.
         /// </summary>
         /// <param name="setUp">Name of a static method which returns a GameObject and accepts no parameters.</param>
         /// <param name="tearDown">Name of a static method which returns void and accepts the GameObject returned by SetUp.</param>
@@ -56,9 +55,9 @@ namespace UnityTest
         }
 
         /// <summary>
-        /// This method will be added to Window > Unit Test Manager based on its path. Use '/' to create nested toggles.
+        /// This method will be added to Window > UnityTest Manager.
         /// </summary>
-        /// <param name="path">A unique identifier for this test. Each '/' determines the depth in Window > Unit Test Manager.</param>
+        /// <param name="pauseOnFail">Pause testing when this test fails. No other subsequent tests will run. default = false.</param>
         /// <param name="name">The test method name which appears in the test manager. The default is the name of the method. Names must be unique per-file.</param>
         /// <param name="sourceFile">DO NOT USE. It is used by reflection techniques to locate the source file that this attribute was used in.</param>
         public TestAttribute(
@@ -74,11 +73,10 @@ namespace UnityTest
         }
 
         /// <summary>
-        /// This method will be added to Window > Unit Test Manager based on its path. Use '/' to create nested toggles.
+        /// This method will be added to Window > UnityTest Manager.
         /// </summary>
-        /// <param name="path"><summary>A unique identifier for this test. Each '/' determines the depth in Window > Unit Test Manager.</summary></param>
         /// <param name="setUp">Name of a static method which returns a GameObject and accepts no parameters.</param>
-        /// <param name="pauseOnFail">Pause the editor when this test fails. No other subsequent tests will run. default = false.</param>
+        /// <param name="pauseOnFail">Pause testing when this test fails. No other subsequent tests will run. default = false.</param>
         /// <param name="name">The test method name which appears in the test manager. The default is the name of the method. Names must be unique per-file.</param>
         /// <param name="sourceFile">DO NOT USE. It is used by reflection techniques to locate the source file that this attribute was used in.</param>
         public TestAttribute(

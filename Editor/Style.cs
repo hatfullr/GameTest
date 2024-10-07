@@ -12,6 +12,19 @@ namespace UnityTest
         private static Dictionary<string, GUIStyle> styles = new Dictionary<string, GUIStyle>();
         private static Dictionary<string, GUIContent> icons = new Dictionary<string, GUIContent>();
 
+        public const string donationLink = "https://www.google.com";
+        public const string welcomeMessage = "Welcome to UnityTest! To get started, select a test below and click the Play button in the toolbar. " +
+            "Press the X button in the toolbar to clear test results. You can open the code for each test by double-clicking its script object. " +
+            "Create your tests in any C# class in the Assets folder by simply writing a method with a UnityTest.Test attribute. " +
+            "See the included README for additional information. Happy testing!" + 
+            "\n" +
+            "\n" +
+            "To hide this message, press the speech bubble in the toolbar above." +
+            "\n" + 
+            "\n" +
+            "If you would like to support this project, please donate at <color=blue>" + donationLink + "</color>. Any amount is greatly appreciated; it keeps me fed :)"
+        ;
+
         public static class TestManagerUI
         {
             public const string windowTitle = "UnityTest Manager";
@@ -216,6 +229,15 @@ namespace UnityTest
                 case "TestManagerUI/Toolbar/Welcome":
                     s = new GUIStyle(EditorStyles.toolbarButton);
                     break;
+
+                case "TestManagerUI/Welcome":
+                    s = new GUIStyle(EditorStyles.helpBox);
+                    s.richText = true;
+                    s.imagePosition = ImagePosition.ImageLeft;
+                    break;
+                case "TestManagerUI/Donate":
+                    s = new GUIStyle(GUI.skin.button);
+                    break;
                 #endregion Toolbar
 
                 #endregion TestManagerUI
@@ -261,8 +283,10 @@ namespace UnityTest
                     break;
                 case "Test/Result":
                     s = new GUIStyle(GUIStyle.none);
-                    s.padding.right = 4;
-                    s.padding.bottom = 2;
+                    s.padding = EditorStyles.iconButton.padding;
+                    s.margin = EditorStyles.iconButton.margin;
+                    s.imagePosition = ImagePosition.ImageOnly;
+                    s.contentOffset = new Vector2(-2, 0); // For some reason the icons are all off-center a bit.
                     break;
                 case "Test/ClearResult":
                     s = new GUIStyle(EditorStyles.iconButton);
@@ -449,6 +473,10 @@ namespace UnityTest
                     break;
                 #endregion Toolbar
 
+                case "TestManagerUI/Welcome":
+                    c = new GUIContent(EditorGUIUtility.IconContent("console.infoicon"));
+                    break;
+
                 #endregion TestManagerUI
 
                 #region Test
@@ -469,6 +497,10 @@ namespace UnityTest
                     break;
                 case "Test/Suite/SettingsButton":
                     c = new GUIContent(EditorGUIUtility.IconContent("_Popup"));
+                    break;
+
+                case "TestManagerUI/Donate":
+                    c = new GUIContent("Donate");
                     break;
                 #endregion Test
 

@@ -1,7 +1,7 @@
 using UnityEngine;
 
 /// <summary>
-/// This is just for showing helpful (hopefully) Unit Test examples
+/// This is just for showing helpful (hopefully) Test examples
 /// </summary>
 namespace UnityTest
 {
@@ -10,9 +10,35 @@ namespace UnityTest
         public class ExampleTests : MonoBehaviour
         {
             /// <summary>
-            /// SetUp functions take no arguments and they return a GameObject to which this script is attached.
-            /// The Unit Tests are performed after OnEnable, which means Start won't have been run before the test runs.
-            /// You can call Start before the test runs yourself by creating a custom SetUp function.
+            /// A test that is meant to fail. The given GameObject has only an ExampleTests component attached to it.
+            /// </summary>
+            [Test]
+            private void Fail(GameObject testObject)
+            {
+                Assert.IsTrue(false, "You can include a message describing this test.");
+            }
+
+            /// <summary>
+            /// A test that is meant to succeed. The given GameObject has only an ExampleTests component attached to it.
+            /// </summary>
+            [Test]
+            private void Pass(GameObject testObject)
+            {
+                Assert.IsTrue(true); // or no message
+            }
+
+            /// <summary>
+            /// A test that uses a SetUp and a TearDown function. In the SetUp function, "testObject" is set as a child of another GameObject
+            /// called "Test Parent".
+            /// </summary>
+            [Test(nameof(SetUp), nameof(TearDown), false)]
+            private void SetUpTearDown(GameObject testObject)
+            {
+                Assert.AreEqual(testObject.transform.parent.name, "Test Parent");
+            }
+
+            /// <summary>
+            /// SetUp functions must be static, take no arguments, and return a GameObject to which this script is attached.
             /// </summary>
             private static GameObject SetUp()
             {
@@ -20,7 +46,7 @@ namespace UnityTest
                 GameObject testObject = new GameObject("ExampleTests (SetUpExample)", typeof(ExampleTests));
 
                 // Uncomment these lines if you want to run the Start function on the attached ExampleTests object
-                // before the Unit Test executes.
+                // before the Test executes.
                 //ExampleTests exampleTests = testObject.GetComponent<ExampleTests>();
                 //exampleTests.Start();
 
@@ -34,48 +60,21 @@ namespace UnityTest
 
 
             /// <summary>
-            /// Sometimes you have to build the scene hierarchy yourself in your SetUp script (i.e. using SetParent). By default
-            /// the Unit Test will only destroy its own GameObject after succeeding its test, but if you need to destroy other
-            /// GameObjects that you created in SetUp, you can specify your own TearDown method. It must accept a GameObject which
-            /// is the same one that was returned by SetUp.
+            /// TearDown functions must take a GameObject argument. Sometimes it is helpful to build the scene in 
+            /// a SetUp function. When a Test finishes, it will by default only destroy the GameObject that was created in 
+            /// SetUp. If a TearDown function is also given, then instead only the TearDown function is run.
             /// </summary>
             private void TearDown(GameObject testObject)
             {
-                ExampleTests script = testObject.GetComponent<ExampleTests>();
                 // This will destroy both the parent we created in SetUp and the GameObject this Component is attached to.
-                // Make sure to use DestroyImmediate so that future Unit Tests won't be confused.
+                // Make sure to use DestroyImmediate so that future Tests won't be confused.
                 DestroyImmediate(testObject.transform.parent.gameObject);
-            }
-
-
-            [Test]
-            private void SimpleFail(GameObject testObject)
-            {
-                Assert.IsTrue(false, "You can include a message describing this test.");
-            }
-
-            [Test]
-            private void SimplePass(GameObject testObject)
-            {
-                Assert.IsTrue(true); // or no message
-            }
-
-            /// <summary>
-            /// You specify the exact SetUp and TearDown functions for each Unit Test, so you can make SetUp and TearDown
-            /// functions for each one of them if you like.
-            /// </summary>
-            [Test(nameof(SetUp), nameof(TearDown), false)]
-            private void SetUpTearDown(GameObject testObject)
-            {
-                // Let the test fail so that it can be seen in the scene hierarchy that there is a GameObject with name "Test Parent"
-                // and it has a child "ExampleTests (SetUpExample)" as defined in the SetUp script.
-                Assert.IsTrue(false, "SetUpTearDown is meant to fail");
             }
         }
 
         /// <summary>
-        /// An example of a UnitTestSuite. Defining the SetUp and TearDown methods is not necessary, but can be done to have more control.
-        /// Each method acts like a UnitTest. The SetUp method must have the name "SetUp", and the same is true for "TearDown". SetUp is 
+        /// An example of a Suite. Defining the SetUp and TearDown methods is not necessary, but can be done to have more control.
+        /// Each method acts like a Test. The SetUp method must have the name "SetUp", and the same is true for "TearDown". SetUp is 
         /// invoked before each method, and TearDown is invoked after each method.
         /// </summary>
         [Suite]

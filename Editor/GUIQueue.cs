@@ -1,7 +1,6 @@
 using UnityEditor;
 using UnityEngine;
 using System.Collections.Generic;
-using UnityEngine.UI;
 
 namespace UnityTest
 {
@@ -78,7 +77,7 @@ namespace UnityTest
             // The queue window
             EditorGUILayout.BeginVertical(GUILayout.ExpandWidth(true), GUILayout.Height(height));
             {
-                DrawQueueCurrent();
+                DrawQueueRunning();
 
                 EditorGUILayout.Space();
                 // "Queue" space
@@ -86,9 +85,8 @@ namespace UnityTest
                 {
                     Rect left = new Rect(rect.x, rect.y, 0.5f * rect.width, rect.height);
                     Rect right = new Rect(rect.x + 0.5f * rect.width, rect.y, 0.5f * rect.width, rect.height);
-
-                    queueScrollPosition = DrawQueue(left, "Queued", TestManager.queue, queueScrollPosition);
-                    finishedScrollPosition = DrawQueue(right, "Finished", TestManager.finishedTests.Reversed(), finishedScrollPosition, true);
+                    queueScrollPosition = DrawQueue(left, "Selected", ref TestManager.queue, queueScrollPosition);
+                    finishedScrollPosition = DrawQueue(right, "Finished", ref TestManager.finishedTests, finishedScrollPosition, true, true);
                 }
                 EditorGUILayout.EndHorizontal();
             }
@@ -101,7 +99,7 @@ namespace UnityTest
             ProcessEvents();
         }
 
-        private Vector2 DrawQueue(Rect rect, string title, Queue queue, Vector2 scrollPosition, bool paintResultFeatures = false)
+        private Vector2 DrawQueue(Rect rect, string title, ref Queue queue, Vector2 scrollPosition, bool paintResultFeatures = false, bool reversed = false)
         {
             bool wasEnabled = GUI.enabled;
             EditorGUILayout.BeginVertical(GUILayout.MaxWidth(rect.width));
@@ -119,7 +117,13 @@ namespace UnityTest
                     if (queue != null)
                     {
                         GUI.enabled &= queue.Count > 0;
-                        if (GUILayout.Button("Clear")) queue.Clear();
+                        if (GUILayout.Button("Clear"))
+                        {
+                            if (queue == TestManager.queue)
+                                foreach (Test test in queue.tests)
+                                    test.selected = false;
+                            queue.Clear();
+                        }
                         GUI.enabled = wasEnabled;
                     }
                     else
@@ -140,9 +144,11 @@ namespace UnityTest
                     {
                         if (queue != null)
                         {
-                            foreach (Test test in new List<Test>(queue.tests))
+                            List<Test> tests = new List<Test>(queue.tests);
+                            if (reversed) tests.Reverse();
+                            foreach (Test test in tests)
                             {
-                                DrawQueueTest(GUILayoutUtility.GetRect(GUIContent.none, Style.Get("GUIQueue/Test")), test, queue, paintResultFeatures);
+                                DrawQueueTest(GUILayoutUtility.GetRect(GUIContent.none, Style.Get("GUIQueue/Test")), test, ref queue, paintResultFeatures);
                             }
                         }
                     }
@@ -158,17 +164,16 @@ namespace UnityTest
             return scrollPosition;
         }
 
-        private void DrawQueueCurrent()
+        private void DrawQueueRunning()
         {
             bool wasEnabled = GUI.enabled;
-            // "Current" space
             GUILayout.BeginVertical();
             {
                 GUILayout.BeginHorizontal();
                 {
                     float previousLabelWidth = EditorGUIUtility.labelWidth;
                     //EditorGUIUtility.labelWidth = 0f;
-                    GUILayout.Label("Current", Style.Get("GUIQueue/Queue/Title"), GUILayout.Width(Style.GetWidth("GUIQueue/Queue/Title", "Current")));
+                    GUILayout.Label("Running", Style.Get("GUIQueue/Queue/Title"), GUILayout.Width(Style.GetWidth("GUIQueue/Queue/Title", "Running")));
 
                     GUILayout.FlexibleSpace();
 
@@ -194,11 +199,16 @@ namespace UnityTest
             GUI.enabled = wasEnabled;
         }
 
-        private void DrawQueueTest(Rect rect, Test test, Queue queue, bool paintResultFeatures = true)
+        private void DrawQueueTest(Rect rect, Test test, ref Queue queue, bool paintResultFeatures = true)
         {
             bool wasEnabled = GUI.enabled;
-            
-            if (paintResultFeatures) rect = TestManagerUI.PaintResultFeatures(rect, test.result);
+
+            if (paintResultFeatures)
+            {
+                Test.Result result = test.result;
+                if (queue.results.ContainsKey(test)) result = queue.results[test];
+                rect = TestManagerUI.PaintResultFeatures(rect, result);
+            }
 
             GUIContent content = Style.GetIcon("GUIQueue/Test/Remove/Button", "Remove test from queue");
             GUIStyle style = Style.Get("GUIQueue/Test/Remove/Button");

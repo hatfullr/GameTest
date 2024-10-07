@@ -138,7 +138,8 @@ namespace UnityTest
             {
                 // Custom method
                 MethodInfo setUp = method.DeclaringType.GetMethod(attribute.setUp, Utilities.bindingFlags);
-                object result = setUp.Invoke(null, null);
+                object result = setUp.Invoke(method.DeclaringType, null);
+                //object result = setUp.Invoke(null, null);
 
 
                 if (IsInSuite())

@@ -44,6 +44,11 @@ namespace UnityTest
 
         private static uint previousFrameNumber = 0;
 
+        /// <summary>
+        /// When all Tests in the queue have been run and the editor has exited Play mode.
+        /// </summary>
+        public static System.Action onStop;
+
         [HideInCallstack]
         public static void OnEnable()
         {
@@ -149,7 +154,7 @@ namespace UnityTest
             {
                 test.onFinished -= OnFinished;
                 test.PrintResult();
-                finishedTests.Enqueue(test);
+                finishedTests.Enqueue(test, test.result); // Giving the result here saves the result
                 
                 if (test.attribute.pauseOnFail && test.result == Test.Result.Fail)
                 {
@@ -172,7 +177,11 @@ namespace UnityTest
         [HideInCallstack]
         public static void Skip()
         {
-            if (Test.current == null) throw new System.Exception("Cannot skip because there is no current Test");
+            if (Test.current == null)
+            {
+                RunNext();
+                return;
+            }
             Test.current.skipped = true;
 
             Test.current.CancelCoroutines();
@@ -201,7 +210,6 @@ namespace UnityTest
         {
             if (change == PlayModeStateChange.ExitingPlayMode)
             {
-                queue.Clear();
                 timer = 0f;
                 nframes = 0;
                 Test.current = null;
@@ -219,9 +227,6 @@ namespace UnityTest
             finishedTests.Clear();
 
             running = true;
-
-            foreach (Test test in tests.Values)
-                if (test.selected) queue.Enqueue(test);
 
             if (!EditorApplication.isPlaying)
             {
@@ -243,6 +248,7 @@ namespace UnityTest
             paused = false;
             running = false;
             if (EditorApplication.isPlaying) EditorApplication.ExitPlaymode();
+            onStop();
         }
         #endregion
 

@@ -110,6 +110,9 @@ namespace UnityTest
             AssemblyReloadEvents.beforeAssemblyReload += Save;
             AssemblyReloadEvents.afterAssemblyReload += Load;
             EditorApplication.playModeStateChanged += OnPlayStateChanged;
+
+            TestManager.onStop += OnTestManagerFinished;
+
             TestManager.OnEnable();
         }
 
@@ -121,7 +124,22 @@ namespace UnityTest
             AssemblyReloadEvents.beforeAssemblyReload -= Save;
             AssemblyReloadEvents.afterAssemblyReload -= Load;
             EditorApplication.playModeStateChanged -= OnPlayStateChanged;
+
+            TestManager.onStop -= OnTestManagerFinished;
+
             TestManager.OnDisable();
+        }
+
+        /// <summary>
+        /// Called when the TestManager has finished all queued tests and exited Play mode. In this method, we repopulate the queue with the
+        /// currently selected Tests.
+        /// </summary>
+        private void OnTestManagerFinished()
+        {
+            foreach (Test test in TestManager.tests.Values)
+            {
+                if (test.selected) TestManager.queue.Enqueue(test);
+            }
         }
 
         /// <summary>
@@ -158,6 +176,9 @@ namespace UnityTest
         private void OnPlayStateChanged(PlayModeStateChange change)
         {
             if (change == PlayModeStateChange.EnteredPlayMode && Utilities.IsSceneEmpty()) Focus();
+
+            // If we don't Repaint() here, then the toolbar buttons can appear incorrect.
+            if (change == PlayModeStateChange.EnteredEditMode) Repaint();
         }
         #endregion Events
 
@@ -274,6 +295,12 @@ namespace UnityTest
 
             // Load relevant information that isn't related to the tests
             if (EditorPrefs.HasKey(Utilities.editorPrefs)) FromString(EditorPrefs.GetString(Utilities.editorPrefs));
+
+            // queue up any selected tests
+            foreach (Test test in TestManager.tests.Values)
+            {
+                if (test.selected && !TestManager.queue.Contains(test)) TestManager.queue.Enqueue(test);
+            }
         }
 
 
@@ -354,7 +381,7 @@ namespace UnityTest
                 {
                     // Left
                     DrawPlayButton(state);
-                    DrawPauseButton();
+                    DrawPauseButton(state);
                     DrawSkipButton();
                     DrawGoToEmptySceneButton();
 
@@ -379,14 +406,22 @@ namespace UnityTest
 
                 if (showWelcome) // Welcome message
                 {
-                    EditorGUILayout.HelpBox(
-                        "Welcome to UnityTest! To get started, select a test below and click the Play button in the toolbar. " +
-                        "Press the X button in the toolbar to clear test results. You can open the code for each test by double-clicking its script object. " +
-                        "Create your tests in any C# class in the Assets folder by simply writing a method with a UnityTest.Test attribute. " +
-                        "See the included README for additional information. Happy testing!" + "\n\n" +
-                        "If you would like to support this project, please donate at _____________________. Any amount is greatly appreciated; it keeps me fed :)" + "\n\n" +
-                        "To hide this message, press the speech bubble in the toolbar above."
-                    , MessageType.Info);
+                    GUIContent content = Style.GetIcon("TestManagerUI/Welcome");
+                    GUIContent donate = Style.GetIcon("TestManagerUI/Donate");
+                    GUIStyle donateStyle = Style.Get("TestManagerUI/Donate");
+
+                    content.text = Style.welcomeMessage + "\n\n";
+                    
+                    GUILayout.Box(content, Style.Get("TestManagerUI/Welcome"));
+                    Rect rect = GUILayoutUtility.GetLastRect();
+                    float height = donateStyle.CalcSize(donate).y;
+                    float width = Style.GetWidth(donateStyle, donate);
+                    rect.y += rect.height - height - donateStyle.margin.bottom;
+                    rect.height = height;
+                    rect.x += rect.width - width - donateStyle.margin.right;
+                    rect.width = width;
+                    if (GUI.Button(rect, donate)) Application.OpenURL(Style.donationLink);
+                    
                 }
                 GUI.enabled = wasEnabled;
 
@@ -595,14 +630,14 @@ namespace UnityTest
             }
         }
 
-        private void DrawPauseButton()
+        private void DrawPauseButton(State state)
         {
             bool wasEnabled = GUI.enabled;
 
             GUIContent content = Style.GetIcon("TestManagerUI/Toolbar/Pause/Off");
             if (TestManager.paused) content = Style.GetIcon("TestManagerUI/Toolbar/Pause/On");
 
-            GUI.enabled &= TestManager.running;
+            GUI.enabled &= TestManager.running || state.anySelected;
             TestManager.paused = GUILayout.Toggle(TestManager.paused, content, Style.Get("TestManagerUI/Toolbar/Pause"));
             GUI.enabled = wasEnabled;
         }
@@ -611,7 +646,7 @@ namespace UnityTest
         {
             bool wasEnabled = GUI.enabled;
             GUIContent content = Style.GetIcon("TestManagerUI/Toolbar/Skip");
-            GUI.enabled &= TestManager.running && Test.current != null;
+            GUI.enabled &= TestManager.running;
             if (GUILayout.Button(content, Style.Get("TestManagerUI/Toolbar/Skip"))) TestManager.Skip();
             GUI.enabled = wasEnabled;
         }
@@ -699,7 +734,7 @@ namespace UnityTest
         }
 
         /// <summary>
-        /// Show the background color change, the result status icon on the right, and the clear result status on the right.
+        /// Show the background color change, the result status icon on the right, and the clear result button on the right.
         /// </summary>
         public static Rect PaintResultFeatures(Rect rect, Test test)
         {
@@ -728,14 +763,15 @@ namespace UnityTest
 
             GUIStyle style = new GUIStyle(Style.Get("Test/Result"));
             style.padding = new RectOffset(0, 0, 0, 0);
-            style.margin = new RectOffset(0, 0, 0, 0);
-
-            GUI.Label(r1, image, style);
+            style.margin = new RectOffset(style.padding.left, style.padding.right, 0, 0);
 
             GUI.enabled = test.result != Test.Result.None;
-            if (GUI.Button(r2, clearImage, Style.Get("Test/ClearResult"))) test.Reset();
-
+            if (GUI.Button(r1, clearImage, Style.Get("Test/ClearResult"))) // The X button to clear the result
+                test.Reset();
             GUI.enabled = wasEnabled;
+
+            GUI.Label(r2, image, style); // The result indicator
+
             return rect;
         }
 
@@ -833,6 +869,16 @@ namespace UnityTest
             if (string.IsNullOrEmpty(name)) name = test.attribute.name;
             //EditorGUI.DrawRect(toggleRect, Color.red);
             List<bool> res = DrawToggle(toggleRect, name, test.selected, test.locked, showLock, false);
+
+            if (!test.selected && res[0]) // Test was just selected
+            {
+                if (!TestManager.queue.Contains(test)) TestManager.queue.Enqueue(test); 
+            }
+            else if (test.selected && !res[0]) // Test was just deselected
+            {
+                if (TestManager.queue.Contains(test)) TestManager.queue.Remove(test);
+            }
+
             test.selected = res[0];
             test.locked = res[1];
 
