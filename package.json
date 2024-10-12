@@ -11,5 +11,12 @@
 	 "unitytest"
   ],
   "license": "See LICENSE file",
-  "type": "tool"
+  "type": "tool",
+  "samples": [
+      {
+		  "displayName": "Example Tests",
+		  "description": "Simple unit tests that showcase how to use UnityTest at the most fundamental level",
+		  "path": "Samples~/Example Tests"
+	  }
+  ]
 }
