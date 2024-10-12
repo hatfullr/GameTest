@@ -31,11 +31,11 @@ namespace UnityTest
         /// <summary>
         /// Location of the "Packages/UnityTest/Runtime" folder.
         /// </summary>
-        public static string runtimeDir { get; } = Path.GetFullPath(Path.Join(packagesPath, "UnityTest", "Runtime"));
+        public static string runtimeDir { get; } = EnsureDirectoryExists(Path.GetFullPath(Path.Join(packagesPath, "UnityTest", "Runtime")));
         /// <summary>
         /// Location of the "Packages/UnityTest/Runtime/Data" folder.
         /// </summary>
-        public static string dataPath { get; } = Path.GetFullPath(Path.Join(runtimeDir, "Data"));
+        public static string dataPath { get; } = EnsureDirectoryExists(Path.GetFullPath(Path.Join(runtimeDir, "Data")));
 
         /// <summary>
         /// The file located at "Packages/UnityTest/Runtime/ExampleTests.cs"
@@ -58,6 +58,16 @@ namespace UnityTest
 
         public static float searchBarMinWidth = 80f;
         public static float searchBarMaxWidth = 300f;
+
+        /// <summary>
+        /// Create directories so that the given directory path exists. Returns the given directory path.
+        /// </summary>
+        private static string EnsureDirectoryExists(string directory)
+        {
+            if (Directory.Exists(directory)) return directory;
+            Directory.CreateDirectory(directory);
+            return directory;
+        }
 
         public static bool IsSceneEmpty()
         {
