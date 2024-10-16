@@ -127,7 +127,7 @@ namespace UnityTest
 
             Debug.Log("path = " + path);
             Debug.Log("packagesPath = " + packagesPath);
-            if (IsPathChild(assetsPath, path)) // it's in the "Assets" folder
+            if (IsPathChild(assetsPath, path, false)) // it's in the "Assets" folder
             {
                 Debug.Log("child of assetsPath");
                 return Path.Join(
@@ -135,7 +135,7 @@ namespace UnityTest
                     Path.GetRelativePath(assetsPath, path)
                 );
             }
-            else if (IsPathChild(packagesPath, path)) // it's in the "Packages" folder somewhere
+            else if (IsPathChild(packagesPath, path, false)) // it's in the "Packages" folder somewhere
             {
                 Debug.Log("child of packagesPath");
                 return Path.Join(
@@ -143,7 +143,7 @@ namespace UnityTest
                     Path.GetRelativePath(packagesPath, path)
                 );
             }
-            else if (IsPathChild(projectPath, path)) // it's in the project folder somewhere
+            else if (IsPathChild(projectPath, path, false)) // it's in the project folder somewhere
             {
                 Debug.Log("child of projectPath");
                 return Path.GetRelativePath(projectPath, path);
@@ -156,9 +156,8 @@ namespace UnityTest
         /// Returns true if the given child path is located in any subdirectory of parent, or if it is located in parent itself.
         /// Returns false if the parent and child paths are the same, or if the child is not located within the parent.
         /// </summary>
-        public static bool IsPathChild(string parent, string child)
+        public static bool IsPathChild(string parent, string child, bool getFullPath = true)
         {
-            // NullOrEmpty == root directory
             if ((parent == child) || (string.IsNullOrEmpty(parent) && string.IsNullOrEmpty(child))) return false;
 
             if (string.IsNullOrEmpty(parent)) return true;
@@ -166,8 +165,11 @@ namespace UnityTest
 
             // Although this method does not require realistic file paths, we must treat them as realistic paths for
             // the purposes of comparison.
-            parent = Path.GetFullPath(parent);
-            child = Path.GetFullPath(child);
+            if (getFullPath)
+            {
+                parent = Path.GetFullPath(parent);
+                child = Path.GetFullPath(child);
+            }
 
             // First check if the two are even on the same disk
             if (parent.Contains(Path.VolumeSeparatorChar) && child.Contains(Path.VolumeSeparatorChar))
