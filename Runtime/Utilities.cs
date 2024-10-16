@@ -93,6 +93,7 @@ namespace UnityTest
         /// </summary>
         private static string EnsureDirectoryExists(string directory)
         {
+            Debug.Log("Ensuring directory exists: " + directory);
             if (Directory.Exists(directory)) return directory;
             if (IsPathChild(assetsPath, directory) || IsPathChild(packagesPath, directory))
             {
