@@ -88,7 +88,13 @@ namespace UnityTest
             test.attribute = attribute;
 
             // Save the Test asset with a unique GUID name to avoid conflicts.
+            Debug.Log("assetsPath = " + Utilities.assetsPath);
+            Debug.Log("projectPath = " + Utilities.projectPath);
+            Debug.Log("packagesPath = " + Utilities.packagesPath);
+            Debug.Log("rootPath = " + Utilities.rootPath);
+            Debug.Log("runtimePath = " + Utilities.runtimePath);
             Debug.Log("dataPath = " + Utilities.dataPath);
+            Debug.Log("examplesTestFile = " + Utilities.exampleTestsFile);
             System.Guid guid = System.Guid.NewGuid();
             Debug.Log("guid = " + guid);
             string rawPath = Path.Join(Utilities.dataPath, guid + ".asset");
