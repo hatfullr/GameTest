@@ -103,6 +103,10 @@ namespace UnityTest
                 AssetDatabase.CreateFolder(Path.GetDirectoryName(path), Path.GetFileName(path));
                 return path;
             }
+            else if (IsPathChild(sourceRootPath, directory))
+            {
+                Debug.Log("Path is a child of the sourceRootPath");
+            }
             Debug.Log("Doing default bad directory creation");
             Directory.CreateDirectory(directory);
             return directory;
