@@ -138,6 +138,10 @@ namespace UnityTest
             else if (IsPathChild(packagesPath, path, false)) // it's in the "Packages" folder somewhere
             {
                 Debug.Log("child of packagesPath");
+                Debug.Log(Path.Join(
+                    Path.GetFileName(packagesPath),
+                    Path.GetRelativePath(packagesPath, path)
+                ));
                 return Path.Join(
                     Path.GetFileName(packagesPath),
                     Path.GetRelativePath(packagesPath, path)
