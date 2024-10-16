@@ -99,13 +99,15 @@ namespace UnityTest
             if (IsPathChild(assetsPath, directory) || IsPathChild(packagesPath, directory))
             {
                 Debug.Log("path is child of assetsPath or packagesPath");
-                string path = GetUnityPath(directory);
-                AssetDatabase.CreateFolder(Path.GetDirectoryName(path), Path.GetFileName(path));
-                return path;
+                directory = GetUnityPath(directory);
+                AssetDatabase.CreateFolder(Path.GetDirectoryName(directory), Path.GetFileName(directory));
+                return directory;
             }
-            else if (IsPathChild(sourceRootPath, directory))
+            if (IsPathSource(directory))
             {
-                Debug.Log("Path is a child of the sourceRootPath");
+                directory = FixSourcePath(directory);
+                AssetDatabase.CreateFolder(Path.GetDirectoryName(directory), Path.GetFileName(directory));
+                return directory;
             }
             Debug.Log("Doing default bad directory creation");
             Directory.CreateDirectory(directory);
@@ -158,7 +160,6 @@ namespace UnityTest
         {
             path = Path.GetFullPath(path); // normalize the path
 
-            Debug.Log("path = " + path);
             if (IsPathChild(assetsPath, path)) // it's in the "Assets" folder
             {
                 return Path.Join(
@@ -173,19 +174,17 @@ namespace UnityTest
                     Path.GetRelativePath(packagesPath, path)
                 );
             }
-            if (IsPathChild(projectPath, path)) // it's in the project folder somewhere
+            if (IsPathSource(path)) // it's in the project folder somewhere
             {
-                Debug.Log("child of projectPath");
-                if (IsPathChild(sourceRootPath, path))
-                {
-                    //Debug.Log(packagesPath);
-                    //Debug.Log(Path.GetRelativePath(sourceRootPath, path));
-                    return Path.Join(Path.GetFileName(packagesPath), Path.GetFileName(rootPath), Path.GetRelativePath(sourceRootPath, path));
-                }
+                return FixSourcePath(path);
             }
             
             throw new InvalidUnityPath(path);
         }
+
+        public static string FixSourcePath(string path) => Path.Join(Path.GetFileName(packagesPath), Path.GetFileName(rootPath), Path.GetRelativePath(sourceRootPath, path));
+
+        public static bool IsPathSource(string path) => IsPathChild(sourceRootPath, path);
 
         /// <summary>
         /// Returns true if the given child path is located in any subdirectory of parent, or if it is located in parent itself.
