@@ -122,10 +122,12 @@ namespace UnityTest
         /// </summary>
         public static string GetUnityPath(string path)
         {
-            //path = Path.GetFullPath(path); // normalize the path
+            path = Path.GetFullPath(path); // normalize the path
 
+            Debug.Log("path = " + path);
             if (IsPathChild(assetsPath, path)) // it's in the "Assets" folder
             {
+                Debug.Log("child of assetsPath");
                 return Path.Join(
                     Path.GetFileName(assetsPath),
                     Path.GetRelativePath(assetsPath, path)
@@ -133,6 +135,7 @@ namespace UnityTest
             }
             else if (IsPathChild(packagesPath, path)) // it's in the project folder somewhere
             {
+                Debug.Log("child of packagesPath");
                 return Path.Join(
                     Path.GetFileName(packagesPath),
                     Path.GetRelativePath(packagesPath, path)
@@ -140,9 +143,10 @@ namespace UnityTest
             }
             else if (IsPathChild(projectPath, path))
             {
+                Debug.Log("child of projectPath");
                 return Path.GetRelativePath(projectPath, path);
             }
-
+            
             throw new InvalidUnityPath(path);
         }
 
