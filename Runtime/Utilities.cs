@@ -16,26 +16,6 @@ namespace UnityTest
         public const char guidDelimiter = '\n';
         public const BindingFlags bindingFlags = BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly | BindingFlags.Static;
 
-        private static string _runtimeDir;
-        /// <summary>
-        /// Location of the "Packages/UnityTest/Runtime" folder. Note that sometimes Unity will download the package into a weird PackageCache
-        /// folder, which they never explain in their documentation. This path is the directory path of the Utilities.cs script, which is located
-        /// in the UnityTest/Runtime package location.
-        /// </summary>
-        public static string runtimeDir
-        {
-            get
-            {
-                if (string.IsNullOrEmpty(_runtimeDir))
-                {
-                    string Get([System.Runtime.CompilerServices.CallerFilePath] string path = null) => path;
-                    _runtimeDir = Path.GetDirectoryName(Get());
-                }
-                return _runtimeDir;
-            }
-        }
-
-
         /// <summary>
         /// Location of the "Assets" folder.
         /// </summary>
@@ -49,17 +29,27 @@ namespace UnityTest
         /// <summary>
         /// Location of the "Packages" folder, found as two directories up from the "Runtime" folder.
         /// </summary>
-        public static string packagesPath { get; } = Path.GetFullPath(Path.GetDirectoryName(Path.GetDirectoryName(runtimeDir))); // Path.GetFullPath(Path.Join(projectPath, "Packages"));
+        public static string packagesPath { get; } = Path.GetFullPath(Path.Join(projectPath, "Packages"));
 
         /// <summary>
-        /// Location of the "Runtime/Data" folder.
+        /// The directory in "Packages/UnityTest".
         /// </summary>
-        public static string dataPath { get; } = EnsureDirectoryExists(Path.GetFullPath(Path.Join(runtimeDir, "Data")));
+        public static string rootPath { get; } = Path.GetFullPath(Path.Join(packagesPath, "UnityTest"));
 
         /// <summary>
-        /// The file located at "Runtime/ExampleTests.cs"
+        /// Location of the "Packages/UnityTest/Runtime" folder.
         /// </summary>
-        public static string exampleTestsFile { get; } = Path.GetFullPath(Path.Join(runtimeDir, "ExampleTests.cs"));
+        public static string runtimePath { get; } = Path.GetFullPath(Path.Join(rootPath, "Runtime"));
+
+        /// <summary>
+        /// Location of the "Packages/UnityTest/Runtime/Data" folder.
+        /// </summary>
+        public static string dataPath { get; } = EnsureDirectoryExists(Path.GetFullPath(Path.Join(runtimePath, "Data")));
+
+        /// <summary>
+        /// The file located at "Packages/UnityTest/Runtime/ExampleTests.cs"
+        /// </summary>
+        public static string exampleTestsFile { get; } = Path.GetFullPath(Path.Join(runtimePath, "ExampleTests.cs"));
 
         /// <summary>
         /// True if the editor is using the theme called "DarkSkin". Otherwise, false.

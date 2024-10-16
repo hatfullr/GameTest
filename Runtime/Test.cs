@@ -33,7 +33,7 @@ namespace UnityTest
         {
             get
             {
-                if (_internalFiles == null) _internalFiles = Directory.GetFiles(Utilities.runtimeDir, "*", SearchOption.AllDirectories);
+                if (_internalFiles == null) _internalFiles = Directory.GetFiles(Utilities.runtimePath, "*", SearchOption.AllDirectories);
                 return _internalFiles;
             }
         }
@@ -361,7 +361,7 @@ namespace UnityTest
             if (IsExample())
             {
                 // Get the internal directory in the style that Unity wants it in (starts with "Packages")
-                pathToSearch = Path.GetRelativePath(Path.GetDirectoryName(Utilities.packagesPath), Utilities.runtimeDir);
+                pathToSearch = Path.GetRelativePath(Path.GetDirectoryName(Utilities.packagesPath), Utilities.runtimePath);
             }
             else
             {
