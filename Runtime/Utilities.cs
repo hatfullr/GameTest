@@ -68,7 +68,7 @@ namespace UnityTest
                 return _sourcePath;
             }
         }
-        public static string sourceRuntimePath { get; } = Path.GetDirectoryName(_sourcePath);
+        public static string sourceRuntimePath { get; } = Path.GetDirectoryName(sourcePath);
         public static string sourceRootPath { get; } = Path.GetDirectoryName(sourceRuntimePath);
 
         /// <summary>
@@ -164,6 +164,8 @@ namespace UnityTest
                 Debug.Log("child of projectPath");
                 if (IsPathChild(sourceRootPath, path))
                 {
+                    Debug.Log(packagesPath);
+                    Debug.Log(Path.GetRelativePath(sourceRootPath, path));
                     return Path.Join(packagesPath, Path.GetRelativePath(sourceRootPath, path));
                 }
             }
