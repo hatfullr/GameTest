@@ -124,12 +124,6 @@ namespace UnityTest
         {
             path = Path.GetFullPath(path); // normalize the path
 
-            if (!File.GetAttributes(path).HasFlag(FileAttributes.Directory) && // Check if the path is referring to a file and not a directory
-                Path.GetDirectoryName(path) == runtimePath) // Check if the file is located in the Packages/Runtime directory
-            {
-
-            }
-
             if (IsPathChild(assetsPath, path)) // it's in the "Assets" folder
             {
                 return Path.Join(
