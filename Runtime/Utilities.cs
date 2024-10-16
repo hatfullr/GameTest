@@ -64,6 +64,7 @@ namespace UnityTest
                 {
                     string Get([System.Runtime.CompilerServices.CallerFilePath] string path = null) => path;
                     _sourcePath = Get();
+                    if (_sourcePath == null) throw new System.Exception("Failed to find source file!");
                 }
                 return _sourcePath;
             }
