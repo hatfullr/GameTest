@@ -94,6 +94,12 @@ namespace UnityTest
         private static string EnsureDirectoryExists(string directory)
         {
             if (Directory.Exists(directory)) return directory;
+            if (IsPathChild(assetsPath, directory) || IsPathChild(packagesPath, directory))
+            {
+                string path = GetUnityPath(directory);
+                AssetDatabase.CreateFolder(Path.GetDirectoryName(path), Path.GetFileName(path));
+                return path;
+            }
             Directory.CreateDirectory(directory);
             return directory;
         }
