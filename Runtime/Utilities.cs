@@ -164,9 +164,9 @@ namespace UnityTest
                 Debug.Log("child of projectPath");
                 if (IsPathChild(sourceRootPath, path))
                 {
-                    Debug.Log(packagesPath);
-                    Debug.Log(Path.GetRelativePath(sourceRootPath, path));
-                    return Path.Join(packagesPath, Path.GetRelativePath(sourceRootPath, path));
+                    //Debug.Log(packagesPath);
+                    //Debug.Log(Path.GetRelativePath(sourceRootPath, path));
+                    return Path.Join(Path.GetFileName(packagesPath), Path.GetRelativePath(sourceRootPath, path));
                 }
             }
             
