@@ -95,12 +95,15 @@ namespace UnityTest
         {
             Debug.Log("Ensuring directory exists: " + directory);
             if (Directory.Exists(directory)) return directory;
+            Debug.Log("Directory didn't exist");
             if (IsPathChild(assetsPath, directory) || IsPathChild(packagesPath, directory))
             {
+                Debug.Log("path is child of assetsPath or packagesPath");
                 string path = GetUnityPath(directory);
                 AssetDatabase.CreateFolder(Path.GetDirectoryName(path), Path.GetFileName(path));
                 return path;
             }
+            Debug.Log("Doing default bad directory creation");
             Directory.CreateDirectory(directory);
             return directory;
         }
