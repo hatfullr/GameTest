@@ -122,7 +122,7 @@ namespace UnityTest
         /// </summary>
         public static string GetUnityPath(string path)
         {
-            path = Path.GetFullPath(path); // normalize the path
+            //path = Path.GetFullPath(path); // normalize the path
 
             if (IsPathChild(assetsPath, path)) // it's in the "Assets" folder
             {
