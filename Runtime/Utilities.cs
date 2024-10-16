@@ -133,12 +133,14 @@ namespace UnityTest
             }
             else if (IsPathChild(packagesPath, path)) // it's in the project folder somewhere
             {
-                return Path.GetRelativePath(projectPath, path);
+                return Path.Join(
+                    Path.GetFileName(packagesPath),
+                    Path.GetRelativePath(packagesPath, path)
+                );
             }
             else if (IsPathChild(projectPath, path))
             {
-                if (path.StartsWith(packagesPath)) return Path.Join(packagesPath, Path.GetRelativePath(packagesPath, path));
-                else if (path.StartsWith(assetsPath)) return Path.Join(assetsPath, Path.GetRelativePath(assetsPath, path));
+                return Path.GetRelativePath(projectPath, path);
             }
 
             throw new InvalidUnityPath(path);
