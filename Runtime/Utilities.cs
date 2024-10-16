@@ -126,6 +126,7 @@ namespace UnityTest
             //path = Path.GetFullPath(path); // normalize the path
 
             Debug.Log("path = " + path);
+            Debug.Log("packagesPath = " + packagesPath);
             if (IsPathChild(assetsPath, path)) // it's in the "Assets" folder
             {
                 Debug.Log("child of assetsPath");
@@ -134,7 +135,7 @@ namespace UnityTest
                     Path.GetRelativePath(assetsPath, path)
                 );
             }
-            else if (IsPathChild(packagesPath, path)) // it's in the project folder somewhere
+            else if (IsPathChild(packagesPath, path)) // it's in the "Packages" folder somewhere
             {
                 Debug.Log("child of packagesPath");
                 return Path.Join(
@@ -142,7 +143,7 @@ namespace UnityTest
                     Path.GetRelativePath(packagesPath, path)
                 );
             }
-            else if (IsPathChild(projectPath, path))
+            else if (IsPathChild(projectPath, path)) // it's in the project folder somewhere
             {
                 Debug.Log("child of projectPath");
                 return Path.GetRelativePath(projectPath, path);
