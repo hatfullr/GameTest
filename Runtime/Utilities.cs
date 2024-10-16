@@ -19,37 +19,37 @@ namespace UnityTest
         /// <summary>
         /// Location of the "Assets" folder.
         /// </summary>
-        public static string assetsPath { get; } = Path.GetFullPath(Application.dataPath);
+        public static string assetsPath { get; } = Application.dataPath;
 
         /// <summary>
         /// Location of the Unity project.
         /// </summary>
-        public static string projectPath { get; } = Path.GetFullPath(Path.GetDirectoryName(assetsPath));
+        public static string projectPath { get; } = Path.GetDirectoryName(assetsPath);
 
         /// <summary>
         /// Location of the "Packages" folder, found as two directories up from the "Runtime" folder.
         /// </summary>
-        public static string packagesPath { get; } = Path.GetFullPath(Path.Join(projectPath, "Packages"));
+        public static string packagesPath { get; } = Path.Join(projectPath, "Packages");
 
         /// <summary>
         /// The directory in "Packages/UnityTest".
         /// </summary>
-        public static string rootPath { get; } = Path.GetFullPath(Path.Join(packagesPath, "UnityTest"));
+        public static string rootPath { get; } = Path.Join(packagesPath, "UnityTest");
 
         /// <summary>
         /// Location of the "Packages/UnityTest/Runtime" folder.
         /// </summary>
-        public static string runtimePath { get; } = Path.GetFullPath(Path.Join(rootPath, "Runtime"));
+        public static string runtimePath { get; } = Path.Join(rootPath, "Runtime");
 
         /// <summary>
         /// Location of the "Packages/UnityTest/Runtime/Data" folder.
         /// </summary>
-        public static string dataPath { get; } = EnsureDirectoryExists(Path.GetFullPath(Path.Join(runtimePath, "Data")));
+        public static string dataPath { get; } = EnsureDirectoryExists(Path.Join(runtimePath, "Data"));
 
         /// <summary>
         /// The file located at "Packages/UnityTest/Runtime/ExampleTests.cs"
         /// </summary>
-        public static string exampleTestsFile { get; } = Path.GetFullPath(Path.Join(runtimePath, "ExampleTests.cs"));
+        public static string exampleTestsFile { get; } = Path.Join(runtimePath, "ExampleTests.cs");
 
         /// <summary>
         /// True if the editor is using the theme called "DarkSkin". Otherwise, false.
@@ -131,9 +131,14 @@ namespace UnityTest
                     Path.GetRelativePath(assetsPath, path)
                 );
             }
-            else if (IsPathChild(projectPath, path)) // it's in the "Packages" folder
+            else if (IsPathChild(packagesPath, path)) // it's in the project folder somewhere
             {
                 return Path.GetRelativePath(projectPath, path);
+            }
+            else if (IsPathChild(projectPath, path))
+            {
+                if (path.StartsWith(packagesPath)) return Path.Join(packagesPath, Path.GetRelativePath(packagesPath, path));
+                else if (path.StartsWith(assetsPath)) return Path.Join(assetsPath, Path.GetRelativePath(assetsPath, path));
             }
 
             throw new InvalidUnityPath(path);
