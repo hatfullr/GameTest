@@ -51,6 +51,26 @@ namespace UnityTest
         /// </summary>
         public static string exampleTestsFile { get; } = Path.Join(runtimePath, "ExampleTests.cs");
 
+
+        private static string _sourcePath;
+        /// <summary>
+        /// The real location of this script.
+        /// </summary>
+        public static string sourcePath
+        {
+            get
+            {
+                if (string.IsNullOrEmpty(_sourcePath))
+                {
+                    string Get([System.Runtime.CompilerServices.CallerFilePath] string path = null) => path;
+                    _sourcePath = Get();
+                }
+                return _sourcePath;
+            }
+        }
+        public static string sourceRuntimePath { get; } = Path.GetDirectoryName(_sourcePath);
+        public static string sourceRootPath { get; } = Path.GetDirectoryName(sourceRuntimePath);
+
         /// <summary>
         /// True if the editor is using the theme called "DarkSkin". Otherwise, false.
         /// </summary>
@@ -122,35 +142,30 @@ namespace UnityTest
         /// </summary>
         public static string GetUnityPath(string path)
         {
-            string fullPath = Path.GetFullPath(path);
-            //path = Path.GetFullPath(path); // normalize the path
+            path = Path.GetFullPath(path); // normalize the path
 
             Debug.Log("path = " + path);
-            Debug.Log("packagesPath = " + packagesPath);
-            if (IsPathChild(assetsPath, path, false)) // it's in the "Assets" folder
+            if (IsPathChild(assetsPath, path)) // it's in the "Assets" folder
             {
-                Debug.Log("child of assetsPath");
                 return Path.Join(
                     Path.GetFileName(assetsPath),
                     Path.GetRelativePath(assetsPath, path)
                 );
             }
-            else if (IsPathChild(packagesPath, path, false)) // it's in the "Packages" folder somewhere
+            if (IsPathChild(packagesPath, path)) // it's in the "Packages" folder somewhere
             {
-                Debug.Log("child of packagesPath");
-                Debug.Log(Path.Join(
-                    Path.GetFileName(packagesPath),
-                    Path.GetRelativePath(packagesPath, path)
-                ));
                 return Path.Join(
                     Path.GetFileName(packagesPath),
                     Path.GetRelativePath(packagesPath, path)
                 );
             }
-            else if (IsPathChild(projectPath, path, false)) // it's in the project folder somewhere
+            if (IsPathChild(projectPath, path)) // it's in the project folder somewhere
             {
                 Debug.Log("child of projectPath");
-                return Path.GetRelativePath(projectPath, path);
+                if (IsPathChild(sourceRootPath, path))
+                {
+                    return Path.Join(packagesPath, Path.GetRelativePath(sourceRootPath, path));
+                }
             }
             
             throw new InvalidUnityPath(path);
@@ -160,7 +175,7 @@ namespace UnityTest
         /// Returns true if the given child path is located in any subdirectory of parent, or if it is located in parent itself.
         /// Returns false if the parent and child paths are the same, or if the child is not located within the parent.
         /// </summary>
-        public static bool IsPathChild(string parent, string child, bool getFullPath = true)
+        public static bool IsPathChild(string parent, string child)
         {
             if ((parent == child) || (string.IsNullOrEmpty(parent) && string.IsNullOrEmpty(child))) return false;
 
@@ -169,11 +184,9 @@ namespace UnityTest
 
             // Although this method does not require realistic file paths, we must treat them as realistic paths for
             // the purposes of comparison.
-            if (getFullPath)
-            {
-                parent = Path.GetFullPath(parent);
-                child = Path.GetFullPath(child);
-            }
+            parent = Path.GetFullPath(parent);
+            child = Path.GetFullPath(child);
+            
 
             // First check if the two are even on the same disk
             if (parent.Contains(Path.VolumeSeparatorChar) && child.Contains(Path.VolumeSeparatorChar))
