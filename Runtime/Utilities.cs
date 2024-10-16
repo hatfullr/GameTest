@@ -166,7 +166,7 @@ namespace UnityTest
                 {
                     //Debug.Log(packagesPath);
                     //Debug.Log(Path.GetRelativePath(sourceRootPath, path));
-                    return Path.Join(Path.GetFileName(packagesPath), Path.GetRelativePath(sourceRootPath, path));
+                    return Path.Join(Path.GetFileName(packagesPath), Path.GetFileName(rootPath), Path.GetRelativePath(sourceRootPath, path));
                 }
             }
             
