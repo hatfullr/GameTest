@@ -51,26 +51,24 @@ namespace UnityTest
         /// </summary>
         public static string exampleTestsFile { get; } = Path.Join(runtimePath, "ExampleTests.cs");
 
-
-        private static string _sourcePath;
         /// <summary>
-        /// The real location of this script.
+        /// Location of the "Library/PackageCache" folder, which is sometimes used by Unity for packages.
         /// </summary>
-        public static string sourcePath
+        public static string packageCachePath { get; } = Path.Join(projectPath, "Library", "PackageCache");
+
+        /// <summary>
+        /// The location of the UnityTest package. If UnityTest was installed using the Package Manager, then this path will
+        /// be in Library/PackageCache/.../unitytest. Otherwise, it is likely to be Packages/UnityTest
+        /// </summary>
+        public static string packageRootPath
         {
             get
             {
-                if (string.IsNullOrEmpty(_sourcePath))
-                {
-                    string Get([System.Runtime.CompilerServices.CallerFilePath] string path = null) => path;
-                    _sourcePath = Get();
-                    if (_sourcePath == null) throw new System.Exception("Failed to find source file!");
-                }
-                return _sourcePath;
+                string Get([System.Runtime.CompilerServices.CallerFilePath] string path = null) => path;
+                string runtimePath = Path.GetDirectoryName(Get());
+                return Path.GetDirectoryName(runtimePath);
             }
         }
-        public static string sourceRuntimePath { get; } = Path.GetDirectoryName(sourcePath);
-        public static string sourceRootPath { get; } = Path.GetDirectoryName(sourceRuntimePath);
 
         /// <summary>
         /// True if the editor is using the theme called "DarkSkin". Otherwise, false.
@@ -97,6 +95,7 @@ namespace UnityTest
             Debug.Log("Ensuring directory exists: " + directory);
             if (Directory.Exists(directory)) return directory;
             Debug.Log("Directory didn't exist");
+
             if (IsPathChild(assetsPath, directory) || IsPathChild(packagesPath, directory))
             {
                 Debug.Log("path is child of assetsPath or packagesPath");
@@ -104,12 +103,7 @@ namespace UnityTest
                 AssetDatabase.CreateFolder(Path.GetDirectoryName(directory), Path.GetFileName(directory));
                 return directory;
             }
-            if (IsPathSource(directory))
-            {
-                directory = FixSourcePath(directory);
-                AssetDatabase.CreateFolder(Path.GetDirectoryName(directory), Path.GetFileName(directory));
-                return directory;
-            }
+
             Debug.Log("Doing default bad directory creation");
             Directory.CreateDirectory(directory);
             return directory;
@@ -175,17 +169,20 @@ namespace UnityTest
                     Path.GetRelativePath(packagesPath, path)
                 );
             }
-            if (IsPathSource(path)) // it's in the project folder somewhere
+            if (IsPathChild(packageCachePath, path))
             {
-                return FixSourcePath(path);
+                // Return an equivalent path, but in Packages/ instead of Library/PackageCache
+                if (IsPathChild(packageRootPath, path))
+                {
+                    return Path.Join(
+                        Path.GetFileName(packagesPath),
+                        Path.GetRelativePath(packageRootPath, path)
+                    );
+                }
+                // The path was not in Library/PackageCache/.../unitytest, so we cannot make an equivalent path.
             }
-            
             throw new InvalidUnityPath(path);
         }
-
-        public static string FixSourcePath(string path) => Path.Join(Path.GetFileName(packagesPath), Path.GetFileName(rootPath), Path.GetRelativePath(sourceRootPath, path));
-
-        public static bool IsPathSource(string path) => IsPathChild(sourceRootPath, path);
 
         /// <summary>
         /// Returns true if the given child path is located in any subdirectory of parent, or if it is located in parent itself.
