@@ -27,16 +27,6 @@ namespace UnityTest
         public TestAttribute attribute;
 
         [HideInInspector] public bool skipped;
-
-        private static string[] _internalFiles;
-        private static string[] internalFiles
-        {
-            get
-            {
-                if (_internalFiles == null) _internalFiles = Directory.GetFiles(Utilities.runtimePath, "*", SearchOption.AllDirectories);
-                return _internalFiles;
-            }
-        }
         
         public GameObject defaultGameObject;
 
@@ -351,18 +341,18 @@ namespace UnityTest
             if (script != null) return script;
             // Intercept trying to load the ExampleTests.cs script from the package folder
             string pathToSearch;
-            if (IsExample())
-            {
-                // Get the internal directory in the style that Unity wants it in (starts with "Packages")
-                pathToSearch = Path.GetRelativePath(Path.GetDirectoryName(Utilities.packagesPath), Utilities.runtimePath);
-            }
-            else
-            {
+            //if (IsExample())
+            //{
+            //    // Get the internal directory in the style that Unity wants it in (starts with "Packages")
+            //    pathToSearch = Path.GetRelativePath(Path.GetDirectoryName(Utilities.packagesPath), Utilities.runtimePath);
+            //}
+            //else
+            //{
                 pathToSearch = Path.GetDirectoryName(Path.Join(
                     Path.GetFileName(Application.dataPath),     // Usually it's "Assets", unless Unity ever changes that
                     Path.GetRelativePath(Application.dataPath, attribute.sourceFile))
                 );
-            }
+            //}
 
             string basename = Path.GetFileName(attribute.sourceFile);
 

@@ -328,15 +328,6 @@ namespace UnityTest
         public bool IsParentOf(Foldout other) => other.IsChildOf(this);
 
         /// <summary>
-        /// Returns true if this Foldout contains any tests from Packages/UnityTest/Runtime/ExampleTests.cs
-        /// </summary>
-        public bool IsExamples()
-        {
-            foreach (Test test in tests)
-                if (test.attribute.sourceFile == Utilities.exampleTestsFile) return true;
-            return false;
-        }
-        /// <summary>
         /// Returns true if more than one of this Foldout's tests is selected, but not all of them. The tests that are checked are
         /// all of those in every subdirectory.
         /// </summary>

@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
-using UnityEditor;
 using UnityEngine;
 
 
@@ -9,11 +8,8 @@ namespace UnityTest
 {
     public static class Utilities
     {
-        public const string debugTag = "[UnityTest]";
-
-        public const string editorPrefs = "UnityTest";
-        public const string guidPrefs = "UnityTest/GUIDs";
-        public const char guidDelimiter = '\n';
+        public static string debugTag { get => "[" + GetPackageInfo().displayName + "]"; }
+        public static string editorPrefs { get => GetPackageInfo().displayName; }
         public const BindingFlags bindingFlags = BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly | BindingFlags.Static;
 
         /// <summary>
@@ -32,24 +28,9 @@ namespace UnityTest
         public static string packagesPath { get; } = Path.Join(projectPath, "Packages");
 
         /// <summary>
-        /// The directory in "Packages/UnityTest".
-        /// </summary>
-        public static string rootPath { get; } = Path.Join(packagesPath, "UnityTest");
-
-        /// <summary>
-        /// Location of the "Packages/UnityTest/Runtime" folder.
-        /// </summary>
-        public static string runtimePath { get; } = Path.Join(rootPath, "Runtime");
-
-        /// <summary>
         /// Location of the "Packages/UnityTest/Runtime/Data" folder.
         /// </summary>
         public static string dataPath { get; } = EnsureDirectoryExists(Path.Join(assetsPath, "UnityTest", "Data"));
-
-        /// <summary>
-        /// The file located at "Packages/UnityTest/Runtime/ExampleTests.cs"
-        /// </summary>
-        public static string exampleTestsFile { get; } = Path.Join(runtimePath, "ExampleTests.cs");
 
         /// <summary>
         /// True if the editor is using the theme called "DarkSkin". Otherwise, false.
@@ -101,7 +82,7 @@ namespace UnityTest
             if (IsPathChild(assetsPath, directory) || IsPathChild(packagesPath, directory))
             {
                 directory = GetUnityPath(directory);
-                AssetDatabase.CreateFolder(Path.GetDirectoryName(directory), Path.GetFileName(directory));
+                UnityEditor.AssetDatabase.CreateFolder(Path.GetDirectoryName(directory), Path.GetFileName(directory));
                 return directory;
             }
 
@@ -217,7 +198,7 @@ namespace UnityTest
         /// <summary>
         /// When the mouse cursor is hovering over the given rect, the mouse cursor will change to the type specified.
         /// </summary>
-        public static void SetCursorInRect(Rect rect, MouseCursor cursor) => EditorGUIUtility.AddCursorRect(rect, cursor);
+        public static void SetCursorInRect(Rect rect, UnityEditor.MouseCursor cursor) => UnityEditor.EditorGUIUtility.AddCursorRect(rect, cursor);
 
         public static bool IsMouseButtonPressed() { if (Event.current == null) return false; return Event.current.rawType == EventType.MouseDown; }
         public static bool IsMouseButtonReleased() { if (Event.current == null) return false; return Event.current.rawType == EventType.MouseUp; }

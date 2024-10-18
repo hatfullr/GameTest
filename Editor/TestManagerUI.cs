@@ -265,14 +265,6 @@ namespace UnityTest
         private void SelectAll() => rootFoldout.Select(); // Simulate a press
 
         private void DeselectAll() => rootFoldout.Deselect(); // Simulate a press
-
-        /// <summary>
-        /// Using the string set by the user in the UI, search for tests with similar names.
-        /// </summary>
-        private void Search()
-        {
-
-        }
         #endregion Methods
 
 
