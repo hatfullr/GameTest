@@ -92,43 +92,6 @@ namespace UnityTest
 
 
         #region Events
-        [InitializeOnLoadMethod]
-        private static void OnInstall()
-        {
-            // Event raised before applying changes to the registered packages list.
-            // https://docs.unity3d.com/ScriptReference/PackageManager.Events-registeringPackages.html
-            UnityEditor.PackageManager.Events.registeringPackages -= BeforePackagesChange; // https://stackoverflow.com/a/7065771
-            UnityEditor.PackageManager.Events.registeringPackages += BeforePackagesChange;
-        }
-
-        private static void BeforePackagesChange(UnityEditor.PackageManager.PackageRegistrationEventArgs args)
-        {
-            Debug.Log("BeforePackagesChange");
-            UnityEditor.PackageManager.PackageInfo ourInfo = Utilities.GetPackageInfo();
-            bool isGoingToBeRemoved = false;
-            foreach (UnityEditor.PackageManager.PackageInfo info in args.removed)
-            {
-                // Not clear to me how else to compare the PackageInfo objects
-                if ((info.name == ourInfo.name) &&
-                    (info.version == ourInfo.version))
-                {
-                    isGoingToBeRemoved = true;
-                }
-            }
-            if (!isGoingToBeRemoved) return;
-
-            Debug.Log("isGoingToBeRemoved");
-
-            // We need to remove the installed samples if there are any
-            foreach (UnityEditor.PackageManager.UI.Sample sample in Utilities.GetSamples())
-            {
-                Debug.Log("Found sample: " + sample.importPath);
-                if (!sample.isImported) continue;
-                Debug.Log("Sample is imported. Removing now.");
-                AssetDatabase.DeleteAsset(sample.importPath);
-            }
-        }
-
         /// <summary>
         /// Called after ShowWindow but before OnEnable, and only when the window is opened.
         /// </summary>
