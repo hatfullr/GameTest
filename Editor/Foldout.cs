@@ -237,7 +237,7 @@ namespace UnityTest
                 foreach (Foldout foldout in TestManagerUI.Instance.foldouts)
                 {
                     if (isRoot && string.IsNullOrEmpty(foldout.path)) continue; // Don't return the rootFoldout on itself
-                    Debug.Log(foldout.path + " " + isRoot + " " + string.IsNullOrEmpty(foldout.path));
+                    Debug.Log(path + " "+ foldout.path + " " + isRoot + " " + string.IsNullOrEmpty(foldout.path));
                     string dirname = Path.GetDirectoryName(foldout.path);
                     if (isRoot && string.IsNullOrEmpty(dirname)) yield return foldout;
                     else if (Path.GetDirectoryName(foldout.path) == path) yield return foldout;
