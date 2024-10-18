@@ -99,14 +99,7 @@ namespace UnityTest
 
         public bool IsInSuite() => method.DeclaringType.GetCustomAttribute(typeof(SuiteAttribute)) != null;
 
-        public bool IsExample()
-        {
-            foreach (string path in internalFiles)
-            {
-                if (attribute.sourceFile == path) return true;
-            }
-            return false;
-        }
+        public bool IsExample() => Utilities.IsSample(attribute.sourceFile);
 
         public GameObject DefaultSetUp()
         {

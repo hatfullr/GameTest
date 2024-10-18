@@ -52,25 +52,6 @@ namespace UnityTest
         public static string exampleTestsFile { get; } = Path.Join(runtimePath, "ExampleTests.cs");
 
         /// <summary>
-        /// Location of the "Library/PackageCache" folder, which is sometimes used by Unity for packages.
-        /// </summary>
-        public static string packageCachePath { get; } = Path.Join(projectPath, "Library", "PackageCache");
-
-        /// <summary>
-        /// The location of the UnityTest package. If UnityTest was installed using the Package Manager, then this path will
-        /// be in Library/PackageCache/.../unitytest. Otherwise, it is likely to be Packages/UnityTest
-        /// </summary>
-        public static string packageRootPath
-        {
-            get
-            {
-                string Get([System.Runtime.CompilerServices.CallerFilePath] string path = null) => path;
-                string runtimePath = Path.GetDirectoryName(Get());
-                return Path.GetDirectoryName(runtimePath);
-            }
-        }
-
-        /// <summary>
         /// True if the editor is using the theme called "DarkSkin". Otherwise, false.
         /// </summary>
         public static bool isDarkTheme = true;
@@ -86,6 +67,29 @@ namespace UnityTest
 
         public static float searchBarMinWidth = 80f;
         public static float searchBarMaxWidth = 300f;
+
+        /// <summary>
+        /// Query the package.json file to determine exactly what the current name of this package is.
+        /// </summary>
+        public static UnityEditor.PackageManager.PackageInfo GetPackageInfo() => UnityEditor.PackageManager.PackageInfo.FindForAssembly(typeof(Utilities).Assembly);
+
+        /// <summary>
+        /// Given the path to a file, returns true if the path is located in the Samples folder, and false otherwise.
+        /// </summary>
+        public static bool IsSample(string path)
+        {
+            foreach (UnityEditor.PackageManager.UI.Sample sample in GetSamples())
+            {
+                if (sample.importPath == path) return true;
+            }
+            return false;
+        }
+
+        public static IEnumerable<UnityEditor.PackageManager.UI.Sample> GetSamples()
+        {
+            UnityEditor.PackageManager.PackageInfo info = GetPackageInfo();
+            return UnityEditor.PackageManager.UI.Sample.FindByPackage(info.name, info.version);
+        }
 
         /// <summary>
         /// Create directories so that the given directory path exists. Returns the given directory path.
@@ -171,18 +175,6 @@ namespace UnityTest
                     Path.GetRelativePath(packagesPath, path)
                 );
             }
-            if (IsPathChild(packageCachePath, path))
-            {
-                // Return an equivalent path, but in Packages/ instead of Library/PackageCache
-                if (IsPathChild(packageRootPath, path))
-                {
-                    return Path.Join(
-                        Path.GetFileName(packagesPath),
-                        Path.GetRelativePath(packageRootPath, path)
-                    );
-                }
-                // The path was not in Library/PackageCache/.../unitytest, so we cannot make an equivalent path.
-            }
             throw new InvalidUnityPath(path);
         }
 
@@ -199,8 +191,8 @@ namespace UnityTest
 
             // Although this method does not require realistic file paths, we must treat them as realistic paths for
             // the purposes of comparison.
-            //parent = Path.GetFullPath(parent);
-            //child = Path.GetFullPath(child);
+            parent = Path.GetFullPath(parent);
+            child = Path.GetFullPath(child);
             
             // First check if the two are even on the same disk
             if (parent.Contains(Path.VolumeSeparatorChar) && child.Contains(Path.VolumeSeparatorChar))

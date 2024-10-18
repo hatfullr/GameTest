@@ -14,10 +14,9 @@
   "type": "tool",
   "samples": [
       {
-		  "displayName": "Example Tests",
+		  "displayName": "Fundamental",
 		  "description": "Simple unit tests that showcase how to use UnityTest at the most fundamental level",
-		  "path": "Samples~/Example Tests",
-		  "interactiveImport": true
+		  "path": "Samples~/Fundamental"
 	  }
   ]
 }
