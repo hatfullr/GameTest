@@ -96,21 +96,15 @@ namespace UnityTest
         /// </summary>
         public static string EnsureDirectoryExists(string directory)
         {
-            Debug.Log("Ensuring directory exists: " + directory);
             if (Directory.Exists(directory)) return directory;
-            Debug.Log("Directory didn't exist");
-
-            Debug.Log(packagesPath + " " + directory + " " + IsPathChild(packagesPath, directory));
 
             if (IsPathChild(assetsPath, directory) || IsPathChild(packagesPath, directory))
             {
-                Debug.Log("path is child of assetsPath or packagesPath");
                 directory = GetUnityPath(directory);
                 AssetDatabase.CreateFolder(Path.GetDirectoryName(directory), Path.GetFileName(directory));
                 return directory;
             }
 
-            Debug.Log("Doing default bad directory creation");
             Directory.CreateDirectory(directory);
             return directory;
         }
@@ -206,7 +200,6 @@ namespace UnityTest
             foreach (string path in IterateDirectories(child))
             {
                 //Debug.Log(path);
-                Debug.Log("Checking: " + parent + " " + path);
                 if (parent == path) return true;
             }
             return false;
