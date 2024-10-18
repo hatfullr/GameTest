@@ -103,6 +103,7 @@ namespace UnityTest
 
         private static void BeforePackagesChange(UnityEditor.PackageManager.PackageRegistrationEventArgs args)
         {
+            Debug.Log("BeforePackagesChange");
             UnityEditor.PackageManager.PackageInfo ourInfo = Utilities.GetPackageInfo();
             bool isGoingToBeRemoved = false;
             foreach (UnityEditor.PackageManager.PackageInfo info in args.removed)
@@ -116,10 +117,14 @@ namespace UnityTest
             }
             if (!isGoingToBeRemoved) return;
 
+            Debug.Log("isGoingToBeRemoved");
+
             // We need to remove the installed samples if there are any
             foreach (UnityEditor.PackageManager.UI.Sample sample in Utilities.GetSamples())
             {
+                Debug.Log("Found sample: " + sample.importPath);
                 if (!sample.isImported) continue;
+                Debug.Log("Sample is imported. Removing now.");
                 AssetDatabase.DeleteAsset(sample.importPath);
             }
         }
