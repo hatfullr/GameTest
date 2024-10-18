@@ -96,6 +96,8 @@ namespace UnityTest
             if (Directory.Exists(directory)) return directory;
             Debug.Log("Directory didn't exist");
 
+            Debug.Log(packagesPath + " " + directory + " " + IsPathChild(packagesPath, directory));
+
             if (IsPathChild(assetsPath, directory) || IsPathChild(packagesPath, directory))
             {
                 Debug.Log("path is child of assetsPath or packagesPath");
@@ -200,7 +202,6 @@ namespace UnityTest
             parent = Path.GetFullPath(parent);
             child = Path.GetFullPath(child);
             
-
             // First check if the two are even on the same disk
             if (parent.Contains(Path.VolumeSeparatorChar) && child.Contains(Path.VolumeSeparatorChar))
             {
