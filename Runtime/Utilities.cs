@@ -44,7 +44,7 @@ namespace UnityTest
         /// <summary>
         /// Location of the "Packages/UnityTest/Runtime/Data" folder.
         /// </summary>
-        public static string dataPath { get; } = EnsureDirectoryExists(Path.Join(runtimePath, "Data"));
+        public static string dataPath { get; } = EnsureDirectoryExists(Path.Join(assetsPath, "UnityTest", "Data"));
 
         /// <summary>
         /// The file located at "Packages/UnityTest/Runtime/ExampleTests.cs"
@@ -90,7 +90,7 @@ namespace UnityTest
         /// <summary>
         /// Create directories so that the given directory path exists. Returns the given directory path.
         /// </summary>
-        private static string EnsureDirectoryExists(string directory)
+        public static string EnsureDirectoryExists(string directory)
         {
             Debug.Log("Ensuring directory exists: " + directory);
             if (Directory.Exists(directory)) return directory;
