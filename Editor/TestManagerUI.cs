@@ -909,9 +909,6 @@ namespace UnityTest
                 SerializedProperty _gameObject = property.FindPropertyRelative(nameof(_gameObject));
                 SerializedProperty _methodName = property.FindPropertyRelative(nameof(_methodName));
 
-
-                //Debug.Log(property.propertyType);
-
                 int index = 0;
                 bool labelInOptions = false;
                 for (int i = 0; i < methodNames.Length; i++)
