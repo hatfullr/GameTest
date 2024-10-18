@@ -4,7 +4,6 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using System.Linq;
 using System.Text.RegularExpressions;
-using System.IO;
 
 namespace UnityTest
 {
@@ -98,6 +97,7 @@ namespace UnityTest
         /// </summary>
         void Awake()
         {
+            Debug.Log("Awake");
             Load();
         }
 
