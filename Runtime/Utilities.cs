@@ -199,8 +199,8 @@ namespace UnityTest
 
             // Although this method does not require realistic file paths, we must treat them as realistic paths for
             // the purposes of comparison.
-            parent = Path.GetFullPath(parent);
-            child = Path.GetFullPath(child);
+            //parent = Path.GetFullPath(parent);
+            //child = Path.GetFullPath(child);
             
             // First check if the two are even on the same disk
             if (parent.Contains(Path.VolumeSeparatorChar) && child.Contains(Path.VolumeSeparatorChar))
