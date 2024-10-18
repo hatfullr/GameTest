@@ -214,6 +214,7 @@ namespace UnityTest
             foreach (string path in IterateDirectories(child))
             {
                 //Debug.Log(path);
+                Debug.Log("Checking: " + parent + " " + path);
                 if (parent == path) return true;
             }
             return false;
