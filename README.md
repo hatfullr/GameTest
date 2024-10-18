@@ -12,12 +12,11 @@ A testing framework for the Unity editor that helps you maintain and debug your 
 
 ## Installation
 ### Unity Package
-1. Copy the GitHub repo link: `https://github.com/hatfullr/UnityTest.git`.
-2. Go to `Window > Package Manager`
-3. Click the "+" button in the top left and select "Add package from git URL..." in the dropdown.
-4. Paste the GitHub repo link into the bar.
-5. Click "Add".
-6. Open the test manager at `Window > UnityTest Manager`.
+1. Go to `Window > Package Manager` in the Unity application menu bar.
+2. Click "+" in the top left and select "Add package from git URL...".
+3. Paste in the GitHub repo link: https://github.com/hatfullr/UnityTest.git
+4. Press Enter, or click "Add".
+5. Open the test manager at `Window > UnityTest Manager`.
 
 ### Simple
 1. Download the `*.cs` scripts from the `Runtime` folder and place them anywhere inside your project.
@@ -26,7 +25,7 @@ A testing framework for the Unity editor that helps you maintain and debug your 
 4. Open the test manager at `Window > UnityTest Manager`.
 
 ## Quick Start
-Unit testing is intended to make sure code runs properly even after other systems have been introduced. However, the following example keeps things simple. Suppose you have some Unity class called `Example`:
+Unit testing is intended to make sure code runs properly throughout version changes. This is particularly helpful when there are many complicated and inter-dependent systems. The following example keeps things simple. Suppose you have some Unity class called `Example`:
 ```C#
 using UnityEngine;
 
@@ -40,7 +39,7 @@ public class Example : MonoBehaviour
     }
 }
 ```
-Are we sure that `Method` actually increments `number` as we expect? Let's make a test to be sure:
+Are we sure that `Method` actually increments `number` by one as we expect? Let's make a test:
 ```C#
 using UnityEngine;
 using UnityTest;
@@ -64,13 +63,13 @@ public class Example : MonoBehaviour
     }
 }
 ```
-Open the test manager at `Window > UnityTest Manager`, check the box where you see "Method" and press the play button in the top left of the window (not the main editor play button). The editor will then enter Play mode and run the test by instantiating a `GameObject` with an attached `Example` component, and then calling `TestMethod` on it.
+Open the test manager at `Window > UnityTest Manager` and type "Method" in the search bar. Check the box to enable the test and then press the play button in the top left of the window (not the editor's play button). The editor will then enter Play mode and run the test. First, a `GameObject` is instantiated with an attached `Example` component. Then, that component's `TestMethod` is called. The results of the test are shown in the console.
 
 ## Debugging
-When a test fails, it will throw an exception that is visible in the console log. Unfortunately, double-clicking the message will not deliver you to the line of code where the test failed. To get there, follow these steps:
+When a test fails, it will throw an exception that is visible in the console log. Unfortunately, double-clicking the message will not deliver you to the line of code where the test failed. This is a limitation of the Unity editor API. To find the line where a test failed, follow these steps:
 1. In the console, click the "triple dot" button in the top-right.
 2. Turn on "Strip logging callstack". This removes any clutter from the stack trace in the console that might have come from `UnityTest`.
 3. Click the message in the console.
-4. Find the link to your script in the stack trace and click it.
+4. Find the link to your script in the stack trace and click on it.
 
 Unfortunately, this is the best solution currently possible in Unity, at least until Unity adds an API for the console window.
