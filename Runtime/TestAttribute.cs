@@ -9,8 +9,6 @@ namespace UnityTest
     [System.AttributeUsage(System.AttributeTargets.Method), System.Serializable]
     public class TestAttribute : System.Attribute, System.IComparable<TestAttribute>
     {
-        //public const string delimiter = "\n**..-- TestAttributeDelimiter --..**\n";
-
         /// <summary>
         /// The test method name which appears in the test manager. The default is the name of the method. Names must be unique per-file.
         /// </summary>
@@ -47,6 +45,7 @@ namespace UnityTest
             [System.Runtime.CompilerServices.CallerMemberName] string name = default,
             [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = default)
         {
+            if (name.StartsWith("Test")) name = name.Substring("Test".Length);
             this.pauseOnFail = pauseOnFail;
             this.setUp = setUp;
             this.tearDown = tearDown;
@@ -65,6 +64,7 @@ namespace UnityTest
             [System.Runtime.CompilerServices.CallerMemberName] string name = default,
             [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = default)
         {
+            if (name.StartsWith("Test")) name = name.Substring("Test".Length);
             setUp = "";
             tearDown = "";
             this.pauseOnFail = pauseOnFail;
@@ -85,6 +85,7 @@ namespace UnityTest
             [System.Runtime.CompilerServices.CallerMemberName] string name = default,
             [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = default)
         {
+            if (name.StartsWith("Test")) name = name.Substring("Test".Length);
             this.setUp = setUp;
             tearDown = "";
             this.pauseOnFail = pauseOnFail;
@@ -109,6 +110,7 @@ namespace UnityTest
 
         public override bool Equals(object other)
         {
+            if (other is null) return false;
             if (GetType() != other.GetType()) return false;
             return this == (other as TestAttribute);
         }

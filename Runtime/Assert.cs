@@ -30,9 +30,9 @@ namespace UnityTest
                 ThrowException(final);
             }
         }
-        [HideInCallstack] public static void AreApproximatelyEqual(float expected, float actual, float tolerance) => AreApproximatelyEqual(expected, actual, tolerance);
+        [HideInCallstack] public static void AreApproximatelyEqual(float expected, float actual, float tolerance) => AreApproximatelyEqual(expected, actual, tolerance, "");
         [HideInCallstack] public static void AreApproximatelyEqual(float expected, float actual, string message) => AreApproximatelyEqual(expected, actual, tolerance, message);
-        [HideInCallstack] public static void AreApproximatelyEqual(float expected, float actual) => AreApproximatelyEqual(expected, actual, tolerance);
+        [HideInCallstack] public static void AreApproximatelyEqual(float expected, float actual) => AreApproximatelyEqual(expected, actual, tolerance, "");
 
 
 
@@ -55,11 +55,9 @@ namespace UnityTest
                 ThrowException(final);
             }
         }
-        [HideInCallstack] public static void AreNotApproximatelyEqual(float expected, float actual, float tolerance) => AreNotApproximatelyEqual(expected, actual, tolerance);
+        [HideInCallstack] public static void AreNotApproximatelyEqual(float expected, float actual, float tolerance) => AreNotApproximatelyEqual(expected, actual, tolerance, "");
         [HideInCallstack] public static void AreNotApproximatelyEqual(float expected, float actual, string message) => AreNotApproximatelyEqual(expected, actual, tolerance, message);
-        [HideInCallstack] public static void AreNotApproximatelyEqual(float expected, float actual) => AreNotApproximatelyEqual(expected, actual, tolerance);
-
-
+        [HideInCallstack] public static void AreNotApproximatelyEqual(float expected, float actual) => AreNotApproximatelyEqual(expected, actual, tolerance, "");
 
         /// <summary>
         /// Assert that the values are equal.

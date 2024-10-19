@@ -177,9 +177,7 @@ namespace UnityTest
 
                     GUILayout.FlexibleSpace();
 
-                    GUI.enabled = false;
                     GUILayout.Label("frame " + string.Format("{0,8}", TestManager.nframes) + "    " + TestManager.timer.ToString("0.0000 s"));
-                    GUI.enabled = wasEnabled;
 
                     EditorGUIUtility.labelWidth = previousLabelWidth;
                 }

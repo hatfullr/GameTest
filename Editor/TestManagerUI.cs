@@ -107,10 +107,16 @@ namespace UnityTest
         {
             searchField = new UnityEditor.IMGUI.Controls.SearchField(); // Unity demands we do this in OnEnable and nowhere else
 
-            AssemblyReloadEvents.beforeAssemblyReload += Save;
-            AssemblyReloadEvents.afterAssemblyReload += Load;
+            // Clear these events out if they are already added
+            AssemblyReloadEvents.beforeAssemblyReload -= OnBeforeAssemblyReload;
+            AssemblyReloadEvents.afterAssemblyReload -= OnAfterAssemblyReload;
+            EditorApplication.playModeStateChanged -= OnPlayStateChanged;
+
+            AssemblyReloadEvents.beforeAssemblyReload += OnBeforeAssemblyReload;
+            AssemblyReloadEvents.afterAssemblyReload += OnAfterAssemblyReload;
             EditorApplication.playModeStateChanged += OnPlayStateChanged;
 
+            TestManager.onStop -= OnTestManagerFinished;
             TestManager.onStop += OnTestManagerFinished;
 
             TestManager.OnEnable();
@@ -121,13 +127,35 @@ namespace UnityTest
         /// </summary>
         void OnDisable()
         {
-            AssemblyReloadEvents.beforeAssemblyReload -= Save;
-            AssemblyReloadEvents.afterAssemblyReload -= Load;
+            AssemblyReloadEvents.beforeAssemblyReload -= OnBeforeAssemblyReload;
+            AssemblyReloadEvents.afterAssemblyReload -= OnAfterAssemblyReload;
             EditorApplication.playModeStateChanged -= OnPlayStateChanged;
 
             TestManager.onStop -= OnTestManagerFinished;
 
             TestManager.OnDisable();
+        }
+
+        private void OnBeforeAssemblyReload()
+        {
+            TestManager.OnBeforeAssemblyReload();
+            Save();
+        }
+
+        private void OnAfterAssemblyReload()
+        {
+            TestManager.OnAfterAssemblyReload();
+            Load();
+        }
+
+        private void OnPlayStateChanged(PlayModeStateChange change)
+        {
+            TestManager.OnPlayStateChanged(change);
+
+            if (change == PlayModeStateChange.EnteredPlayMode && Utilities.IsSceneEmpty()) Focus();
+
+            // If we don't Repaint() here, then the toolbar buttons can appear incorrect.
+            if (change == PlayModeStateChange.EnteredEditMode) Repaint();
         }
 
         /// <summary>
@@ -172,14 +200,6 @@ namespace UnityTest
             TestManager.Update();
             if (TestManager.running && !TestManager.paused) Repaint(); // keeps the frame counter and timer up-to-date
         }
-
-        private void OnPlayStateChanged(PlayModeStateChange change)
-        {
-            if (change == PlayModeStateChange.EnteredPlayMode && Utilities.IsSceneEmpty()) Focus();
-
-            // If we don't Repaint() here, then the toolbar buttons can appear incorrect.
-            if (change == PlayModeStateChange.EnteredEditMode) Repaint();
-        }
         #endregion Events
 
 
@@ -188,7 +208,9 @@ namespace UnityTest
         {
             EditorPrefs.SetString(Utilities.editorPrefs, null);
 
+            TestManager.ClearData();
             TestManager.Reset();
+            
             guiQueue.Reset();
 
             _settings = null;
@@ -204,7 +226,10 @@ namespace UnityTest
             foldouts = new HashSet<Foldout>();
             search = null;
 
-            Load();
+            // Invoke a fake assembly reload event
+            OnBeforeAssemblyReload();
+            OnAfterAssemblyReload();
+
             Utilities.Log("Reset " + Style.TestManagerUI.windowTitle);
         }
 
@@ -281,8 +306,7 @@ namespace UnityTest
         /// Parse the string saved by Save() in the EditorPrefs
         /// </summary>
         private void Load()
-        {
-            TestManager.Reset();
+        { 
             CreateFoldouts();
 
             // Load relevant information that isn't related to the tests

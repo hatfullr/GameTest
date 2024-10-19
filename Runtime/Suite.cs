@@ -1,14 +1,13 @@
-using System.Linq;
+// TODO: Move this into Editor/ folder
+using System.IO;
 using UnityEditor;
-#if UNITY_EDITOR
 using UnityEngine;
-#endif
 
 namespace UnityTest
 {
     public class Suite : ScriptableObject
     {
-        public static string GetAssetPath(System.Type type) => string.Join("/", Utilities.dataPath, type.Name + ".asset");
+        public static string GetAssetPath(System.Type type) => Path.Join(Utilities.dataPath, type.Name + ".asset");// string.Join("/", Utilities.dataPath, type.Name + ".asset");
 
         /// <summary>
         /// Obtain the Suite asset, or create a new one if there isn't one yet. The asset is saved in the directory where the Suite 

@@ -1,16 +1,14 @@
-using System.Linq;
+// TODO: Move into the Editor/ folder
+
 using System.Reflection;
 using UnityEngine;
 using System.IO;
 using System.Collections.Generic;
-
-#if UNITY_EDITOR
 using UnityEditor;
-#endif
+
 
 namespace UnityTest
 {
-#if UNITY_EDITOR
     /// <summary>
     /// A unit test that will appear in the UnityTest Manager as a toggleable test. Each Test has an executable method and an attribute.
     /// </summary>
@@ -54,33 +52,6 @@ namespace UnityTest
             None,
             Pass,
             Fail,
-        }
-
-
-        /// <summary>
-        /// Retrieve the Test that is saved in memory for the given TestAttribute. If no Test is found, returns a newly created Test object.
-        /// </summary>
-        /// <param name="attribute"></param>
-        /// <returns></returns>
-        public static Test Get(TestAttribute attribute)
-        {
-            Test test;
-
-            // It isn't efficient, but let's try just searching through all the existing Test objects for one that has a matching TestAttribute
-            foreach (string path in Directory.GetFiles(Utilities.dataPath, "*.asset", SearchOption.TopDirectoryOnly))
-            {
-                test = AssetDatabase.LoadAssetAtPath(Utilities.GetUnityPath(path), typeof(Test)) as Test;
-                if (test.attribute != attribute) continue;
-                return test;
-            }
-
-            test = ScriptableObject.CreateInstance<Test>();
-            test.attribute = attribute;
-
-            // Save the Test asset with a unique GUID name to avoid conflicts.
-            AssetDatabase.CreateAsset(test, Utilities.GetUnityPath(Path.Join(Utilities.dataPath, System.Guid.NewGuid() + ".asset")));
-
-            return test;
         }
 
         private class CoroutineMonoBehaviour : MonoBehaviour { }
@@ -380,7 +351,6 @@ namespace UnityTest
             }
             return script;
         }
-#endif
 
         /// <summary>
         /// This object can be used in the inspector to set a default prefab to be instantiated when running a Test instead
