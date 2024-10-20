@@ -15,8 +15,13 @@
   "samples": [
       {
 		  "displayName": "Fundamental",
-		  "description": "Simple unit tests that showcase how to use UnityTest at the most fundamental level",
+		  "description": "Simple unit tests that showcase how to use UnityTest at the most fundamental level.",
 		  "path": "Samples~/Fundamental"
+	  },
+	  {
+		  "displayName": "Character",
+		  "description": "An interactive example showing a few tests for character movement in a simple 'game'.",
+		  "path": "Samples~/Character"
 	  }
   ]
 }

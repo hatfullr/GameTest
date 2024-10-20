@@ -30,7 +30,7 @@ namespace UnityTest
         /// <summary>
         /// Location of the "Packages/UnityTest/Runtime/Data" folder.
         /// </summary>
-        public static string dataPath { get; } = EnsureDirectoryExists(Path.Join(assetsPath, "UnityTest", "Data"));
+        public static string dataPath { get => EnsureDirectoryExists(Path.Join(assetsPath, "UnityTest", "Data")); }
 
         /// <summary>
         /// True if the editor is using the theme called "DarkSkin". Otherwise, false.

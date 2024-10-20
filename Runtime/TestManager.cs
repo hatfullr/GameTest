@@ -1,3 +1,5 @@
+// TODO: Move this into the Editor/ folder
+
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor;
@@ -13,15 +15,6 @@ namespace UnityTest
     public static class TestManager
     {
         public const string editorPref = "UnityTestManager";
-        //public const string delimiter = "\n===|TestManager|===\n"; // Some unique value
-        //public const string testDelimiter = "\n!!!@@@Test@@@!!!\n"; // Some unique value
-
-        private static List<System.Reflection.Assembly> assemblies = new List<System.Reflection.Assembly>();
-
-        /// <summary>
-        /// The code methods which have a TestAttribute attached to them.
-        /// </summary>
-        public static SortedDictionary<TestAttribute, MethodInfo> methods = new SortedDictionary<TestAttribute, MethodInfo>();
 
         /// <summary>
         /// The Test objects associated with the methods that have a TestAttribute attached to them.
@@ -49,27 +42,15 @@ namespace UnityTest
         /// </summary>
         public static System.Action onStop;
 
-        [HideInCallstack]
-        public static void OnEnable()
+        public static void OnPlayStateChanged(PlayModeStateChange change)
         {
-            Load();
-            AssemblyReloadEvents.beforeAssemblyReload += Save;
-            AssemblyReloadEvents.afterAssemblyReload += Load;
-            EditorApplication.playModeStateChanged += OnPlayStateChanged;
-        }
-
-        public static void OnDisable()
-        {
-            AssemblyReloadEvents.beforeAssemblyReload -= Save;
-            AssemblyReloadEvents.afterAssemblyReload -= AfterAssemblyReload;
-            EditorApplication.playModeStateChanged -= OnPlayStateChanged;
-            Save();
-        }
-
-        private static void AfterAssemblyReload()
-        {
-            Load();
-            if (running && queue.Count == 0) Start();
+            if (change == PlayModeStateChange.ExitingPlayMode)
+            {
+                timer = 0f;
+                nframes = 0;
+                Test.current = null;
+            }
+            if (change == PlayModeStateChange.EnteredEditMode) running = false;
         }
 
         [HideInCallstack]
@@ -79,12 +60,15 @@ namespace UnityTest
             previousFrameNumber = (uint)Time.frameCount;
         }
 
+        /// <summary>
+        /// This method is only called when the editor has advanced a single frame.
+        /// </summary>
         [HideInCallstack]
         private static void OnUpdate()
         {
             if (running)
             {
-                if (EditorApplication.isPaused) return;
+                //if (EditorApplication.isPaused) return;
 
                 if (Test.current == null) // No test is currently running
                 {
@@ -107,6 +91,7 @@ namespace UnityTest
             EditorPrefs.SetString(editorPref, GetString());
         }
 
+        [InitializeOnLoadMethod] // Run this whenever the TestManager is first initialized, including after domain reloading
         public static void Load()
         {
             FromString(EditorPrefs.GetString(editorPref));
@@ -190,6 +175,9 @@ namespace UnityTest
             Test.current = null;
         }
 
+        /// <summary>
+        /// "factory reset" the TestManager, but don't clear out the asset data. If you want to clear the asset data, use TestManager.ClearData().
+        /// </summary>
         public static void Reset()
         {
             debug = true;
@@ -198,23 +186,20 @@ namespace UnityTest
             nframes = 0;
             queue = new Queue();
             finishedTests = new Queue();
-            tests = new SortedDictionary<TestAttribute, Test>();
-            methods = new SortedDictionary<TestAttribute, MethodInfo>();
-            UpdateAssemblies();
-            UpdateMethods();
-            CreateTests();
+            Save();
         }
 
-
-        public static void OnPlayStateChanged(PlayModeStateChange change)
+        /// <summary>
+        /// Delete all the contents of the UnityTest/Data directory, which is where Test and Suite assets are stored. If any Test objects
+        /// exist currently in the "tests" property, assets will be created for those tests.
+        /// </summary>
+        public static void ClearData()
         {
-            if (change == PlayModeStateChange.ExitingPlayMode)
+            AssetDatabase.DeleteAsset(Utilities.GetUnityPath(Utilities.dataPath));
+            foreach (TestAttribute attribute in new List<TestAttribute>(tests.Keys))
             {
-                timer = 0f;
-                nframes = 0;
-                Test.current = null;
+                tests[attribute] = CreateTest(attribute, tests[attribute].method);
             }
-            if (change == PlayModeStateChange.EnteredEditMode) running = false;
         }
 
 
@@ -256,16 +241,17 @@ namespace UnityTest
 
 
         #region Assembly and Test Management
-        private static TestAttribute GetAttribute(MethodInfo method) => method.GetCustomAttribute(typeof(TestAttribute), false) as TestAttribute;
+        private static T GetAttribute<T>(MethodInfo method) => (T)(object)method.GetCustomAttribute(typeof(T), false);
+        private static T GetAttribute<T>(System.Type cls) => (T)(object)cls.GetCustomAttribute(typeof(T), false);
 
-        public static bool IsMethodIgnored(MethodInfo method) => method.GetCustomAttribute(typeof(IgnoreAttribute), false) != null;
+        public static bool IsMethodIgnored(MethodInfo method) => GetAttribute<IgnoreAttribute>(method) != null;
 
         /// <summary>
-        /// Locate the assemblies that Unity has most recently compile, and load them into memory. This can only be called from the main thread.
+        /// Collect all the assemblies that Unity has compiled.
         /// </summary>
-        public static void UpdateAssemblies()
+        private static List<System.Reflection.Assembly> GetAssemblies()
         {
-            assemblies.Clear();
+            List<System.Reflection.Assembly> assemblies = new List<System.Reflection.Assembly>();
             foreach (AssembliesType type in (AssembliesType[])System.Enum.GetValues(typeof(AssembliesType))) // Hit all assembly types
             {
                 foreach (UnityEditor.Compilation.Assembly assembly in CompilationPipeline.GetAssemblies(type))
@@ -273,115 +259,146 @@ namespace UnityTest
                     assemblies.Add(System.Reflection.Assembly.LoadFile(Path.Join(Utilities.projectPath, assembly.outputPath)));
                 }
             }
+            return assemblies;
         }
 
-        /// <summary>
-        /// Using the assemblies located by UpdateAssemblies(), find all the test methods and test suite classes, which are stored in 
-        /// "methods" and "classes" respectively.
-        /// </summary>
-        public static void UpdateMethods()
+        private static IEnumerable<MethodInfo> GetTests(List<System.Reflection.Assembly> assemblies)
         {
-            List<MethodInfo> _methods = new List<MethodInfo>();
-            List<System.Type> classes = new List<System.Type>();
             foreach (System.Reflection.Assembly assembly in assemblies)
             {
                 foreach (System.Type type in assembly.GetTypes())
                 {
                     if (!type.IsClass) continue; // only work with classes
-
-                    // Fetch the test methods
                     foreach (MethodInfo method in type.GetMethods(Utilities.bindingFlags))
                     {
-                        // Make sure the method has the TestAttribute decorator
+                        if (IsMethodIgnored(method)) continue;
+
+                        // It has to be done this way for some reason I can't understand.
                         object[] attributes = method.GetCustomAttributes(typeof(TestAttribute), false);
                         if (attributes.Length == 0) continue;
-                        bool hasAttribute = false;
                         foreach (object attribute in attributes)
                         {
                             if (attribute.GetType() != typeof(TestAttribute)) continue;
-                            hasAttribute = true;
+                            yield return method;
                             break;
                         }
-                        if (!hasAttribute) continue;
-
-                        // It has the TestAttribute decorator
-                        _methods.Add(method);
                     }
+                }
+            }
+        }
 
-                    // Fetch the test suites
-                    foreach (object attribute in type.GetCustomAttributes(typeof(SuiteAttribute), false))
+        private static IEnumerable<System.Type> GetSuites(List<System.Reflection.Assembly> assemblies)
+        {
+            foreach (System.Reflection.Assembly assembly in assemblies)
+            {
+                foreach (System.Type suite in assembly.GetTypes())
+                {
+                    if (!suite.IsClass) continue; // only work with classes
+
+                    // It has to be done this way for some reason I can't understand.
+                    object[] attributes = suite.GetCustomAttributes(typeof(SuiteAttribute), false);
+                    if (attributes.Length == 0) continue;
+                    foreach (object attribute in attributes)
                     {
                         if (attribute.GetType() != typeof(SuiteAttribute)) continue;
-                        // Yes, this type has our SuiteAttribute
-                        classes.Add(type);
+                        yield return suite;
                         break;
                     }
                 }
             }
+        }
 
-            List<TestAttribute> found = new List<TestAttribute>();
-            foreach (MethodInfo method in _methods)
+
+        private static Test CreateTest(TestAttribute attribute, MethodInfo method)
+        {
+            // Try to locate an existing Test asset that matches the given TestAttribute.
+            // If none are found, create a new Test object and saves the asset to disk.
+
+            // It isn't efficient, but let's try just searching through all the existing Test objects for one that has a matching TestAttribute
+            foreach (string path in Directory.GetFiles(Utilities.dataPath, "*.asset", SearchOption.TopDirectoryOnly))
+            {
+                Test t = AssetDatabase.LoadAssetAtPath(Utilities.GetUnityPath(path), typeof(Test)) as Test;
+                if (t.attribute != attribute) continue;
+                t.method = method;
+                return t;
+            }
+
+            // No Test was found amongst the existing Test assets that match the given TestAttribute. So we create a new one here.
+            Test test = ScriptableObject.CreateInstance<Test>();
+            test.attribute = attribute;
+            test.method = method;
+
+            // Save the Test asset with a unique GUID name to avoid conflicts.
+            AssetDatabase.CreateAsset(test, Utilities.GetUnityPath(Path.Join(Utilities.dataPath, System.Guid.NewGuid() + ".asset")));
+
+            return test;
+        }
+
+        [InitializeOnLoadMethod] // Run this whenever the TestManager is first initialized, including after domain reloading
+        private static void UpdateTests()
+        {
+            Debug.Log("UpdateTests");
+            List<System.Reflection.Assembly> assemblies = GetAssemblies();
+
+            List<TestAttribute> found = new List<TestAttribute>(); // Record the Tests we found
+            // Later, we will use this list to remove from the "tests" property old Tests that were not found this time around.
+            // This can happen when the user deletes a file which had Tests in it, for example.
+
+            foreach (MethodInfo method in GetTests(assemblies))
+            {
+                TestAttribute attribute = GetAttribute<TestAttribute>(method);
+                found.Add(attribute);
+                if (tests.ContainsKey(attribute)) tests[attribute].method = method; // Update the Test's method
+                else tests.Add(attribute, CreateTest(attribute, method)); // Create a new Test
+            }
+
+            foreach (System.Type suite in GetSuites(assemblies))
+            {
+                SuiteAttribute attribute = GetAttribute<SuiteAttribute>(suite);
+
+                // Get the Suite's SetUp and TearDown methods. These are null if it doesn't have them
+                MethodInfo setUp = GetSuiteMethod(suite, "SetUp");
+                MethodInfo tearDown = GetSuiteMethod(suite, "TearDown");
+
+                foreach (MethodInfo method in suite.GetMethods(Utilities.bindingFlags))
+                {
+                    if (IsMethodIgnored(method)) continue;
+                    if (method.Name == setUp.Name || method.Name == tearDown.Name) continue;
+
+                    string path = Path.Join(attribute.GetPath(), method.Name); // The path for the Test Manager UI
+
+                    TestAttribute testAttribute;
+
+                    if (setUp != null && tearDown != null)
+                        testAttribute = new TestAttribute(setUp.Name, tearDown.Name, attribute.pauseOnFail, path, attribute.sourceFile);
+                    else if (setUp != null && tearDown == null)
+                        testAttribute = new TestAttribute(setUp.Name, attribute.pauseOnFail, path, attribute.sourceFile);
+                    else
+                        testAttribute = new TestAttribute(attribute.pauseOnFail, path, attribute.sourceFile);
+
+                    found.Add(testAttribute);
+                    if (tests.ContainsKey(testAttribute)) tests[testAttribute].method = method;
+                    else tests.Add(testAttribute, CreateTest(testAttribute, method));
+                }
+            }
+
+            // Ensure that "tests" no longer contains any Test objects that weren't found on this update
+            foreach (TestAttribute attribute in new List<TestAttribute>(tests.Keys))
+            {
+                if (!found.Contains(attribute)) tests.Remove(attribute);
+            }
+        }
+
+        private static MethodInfo GetSuiteMethod(System.Type suite, string name)
+        {
+            foreach (MethodInfo method in suite.GetMethods(Utilities.bindingFlags))
             {
                 if (IsMethodIgnored(method)) continue;
-
-                TestAttribute attribute = GetAttribute(method);
-                found.Add(attribute);
-                if (methods.ContainsKey(attribute)) methods[attribute] = method; // Update the method with the current one
-                else methods.Add(attribute, method); // Add a new method
+                if (method.Name == name) return method;
             }
-            
-
-            foreach (System.Type cls in classes)
-            {
-                SuiteAttribute attribute = cls.GetCustomAttribute(typeof(SuiteAttribute), false) as SuiteAttribute;
-                bool hasSetUp = false;
-                bool hasTearDown = false;
-                foreach (MethodInfo method in cls.GetMethods(Utilities.bindingFlags))
-                {
-                    if (IsMethodIgnored(method)) continue;
-                    if (method.Name == "SetUp") hasSetUp = true;
-                    else if (method.Name == "TearDown") hasTearDown = true;
-                }
-
-                foreach (MethodInfo method in cls.GetMethods(Utilities.bindingFlags))
-                {
-                    if (IsMethodIgnored(method)) continue;
-                    if (method.Name == "SetUp" || method.Name == "TearDown") continue;
-                    TestAttribute attr;
-
-                    if (hasSetUp && hasTearDown)
-                        attr = new TestAttribute("SetUp", "TearDown", attribute.pauseOnFail, Path.Join(attribute.GetPath(), method.Name), attribute.sourceFile);
-                    else if (hasSetUp && !hasTearDown)
-                        attr = new TestAttribute("SetUp", attribute.pauseOnFail, Path.Join(attribute.GetPath(), method.Name), attribute.sourceFile);
-                    else
-                        attr = new TestAttribute(attribute.pauseOnFail, Path.Join(attribute.GetPath(), method.Name), attribute.sourceFile);
-                    found.Add(attr);
-                    if (methods.ContainsKey(attr)) methods[attr] = method;
-                    else methods.Add(attr, method);
-                }
-            }
-
-            // Ensure that methods no longer contains old, invalid items
-            foreach (TestAttribute attribute in new List<TestAttribute>(methods.Keys))
-            {
-                if (!found.Contains(attribute)) methods.Remove(attribute);
-            }
+            return null;
         }
 
-
-        /// <summary>
-        /// Populate the "tests" attribute with Test objects that are correctly linked up to their associated methods.
-        /// </summary>
-        public static void CreateTests()
-        {
-            Test newTest;
-            foreach (TestAttribute attribute in methods.Keys)
-            {
-                newTest = Test.Get(attribute);
-                newTest.method = methods[attribute];
-                tests.Add(attribute, newTest);
-            }
-        }
         #endregion
     }
 }
