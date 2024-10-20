@@ -4,6 +4,7 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using System.Linq;
 using System.Text.RegularExpressions;
+using System.Collections;
 
 namespace UnityTest
 {
@@ -98,6 +99,7 @@ namespace UnityTest
         void Awake()
         {
             Load();
+            TestManager.Load();
         }
 
         /// <summary>
@@ -118,8 +120,6 @@ namespace UnityTest
 
             TestManager.onStop -= OnTestManagerFinished;
             TestManager.onStop += OnTestManagerFinished;
-
-            TestManager.OnEnable();
         }
 
         /// <summary>
@@ -133,18 +133,18 @@ namespace UnityTest
 
             TestManager.onStop -= OnTestManagerFinished;
 
-            TestManager.OnDisable();
+            TestManager.Save();
         }
 
         private void OnBeforeAssemblyReload()
         {
-            TestManager.OnBeforeAssemblyReload();
+            TestManager.Save();
             Save();
         }
 
         private void OnAfterAssemblyReload()
         {
-            TestManager.OnAfterAssemblyReload();
+            if (TestManager.running && TestManager.queue.Count == 0) TestManager.Start();
             Load();
         }
 
@@ -176,6 +176,7 @@ namespace UnityTest
         void OnDestroy()
         {
             Save();
+            TestManager.Save();
         }
 
         void OnLostFocus()
@@ -261,6 +262,7 @@ namespace UnityTest
                         foldouts.Add(final);
                     }
                 }
+                if (final.tests.Contains(test)) continue;
                 final.tests.Add(test);
             }
         }
@@ -299,14 +301,13 @@ namespace UnityTest
         private void Save()
         {
             EditorPrefs.SetString(Utilities.editorPrefs, GetString());
-            TestManager.Save();
         }
 
         /// <summary>
         /// Parse the string saved by Save() in the EditorPrefs
         /// </summary>
         private void Load()
-        { 
+        {
             CreateFoldouts();
 
             // Load relevant information that isn't related to the tests

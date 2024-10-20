@@ -42,29 +42,6 @@ namespace UnityTest
         /// </summary>
         public static System.Action onStop;
 
-        [HideInCallstack]
-        public static void OnEnable()
-        {
-            Load();
-        }
-
-        public static void OnDisable()
-        {
-            Save();
-        }
-
-        public static void OnBeforeAssemblyReload()
-        {
-            Save();
-        }
-
-        public static void OnAfterAssemblyReload()
-        {
-            UpdateTests();
-            Load();
-            if (running && queue.Count == 0) Start();
-        }
-
         public static void OnPlayStateChanged(PlayModeStateChange change)
         {
             if (change == PlayModeStateChange.ExitingPlayMode)
@@ -114,6 +91,7 @@ namespace UnityTest
             EditorPrefs.SetString(editorPref, GetString());
         }
 
+        [InitializeOnLoadMethod] // Run this whenever the TestManager is first initialized, including after domain reloading
         public static void Load()
         {
             FromString(EditorPrefs.GetString(editorPref));
@@ -356,8 +334,10 @@ namespace UnityTest
             return test;
         }
 
+        [InitializeOnLoadMethod] // Run this whenever the TestManager is first initialized, including after domain reloading
         private static void UpdateTests()
         {
+            Debug.Log("UpdateTests");
             List<System.Reflection.Assembly> assemblies = GetAssemblies();
 
             List<TestAttribute> found = new List<TestAttribute>(); // Record the Tests we found
