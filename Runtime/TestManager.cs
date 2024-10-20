@@ -337,7 +337,6 @@ namespace UnityTest
         [InitializeOnLoadMethod] // Run this whenever the TestManager is first initialized, including after domain reloading
         private static void UpdateTests()
         {
-            Debug.Log("UpdateTests");
             List<System.Reflection.Assembly> assemblies = GetAssemblies();
 
             List<TestAttribute> found = new List<TestAttribute>(); // Record the Tests we found
