@@ -1,5 +1,3 @@
-// TODO: Move this into the Editor/ folder
-
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor;
@@ -12,37 +10,40 @@ namespace UnityTest
     /// <summary>
     /// Holds the assemblies, Test methods, and queues. Executes the tests when instructed.
     /// </summary>
-    public static class TestManager
+    [System.Serializable]
+    public class TestManager : ScriptableObject
     {
-        public const string editorPref = "UnityTestManager";
+        public const string fileName = nameof(TestManager);
 
         /// <summary>
         /// The Test objects associated with the methods that have a TestAttribute attached to them.
         /// </summary>
-        public static SortedDictionary<TestAttribute, Test> tests = new SortedDictionary<TestAttribute, Test>();
+        public Tests tests;
 
-        public static Queue queue = new Queue();
-        public static Queue finishedTests = new Queue();
+        public List<Test> queue = new List<Test>();
+        public List<Test> finishedTests = new List<Test>();
+        public List<Test.Result> finishedResults = new List<Test.Result>();
 
-        public static float timer;
-        public static uint nframes;
+        public float timer;
+        public uint nframes;
 
         /// <summary>
         /// When true, debug messages are printed to Console.
         /// </summary>
-        public static bool debug = true;
+        public bool debug = true;
 
-        public static bool paused = false;
-        public static bool running = false;
+        public bool paused = false;
+        public bool running = false;
 
-        private static uint previousFrameNumber = 0;
+        private uint previousFrameNumber = 0;
 
         /// <summary>
         /// When all Tests in the queue have been run and the editor has exited Play mode.
         /// </summary>
-        public static System.Action onStop;
+        public System.Action onStop;
 
-        public static void OnPlayStateChanged(PlayModeStateChange change)
+
+        public void OnPlayStateChanged(PlayModeStateChange change)
         {
             if (change == PlayModeStateChange.ExitingPlayMode)
             {
@@ -54,9 +55,10 @@ namespace UnityTest
         }
 
         [HideInCallstack]
-        public static void Update()
+        public void Update()
         {
-            if (Time.frameCount > previousFrameNumber && !paused) OnUpdate();
+            //Debug.Log(Time.frameCount + " " + previousFrameNumber);
+            if (Time.frameCount > previousFrameNumber) OnUpdate();
             previousFrameNumber = (uint)Time.frameCount;
         }
 
@@ -64,17 +66,15 @@ namespace UnityTest
         /// This method is only called when the editor has advanced a single frame.
         /// </summary>
         [HideInCallstack]
-        private static void OnUpdate()
+        private void OnUpdate()
         {
             if (running)
             {
-                //if (EditorApplication.isPaused) return;
-
                 if (Test.current == null) // No test is currently running
                 {
                     if (queue.Count > 0) // Start the next test if there is one
                     {
-                        RunNext();
+                        if (!paused) RunNext();
                         return;
                     }
                 }
@@ -86,60 +86,19 @@ namespace UnityTest
             }
         }
 
-        public static void Save()
-        {
-            EditorPrefs.SetString(editorPref, GetString());
-        }
-
-        [InitializeOnLoadMethod] // Run this whenever the TestManager is first initialized, including after domain reloading
-        public static void Load()
-        {
-            FromString(EditorPrefs.GetString(editorPref));
-        }
-
-        private static string GetString()
-        {
-            return string.Join('\n',
-                timer,
-                nframes,
-                debug,
-                paused,
-                running,
-                previousFrameNumber
-            );
-        }
-
-        private static void FromString(string data)
-        {
-            if (string.IsNullOrEmpty(data)) return;
-            string[] c = data.Split('\n');
-            try { timer = float.Parse(c[0]); }
-            catch (System.Exception e) { if (!(e is System.FormatException || e is System.IndexOutOfRangeException)) throw e; }
-            try { nframes = uint.Parse(c[1]); }
-            catch (System.Exception e) { if (!(e is System.FormatException || e is System.IndexOutOfRangeException)) throw e; }
-            try { debug = bool.Parse(c[2]); }
-            catch (System.Exception e) { if (!(e is System.FormatException || e is System.IndexOutOfRangeException)) throw e; }
-            try { paused = bool.Parse(c[3]); }
-            catch (System.Exception e) { if (!(e is System.FormatException || e is System.IndexOutOfRangeException)) throw e; }
-            try { running = bool.Parse(c[4]); }
-            catch (System.Exception e) { if (!(e is System.FormatException || e is System.IndexOutOfRangeException)) throw e; }
-            try { previousFrameNumber = uint.Parse(c[5]); }
-            catch (System.Exception e) { if (!(e is System.FormatException || e is System.IndexOutOfRangeException)) throw e; }
-        }
-
         [HideInCallstack]
-        private static void RunNext()
+        private void RunNext()
         {
             timer = 0f;
             nframes = 0;
-            Test test = queue.Dequeue();
+            Test test = PopFromQueue();
 
             [HideInCallstack]
             void OnFinished()
             {
                 test.onFinished -= OnFinished;
                 test.PrintResult();
-                finishedTests.Enqueue(test, test.result); // Giving the result here saves the result
+                AddToFinishedQueue(test);
                 
                 if (test.attribute.pauseOnFail && test.result == Test.Result.Fail)
                 {
@@ -160,7 +119,7 @@ namespace UnityTest
         /// Stop running the current test and move to the next.
         /// </summary>
         [HideInCallstack]
-        public static void Skip()
+        public void Skip()
         {
             if (Test.current == null)
             {
@@ -178,28 +137,15 @@ namespace UnityTest
         /// <summary>
         /// "factory reset" the TestManager, but don't clear out the asset data. If you want to clear the asset data, use TestManager.ClearData().
         /// </summary>
-        public static void Reset()
+        public void Reset()
         {
             debug = true;
             previousFrameNumber = 0;
             timer = 0f;
             nframes = 0;
-            queue = new Queue();
-            finishedTests = new Queue();
-            Save();
-        }
-
-        /// <summary>
-        /// Delete all the contents of the UnityTest/Data directory, which is where Test and Suite assets are stored. If any Test objects
-        /// exist currently in the "tests" property, assets will be created for those tests.
-        /// </summary>
-        public static void ClearData()
-        {
-            AssetDatabase.DeleteAsset(Utilities.GetUnityPath(Utilities.dataPath));
-            foreach (TestAttribute attribute in new List<TestAttribute>(tests.Keys))
-            {
-                tests[attribute] = CreateTest(attribute, tests[attribute].method);
-            }
+            queue = new List<Test>();
+            finishedTests = new List<Test>();
+            finishedResults = new List<Test.Result>();
         }
 
 
@@ -207,9 +153,10 @@ namespace UnityTest
         /// <summary>
         /// Begin working through the queue, running each Test.
         /// </summary>
-        public static void Start()
+        public void Start()
         {
             finishedTests.Clear();
+            finishedResults.Clear();
 
             running = true;
 
@@ -226,13 +173,14 @@ namespace UnityTest
         /// <summary>
         /// Stop running tests and clear the queues
         /// </summary>
-        public static void Stop()
+        public void Stop()
         {
             if (debug) Utilities.Log("Finished", null, null);
             queue.Clear();
             paused = false;
             running = false;
             if (EditorApplication.isPlaying) EditorApplication.ExitPlaymode();
+            Test.current = null;
             onStop();
         }
         #endregion
@@ -241,15 +189,31 @@ namespace UnityTest
 
 
         #region Assembly and Test Management
-        private static T GetAttribute<T>(MethodInfo method) => (T)(object)method.GetCustomAttribute(typeof(T), false);
-        private static T GetAttribute<T>(System.Type cls) => (T)(object)cls.GetCustomAttribute(typeof(T), false);
+        public void AddToQueue(Test test)
+        {
+            queue.Insert(0, test);
+        }
+        private void AddToFinishedQueue(Test test)
+        {
+            finishedTests.Insert(0, test);
+            finishedResults.Insert(0, test.result);
+        }
+        private Test PopFromQueue()
+        {
+            Test test = queue[0];
+            queue.RemoveAt(0);
+            return test;
+        }
 
-        public static bool IsMethodIgnored(MethodInfo method) => GetAttribute<IgnoreAttribute>(method) != null;
+        private T GetAttribute<T>(MethodInfo method) => (T)(object)method.GetCustomAttribute(typeof(T), false);
+        private T GetAttribute<T>(System.Type cls) => (T)(object)cls.GetCustomAttribute(typeof(T), false);
+
+        public bool IsMethodIgnored(MethodInfo method) => GetAttribute<IgnoreAttribute>(method) != null;
 
         /// <summary>
         /// Collect all the assemblies that Unity has compiled.
         /// </summary>
-        private static List<System.Reflection.Assembly> GetAssemblies()
+        private List<System.Reflection.Assembly> GetAssemblies()
         {
             List<System.Reflection.Assembly> assemblies = new List<System.Reflection.Assembly>();
             foreach (AssembliesType type in (AssembliesType[])System.Enum.GetValues(typeof(AssembliesType))) // Hit all assembly types
@@ -262,7 +226,7 @@ namespace UnityTest
             return assemblies;
         }
 
-        private static IEnumerable<MethodInfo> GetTests(List<System.Reflection.Assembly> assemblies)
+        private IEnumerable<MethodInfo> GetTests(List<System.Reflection.Assembly> assemblies)
         {
             foreach (System.Reflection.Assembly assembly in assemblies)
             {
@@ -287,7 +251,7 @@ namespace UnityTest
             }
         }
 
-        private static IEnumerable<System.Type> GetSuites(List<System.Reflection.Assembly> assemblies)
+        private IEnumerable<System.Type> GetSuites(List<System.Reflection.Assembly> assemblies)
         {
             foreach (System.Reflection.Assembly assembly in assemblies)
             {
@@ -309,33 +273,23 @@ namespace UnityTest
         }
 
 
-        private static Test CreateTest(TestAttribute attribute, MethodInfo method)
+        private Test CreateTest(TestAttribute attribute, MethodInfo method)
         {
             // Try to locate an existing Test asset that matches the given TestAttribute.
             // If none are found, create a new Test object and saves the asset to disk.
 
             // It isn't efficient, but let's try just searching through all the existing Test objects for one that has a matching TestAttribute
-            foreach (string path in Directory.GetFiles(Utilities.dataPath, "*.asset", SearchOption.TopDirectoryOnly))
+            Test t = Utilities.SearchForAsset<Test>((Test test) => test.attribute == attribute, Utilities.testDataPath, false);
+            if (t != null) // Found it
             {
-                Test t = AssetDatabase.LoadAssetAtPath(Utilities.GetUnityPath(path), typeof(Test)) as Test;
-                if (t.attribute != attribute) continue;
                 t.method = method;
                 return t;
             }
 
-            // No Test was found amongst the existing Test assets that match the given TestAttribute. So we create a new one here.
-            Test test = ScriptableObject.CreateInstance<Test>();
-            test.attribute = attribute;
-            test.method = method;
-
-            // Save the Test asset with a unique GUID name to avoid conflicts.
-            AssetDatabase.CreateAsset(test, Utilities.GetUnityPath(Path.Join(Utilities.dataPath, System.Guid.NewGuid() + ".asset")));
-
-            return test;
+            return Utilities.CreateAsset<Test>(System.Guid.NewGuid().ToString(), Utilities.testDataPath, (Test test) => { test.attribute = attribute; test.method = method; });
         }
 
-        [InitializeOnLoadMethod] // Run this whenever the TestManager is first initialized, including after domain reloading
-        private static void UpdateTests()
+        public void UpdateTests()
         {
             List<System.Reflection.Assembly> assemblies = GetAssemblies();
 
@@ -347,8 +301,8 @@ namespace UnityTest
             {
                 TestAttribute attribute = GetAttribute<TestAttribute>(method);
                 found.Add(attribute);
-                if (tests.ContainsKey(attribute)) tests[attribute].method = method; // Update the Test's method
-                else tests.Add(attribute, CreateTest(attribute, method)); // Create a new Test
+                if (tests.ContainsAttribute(attribute)) tests.UpdateMethod(attribute, method);
+                else tests.Add(CreateTest(attribute, method));
             }
 
             foreach (System.Type suite in GetSuites(assemblies))
@@ -376,19 +330,20 @@ namespace UnityTest
                         testAttribute = new TestAttribute(attribute.pauseOnFail, path, attribute.sourceFile);
 
                     found.Add(testAttribute);
-                    if (tests.ContainsKey(testAttribute)) tests[testAttribute].method = method;
-                    else tests.Add(testAttribute, CreateTest(testAttribute, method));
+
+                    if (tests.ContainsAttribute(testAttribute)) tests.UpdateMethod(testAttribute, method);
+                    else tests.Add(CreateTest(testAttribute, method));
                 }
             }
 
             // Ensure that "tests" no longer contains any Test objects that weren't found on this update
-            foreach (TestAttribute attribute in new List<TestAttribute>(tests.Keys))
+            foreach (TestAttribute attribute in tests.GetAttributes())
             {
-                if (!found.Contains(attribute)) tests.Remove(attribute);
+                if (!found.Contains(attribute)) tests.RemoveAtAttribute(attribute);
             }
         }
 
-        private static MethodInfo GetSuiteMethod(System.Type suite, string name)
+        private MethodInfo GetSuiteMethod(System.Type suite, string name)
         {
             foreach (MethodInfo method in suite.GetMethods(Utilities.bindingFlags))
             {
@@ -399,5 +354,44 @@ namespace UnityTest
         }
 
         #endregion
+
+
+        [System.Serializable]
+        public class Tests : List<Test>
+        {
+            public void RemoveAtAttribute(TestAttribute attribute)
+            {
+                foreach (Test test in new List<Test>(this))
+                {
+                    if (test.attribute == attribute)
+                    {
+                        Remove(test);
+                        return;
+                    }
+                }
+            }
+            public bool ContainsAttribute(TestAttribute attribute)
+            {
+                foreach (TestAttribute a in GetAttributes())
+                    if (a == attribute) return true;
+                return false;
+            }
+            public void UpdateMethod(TestAttribute attribute, MethodInfo method)
+            {
+                foreach (Test test in this)
+                {
+                    if (test.attribute == attribute)
+                    {
+                        test.method = method;
+                        return;
+                    }
+                }
+            }
+            public IEnumerable<TestAttribute> GetAttributes()
+            {
+                foreach (Test test in new List<Test>(this))
+                    yield return test.attribute;
+            }
+        }
     }
 }

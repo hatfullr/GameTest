@@ -464,7 +464,8 @@ namespace UnityTest
 
                 case "TestManagerUI/Toolbar/Refresh":
                     c = new GUIContent(EditorGUIUtility.IconContent("Refresh"));
-                    c.tooltip = "Refresh Test methods and classes by searching all assemblies";
+                    c.tooltip = "Refresh Test methods and classes by searching all assemblies. This should never be necessary, but could " +
+                        "be helpful if UnityTest is having trouble detecting your tests.";
                     break;
 
                 case "TestManagerUI/Toolbar/Welcome":

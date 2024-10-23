@@ -7,65 +7,46 @@ namespace UnityTest
     /// <summary>
     /// This is where the queued and finished tests in the TestManagerUI are drawn
     /// </summary>
-    public class GUIQueue
+    [System.Serializable]
+    public class GUIQueue : ScriptableObject
     {
-        private const string delimiter = "-~!@ delim @!~-";
+        public const string fileName = nameof(GUIQueue);
 
-        private Vector2 queueScrollPosition, finishedScrollPosition;
+        [SerializeField] private Vector2 queueScrollPosition;
+        [SerializeField] private Vector2 finishedScrollPosition;
+        [SerializeField] private bool hideMain = false;
 
         private float height = Style.GUIQueue.minHeight;
 
         private Rect splitterRect, mainRect;
         private bool dragging;
-        private bool hideMain = false;
         private Vector2 dragPos;
 
-        public GUIQueue(string data = null)
+        private static TestManagerUI _ui;
+        private static TestManagerUI ui
         {
-            FromString(data);
-        }
-
-        public string GetString()
-        {
-            return string.Join(delimiter,
-                height,
-                hideMain,
-                TestManager.queue.GetString(),
-                TestManager.finishedTests.GetString()
-            );
-        }
-
-        public void FromString(string data)
-        {
-            if (string.IsNullOrEmpty(data)) return;
-
-            string[] split = data.Split(delimiter);
-            try { height = float.Parse(split[0]); }
-            catch (System.Exception e) { if (!(e is System.FormatException || e is System.IndexOutOfRangeException)) throw e; }
-            try { hideMain = bool.Parse(split[1]); }
-            catch (System.Exception e) { if (!(e is System.FormatException || e is System.IndexOutOfRangeException)) throw e; }
-            try { TestManager.queue = Queue.FromString(split[2]); }
-            catch (System.Exception e) { if (!(e is System.FormatException || e is System.IndexOutOfRangeException)) throw e; }
-            try { TestManager.finishedTests = Queue.FromString(split[3]); }
-            catch (System.Exception e) { if (!(e is System.FormatException || e is System.IndexOutOfRangeException)) throw e; }
+            get
+            {
+                if (_ui == null) _ui = EditorWindow.GetWindow<TestManagerUI>();
+                return _ui;
+            }
         }
 
         public void Reset()
         {
-            splitterRect = new Rect();
-            mainRect = new Rect();
-            queueScrollPosition = Vector2.zero;
-            finishedScrollPosition = Vector2.zero;
+            splitterRect = default;
+            mainRect = default;
+            queueScrollPosition = default;
+            finishedScrollPosition = default;
             height = Style.GUIQueue.minHeight;
             hideMain = false;
-        }
 
-        
+            Utilities.DeleteAsset(fileName, Utilities.dataPath);
+            Utilities.SaveAsset(this);
+        }
 
         public void Draw()
         {
-            bool wasEnabled = GUI.enabled;
-
             DrawSplitter();
 
             if (hideMain)
@@ -85,8 +66,8 @@ namespace UnityTest
                 {
                     Rect left = new Rect(rect.x, rect.y, 0.5f * rect.width, rect.height);
                     Rect right = new Rect(rect.x + 0.5f * rect.width, rect.y, 0.5f * rect.width, rect.height);
-                    queueScrollPosition = DrawQueue(left, "Selected", ref TestManager.queue, queueScrollPosition);
-                    finishedScrollPosition = DrawQueue(right, "Finished", ref TestManager.finishedTests, finishedScrollPosition, true, true);
+                    queueScrollPosition = DrawQueue(left, "Selected", ui.manager.queue, null, queueScrollPosition);
+                    finishedScrollPosition = DrawQueue(right, "Finished", ui.manager.finishedTests, ui.manager.finishedResults, finishedScrollPosition, true, true);
                 }
                 EditorGUILayout.EndHorizontal();
             }
@@ -94,14 +75,11 @@ namespace UnityTest
 
             mainRect = GUILayoutUtility.GetLastRect();
 
-            GUI.enabled = wasEnabled;
-
             ProcessEvents();
         }
 
-        private Vector2 DrawQueue(Rect rect, string title, ref Queue queue, Vector2 scrollPosition, bool paintResultFeatures = false, bool reversed = false)
+        private Vector2 DrawQueue(Rect rect, string title, List<Test> queue, List<Test.Result> results, Vector2 scrollPosition, bool paintResultFeatures = false, bool reversed = false)
         {
-            bool wasEnabled = GUI.enabled;
             EditorGUILayout.BeginVertical(GUILayout.MaxWidth(rect.width));
             {
                 // header labels for the queue
@@ -114,23 +92,18 @@ namespace UnityTest
 
                     GUILayout.FlexibleSpace();
 
-                    if (queue != null)
+                    bool disabled = false;
+                    if (queue != null) disabled = queue.Count == 0;
+
+                    using (new EditorGUI.DisabledScope(disabled))
                     {
-                        GUI.enabled &= queue.Count > 0;
-                        if (GUILayout.Button("Clear"))
+                        if (GUILayout.Button("Clear") && !disabled)
                         {
-                            if (queue == TestManager.queue)
-                                foreach (Test test in queue.tests)
+                            if (queue == ui.manager.queue)
+                                foreach (Test test in queue)
                                     test.selected = false;
                             queue.Clear();
                         }
-                        GUI.enabled = wasEnabled;
-                    }
-                    else
-                    {
-                        GUI.enabled = false;
-                        GUILayout.Button("Clear");
-                        GUI.enabled = wasEnabled;
                     }
                 }
                 EditorGUILayout.EndHorizontal();
@@ -144,11 +117,11 @@ namespace UnityTest
                     {
                         if (queue != null)
                         {
-                            List<Test> tests = new List<Test>(queue.tests);
+                            List<Test> tests = new List<Test>(queue);
                             if (reversed) tests.Reverse();
                             foreach (Test test in tests)
                             {
-                                DrawQueueTest(GUILayoutUtility.GetRect(GUIContent.none, Style.Get("GUIQueue/Test")), test, ref queue, paintResultFeatures);
+                                DrawQueueTest(GUILayoutUtility.GetRect(GUIContent.none, Style.Get("GUIQueue/Test")), test, queue, paintResultFeatures);
                             }
                         }
                     }
@@ -160,13 +133,11 @@ namespace UnityTest
             }
             EditorGUILayout.EndVertical();
 
-            GUI.enabled = wasEnabled;
             return scrollPosition;
         }
 
         private void DrawQueueRunning()
         {
-            bool wasEnabled = GUI.enabled;
             GUILayout.BeginVertical();
             {
                 GUILayout.BeginHorizontal();
@@ -177,7 +148,7 @@ namespace UnityTest
 
                     GUILayout.FlexibleSpace();
 
-                    GUILayout.Label("frame " + string.Format("{0,8}", TestManager.nframes) + "    " + TestManager.timer.ToString("0.0000 s"));
+                    GUILayout.Label("frame " + string.Format("{0,8}", ui.manager.nframes) + "    " + ui.manager.timer.ToString("0.0000 s"));
 
                     EditorGUIUtility.labelWidth = previousLabelWidth;
                 }
@@ -194,18 +165,13 @@ namespace UnityTest
                 if (Test.current != null) DrawQueueTest(rect, Test.current);
             }
             GUILayout.EndVertical();
-            GUI.enabled = wasEnabled;
         }
 
-        private void DrawQueueTest(Rect rect, Test test, ref Queue queue, bool paintResultFeatures = true)
+        private void DrawQueueTest(Rect rect, Test test, List<Test> queue, bool paintResultFeatures = true)
         {
-            bool wasEnabled = GUI.enabled;
-
             if (paintResultFeatures)
             {
-                Test.Result result = test.result;
-                if (queue.results.ContainsKey(test)) result = queue.results[test];
-                rect = TestManagerUI.PaintResultFeatures(rect, result);
+                rect = TestManagerUI.PaintResultFeatures(rect, test.result);
             }
 
             GUIContent content = Style.GetIcon("GUIQueue/Test/Remove/Button", "Remove test from queue");
@@ -220,8 +186,6 @@ namespace UnityTest
 
             string s = test.attribute.GetPath();
             GUI.Label(rect, s, Style.GetTextOverflowAlignmentStyle(rect, Style.Get("GUIQueue/Test"), s, TextAnchor.MiddleRight));
-
-            GUI.enabled = wasEnabled;
         }
 
 

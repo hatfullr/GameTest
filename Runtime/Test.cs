@@ -44,7 +44,7 @@ namespace UnityTest
 
         private static bool sceneWarningPrinted = false;
 
-        public System.Action onFinished;
+        public System.Action onFinished, onSelected, onDeselected;
 
         [System.Serializable]
         public enum Result

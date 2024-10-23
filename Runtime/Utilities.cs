@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
+using UnityEditor;
 using UnityEngine;
 
 
@@ -9,7 +10,6 @@ namespace UnityTest
     public static class Utilities
     {
         public static string debugTag { get => "[" + GetPackageInfo().displayName + "]"; }
-        public static string editorPrefs { get => GetPackageInfo().displayName; }
         public const BindingFlags bindingFlags = BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly | BindingFlags.Static;
 
         /// <summary>
@@ -28,9 +28,19 @@ namespace UnityTest
         public static string packagesPath { get; } = Path.Join(projectPath, "Packages");
 
         /// <summary>
-        /// Location of the "Packages/UnityTest/Runtime/Data" folder.
+        /// Location where data assets are stored.
         /// </summary>
         public static string dataPath { get => EnsureDirectoryExists(Path.Join(assetsPath, "UnityTest", "Data")); }
+
+        /// <summary>
+        /// Location where Foldout assets are stored.
+        /// </summary>
+        public static string foldoutDataPath { get => EnsureDirectoryExists(Path.Join(dataPath, "Foldouts")); }
+
+        /// <summary>
+        /// Location where Test assets are stored.
+        /// </summary>
+        public static string testDataPath { get => EnsureDirectoryExists(Path.Join(dataPath, "Tests")); }
 
         /// <summary>
         /// True if the editor is using the theme called "DarkSkin". Otherwise, false.
@@ -73,20 +83,132 @@ namespace UnityTest
         }
 
         /// <summary>
+        /// Get the file path to Assets/UnityPath/Data/[name].asset.
+        /// </summary>
+        public static string GetAssetPath(string name, string directory)
+        {
+            if (directory == null) directory = dataPath;
+            string path = Path.Join(directory, name);
+            if (Path.GetExtension(path) != ".asset") path = Path.ChangeExtension(path, ".asset");
+            return GetUnityPath(path);
+        }
+
+        /// <summary>
+        /// Check Assets/UnityTest/Data/[name].asset to see if it exists.
+        /// </summary>
+        public static bool AssetExists(string name, string directory) => File.Exists(GetAssetPath(name, directory));
+
+        /// <summary>
+        /// Loop through all *.asset files in Assets/UnityTest/Data to find the first asset that meets the given criteria function. The
+        /// input parameter to the criteria function is any Object. The result of the criteria function must be a bool.
+        /// </summary>
+        public static T SearchForAsset<T>(System.Func<T, bool> criteria, string searchDirectory, bool errorOnMissing = true)
+        {
+            foreach (string path in Directory.GetFiles(searchDirectory, "*.asset", SearchOption.TopDirectoryOnly))
+            {
+                T asset = LoadAssetAtPath<T>(GetUnityPath(path));
+                if (asset == null) continue; // No asset of the given type exists at the given path
+                if (criteria(asset)) return asset;
+            }
+            if (errorOnMissing) throw new AssetNotFound("type = '" + typeof(T) + "', criteria = '" + criteria + "'");
+            return (T)(object)null;
+        }
+
+        /// <summary>
+        /// Loop through all *.asset files in Assets/UnityTest/Data to find the first asset that meets the given criteria function. The
+        /// input parameter to the criteria function is any Object. The result of the criteria function must be a bool.
+        /// </summary>
+        public static T LoadAssetAtPath<T>(string assetPath) => (T)(object)AssetDatabase.LoadAssetAtPath(GetUnityPath(assetPath), typeof(T));
+
+        /// <summary>
+        /// Create a new asset file at Assets/UnityTest/Data/[name].asset. If overwrite is true then if an asset with the same name already
+        /// exists, it is destroyed and a new one is created in its place. Otherwise, if overwrite is false, the asset is loaded and returned.
+        /// The type must inherit from ScriptableObject.
+        /// </summary>
+        public static T CreateAsset<T>(string name, string directory, System.Action<T> initializer = null, bool overwrite = false)
+        {
+            if (directory == null) directory = dataPath;
+
+            // First check if this asset already exists
+            string path = GetUnityPath(GetAssetPath(name, directory));
+            if (AssetExists(name, directory))
+            {
+                if (overwrite)
+                {
+                    if (!AssetDatabase.DeleteAsset(path)) throw new System.Exception("Failed to overwrite asset at path '" + path + "'");
+                }
+                else return (T)(object)AssetDatabase.LoadAssetAtPath(path, typeof(T));
+            }
+
+            ScriptableObject result = ScriptableObject.CreateInstance(typeof(T));
+            if (initializer != null) initializer((T)(object)result);
+            AssetDatabase.CreateAsset(result, path);
+            return (T)(object)result;
+        }
+
+        public static void SaveAsset(Object asset)
+        {
+            MarkAssetsForSave(asset);
+            SaveDirtyAssets(asset);
+        }
+
+        public static void MarkAssetsForSave(params Object[] assets)
+        {
+            foreach (Object asset in assets)
+            {
+                if (asset == null) continue;
+                EditorUtility.SetDirty(asset);
+            }
+        }
+
+        public static void SaveDirtyAssets(params Object[] assets)
+        {
+            foreach (Object asset in assets)
+            {
+                if (asset == null) continue;
+                AssetDatabase.SaveAssetIfDirty(asset);
+            }
+        }
+
+        public static void DeleteAsset(string name, string directory) => AssetDatabase.DeleteAsset(GetAssetPath(name, directory));
+
+        public static void DeleteFolder(string path) => AssetDatabase.DeleteAsset(GetUnityPath(path));
+
+        /// <summary>
         /// Create directories so that the given directory path exists. Returns the given directory path.
         /// </summary>
         public static string EnsureDirectoryExists(string directory)
         {
-            if (Directory.Exists(directory)) return directory;
+            directory = GetUnityPath(directory);
 
-            if (IsPathChild(assetsPath, directory) || IsPathChild(packagesPath, directory))
+            string parent, newFolderName;
+
+            // reverse order begins with top-most directory
+            Debug.Log("Orig = " + directory);
+            foreach (string dir in IterateDirectories(directory, true))
             {
-                directory = GetUnityPath(directory);
-                UnityEditor.AssetDatabase.CreateFolder(Path.GetDirectoryName(directory), Path.GetFileName(directory));
-                return directory;
+                Debug.Log("Trying for " + dir);
+                parent = Path.GetDirectoryName(dir);
+                newFolderName = Path.GetFileName(dir);
+                if (!AssetDatabase.IsValidFolder(dir))
+                {
+                    Debug.Log("Creating " + parent + " " + newFolderName);
+                    AssetDatabase.CreateFolder(parent, newFolderName);
+                }
             }
 
-            Directory.CreateDirectory(directory);
+            // Create the final directory at the destination path
+            Debug.Log("Final");
+            parent = Path.GetDirectoryName(directory);
+            newFolderName = Path.GetFileName(directory);
+            if (!AssetDatabase.IsValidFolder(directory))
+            {
+                Debug.Log("Creating " + parent + " " + newFolderName);
+                AssetDatabase.CreateFolder(parent, newFolderName);
+            }
+
+            Debug.Log("");
+
             return directory;
         }
 
@@ -134,6 +256,9 @@ namespace UnityTest
         /// </summary>
         public static string GetUnityPath(string path)
         {
+            // If the path begins with either "Assets" or "Packages", then it's already a Unity path.
+            if (path.StartsWith("Assets") || path.StartsWith("Packages")) return path;
+
             path = Path.GetFullPath(path); // normalize the path
 
             if (IsPathChild(assetsPath, path)) // it's in the "Assets" folder
@@ -260,6 +385,16 @@ namespace UnityTest
             public InvalidUnityPath() { }
             public InvalidUnityPath(string message) : base(message) { }
             public InvalidUnityPath(string message, System.Exception inner) : base(message, inner) { }
+        }
+
+        /// <summary>
+        /// Raised when SearchForAsset fails to locate an asset given its criteria function.
+        /// </summary>
+        public class AssetNotFound : System.Exception
+        {
+            public AssetNotFound() { }
+            public AssetNotFound(string message) : base(message) { }
+            public AssetNotFound(string message, System.Exception inner) : base(message, inner) { }
         }
     }
 }

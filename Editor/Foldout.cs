@@ -6,33 +6,35 @@ using UnityEngine;
 
 namespace UnityTest
 {
-    public class Foldout
+    [System.Serializable]
+    public class Foldout : ScriptableObject
     {
         /// <summary>
         /// All Test objects in this Foldout will have paths that start with this path.
         /// </summary>
-        public string path { get; private set; }
+        [SerializeField] public string path;
+        [SerializeField] private bool selected;
+        [SerializeField] private bool expanded;
+        [SerializeField] private bool locked;
 
-        public bool selected, expanded, locked;
-
+        [SerializeField] private bool _isSuite = false;
         /// <summary>
         /// true if this Foldout is a Suite, and false otherwise. This is set only after Add() is called with an input test that originates
         /// from a Suite class.
         /// </summary>
-        public bool isSuite { get; private set; } = false;
+        public bool isSuite { get => _isSuite; private set => _isSuite = value; }
 
-        public List<Test> tests { get; private set; } = new List<Test>();
+        public List<Test> tests = new List<Test>();
 
-        /// <summary>
-        /// Create a new Foldout located at the given path
-        /// </summary>
-        /// <param name="path"></param>
-        public Foldout(string path)
+        private static TestManagerUI _ui;
+        private static TestManagerUI ui
         {
-            this.path = path;
+            get
+            {
+                if (_ui == null) _ui = EditorWindow.GetWindow<TestManagerUI>();
+                return _ui;
+            }
         }
-
-
 
         #region UI Methods
         public void Draw()
@@ -49,18 +51,18 @@ namespace UnityTest
 
                 // Setup the indented area
                 Rect indentedRect;
-                if (TestManagerUI.Instance.indentWidth == 0f)
+                if (ui.indentWidth == 0f)
                 {
                     EditorGUI.indentLevel++;
                     indentedRect = EditorGUI.IndentedRect(controlRect);
                     EditorGUI.indentLevel--;
-                    TestManagerUI.Instance.indentWidth = controlRect.width - indentedRect.width;
+                    ui.indentWidth = controlRect.width - indentedRect.width;
                 }
                 else
                 {
                     indentedRect = new Rect(controlRect);
-                    indentedRect.x += TestManagerUI.Instance.indentWidth * TestManagerUI.Instance.indentLevel;
-                    indentedRect.width -= TestManagerUI.Instance.indentWidth * TestManagerUI.Instance.indentLevel;
+                    indentedRect.x += ui.indentWidth * ui.indentLevel;
+                    indentedRect.width -= ui.indentWidth * ui.indentLevel;
                 }
 
                 // Draw the Foldout control
@@ -118,38 +120,39 @@ namespace UnityTest
 
                     if (GUI.Button(indentedRect, Style.GetIcon("Test/Suite/SettingsButton"), Style.Get("Test/Suite/SettingsButton")))
                     {
-                        TestManagerUI.Instance.settings.SetTest(tests[0]);
-                        TestManagerUI.Instance.settings.SetVisible(true);
+                        ui.settings.SetTest(tests[0]);
+                        ui.settings.SetVisible(true);
                     }
 
                     indentedRect.x += indentedRect.width;
                     indentedRect.width = Style.TestManagerUI.scriptWidth;
-                    bool wasEnabled = GUI.enabled;
-                    GUI.enabled = false;
-                    EditorGUI.ObjectField(indentedRect, GUIContent.none, tests[0].GetScript(), tests[0].method.DeclaringType, false);
-                    GUI.enabled = wasEnabled;
+                    using (new EditorGUI.DisabledScope(true))
+                    {
+                        EditorGUI.ObjectField(indentedRect, GUIContent.none, tests[0].GetScript(), tests[0].method.DeclaringType, false);
+                    }
                 }
             }
             GUILayout.EndHorizontal();
 
             if (expanded)
             {
-                TestManagerUI.Instance.indentLevel++;
+                ui.indentLevel++;
                 DrawChildren();
-                TestManagerUI.Instance.indentLevel--;
+                ui.indentLevel--;
             }
         }
         private void DrawChildren()
         {
-            float indent = TestManagerUI.Instance.indentLevel * TestManagerUI.Instance.indentWidth;
-            foreach (Test test in tests)
+            float indent = ui.indentLevel * ui.indentWidth;
+            foreach (Test test in tests.OrderBy(x => x.attribute.name))
             {
                 Rect rect = EditorGUILayout.GetControlRect(false);
                 rect = TestManagerUI.PaintResultFeatures(rect, test);
                 rect.x += indent;
                 rect.width -= indent;
-                TestManagerUI.DrawTest(rect, test, true, !test.IsInSuite(), true);
+                ui.DrawTest(rect, test, true, !test.IsInSuite(), true);
             }
+
             List<Foldout> children = new List<Foldout>(GetChildren(false).OrderBy(x => x.GetName()));
             if (children.Count > 0 && tests.Count > 0) EditorGUILayout.Space(0.5f * EditorGUIUtility.singleLineHeight);
 
@@ -208,18 +211,6 @@ namespace UnityTest
         }
         #endregion
 
-        #region Test Object Handling
-        /// <summary>
-        /// Returns true if the given Test is located within this Foldout, and false otherwise.
-        /// </summary>
-        public bool Contains(Test test, bool includeSubdirectories = false)
-        {
-            foreach (Test other in GetTests(includeSubdirectories))
-                if (test.attribute == other.attribute) return true;
-            return false;
-        }
-        #endregion
-
         #region Tree Methods
         /// <summary>
         /// Locate all the Foldout objects that are children of this Foldout.
@@ -228,13 +219,13 @@ namespace UnityTest
         {
             if (includeSubdirectories)
             {
-                foreach (Foldout foldout in TestManagerUI.Instance.foldouts)
+                foreach (Foldout foldout in ui.foldouts)
                     if (IsParentOf(foldout)) yield return foldout;
             }
             else
             {
                 bool isRoot = string.IsNullOrEmpty(path);
-                foreach (Foldout foldout in TestManagerUI.Instance.foldouts)
+                foreach (Foldout foldout in ui.foldouts)
                 {
                     if (string.IsNullOrEmpty(foldout.path)) // This is the root foldout
                     {
@@ -278,19 +269,6 @@ namespace UnityTest
             if (anyPassed) return Test.Result.Pass;
             return Test.Result.None; // inconclusive
         }
-
-        /// <summary>
-        /// Return the Foldout that is holding the given Test. Foldouts are like folders, which can contain other Foldouts. This method
-        /// returns the "folder" that the given Test is in. Returns null if the given Test wasn't found in any Foldout.
-        /// </summary>
-        public static Foldout GetFoldoutFromTest(Test test)
-        {
-            foreach (Foldout foldout in TestManagerUI.Instance.foldouts)
-            {
-                if (foldout.Contains(test)) return foldout;
-            }
-            return null;
-        }
         #endregion
 
         #region Operators
@@ -298,25 +276,6 @@ namespace UnityTest
         #endregion
 
         #region Properties Methods
-        /// <summary>
-        /// Returns true if the given Foldout already exists.
-        /// </summary>
-        public static bool Exists(Foldout foldout)
-        {
-            foreach (Foldout f in TestManagerUI.Instance.foldouts)
-                if (foldout.path == f.path) return true;
-            return false;
-        }
-        /// <summary>
-        /// Returns true if the given path corresponds to a currently-existing Foldout
-        /// </summary>
-        public static bool ExistsAtPath(string path)
-        {
-            if (string.IsNullOrEmpty(path)) return true; // root foldout always exists
-            foreach (Foldout foldout in TestManagerUI.Instance.foldouts)
-                if (foldout.path == path) return true;
-            return false;
-        }
         /// <summary>
         /// Returns true if the other Foldout contains this Foldout in any of its subdirectories, and false otherwise.
         /// </summary>
@@ -368,67 +327,5 @@ namespace UnityTest
         /// </summary>
         public string GetName() => Path.GetFileName(path);
         #endregion
-
-
-        /// <summary>
-        /// Return an existing Foldout located at the given path.
-        /// </summary>
-        /// <param name="path"></param>
-        /// <exception cref="FoldoutNotFoundException"></exception>
-        public static Foldout GetAtPath(string path)
-        {
-            foreach (Foldout foldout in TestManagerUI.Instance.foldouts)
-                if (path == foldout.path) return foldout;
-            throw new FoldoutNotFoundException(path);
-        }
-
-        
-        #region Persistence Methods
-        public string GetString()
-        {
-            return string.Join('\n',
-                path,
-                selected,
-                expanded,
-                locked
-            );
-        }
-
-        public static Foldout FromString(string data)
-        {
-            Foldout result = new Foldout("");
-
-            string[] s = data.Split('\n');
-            try { result.path = s[0]; }
-            catch (System.IndexOutOfRangeException) { return null; }
-
-            try { result.selected = bool.Parse(s[1]); }
-            catch (System.Exception e) { if (!(e is System.FormatException || e is System.IndexOutOfRangeException)) throw e; }
-
-            try { result.expanded = bool.Parse(s[2]); }
-            catch (System.Exception e) { if (!(e is System.FormatException || e is System.IndexOutOfRangeException)) throw e; }
-
-            try { result.locked = bool.Parse(s[3]); }
-            catch (System.Exception e) { if (!(e is System.FormatException || e is System.IndexOutOfRangeException)) throw e; }
-
-            return result;
-        }
-
-        public void CopyFrom(Foldout other)
-        {
-            path = other.path;
-            selected = other.selected;
-            expanded = other.expanded;
-            locked = other.locked;
-        }
-        #endregion
-        
-
-        public class FoldoutNotFoundException : System.Exception
-        {
-            public FoldoutNotFoundException() { }
-            public FoldoutNotFoundException(string message) : base(message) { }
-            public FoldoutNotFoundException(string message, System.Exception inner) : base(message, inner) { }
-        }
     }
 }
