@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using UnityEditor;
 using UnityEngine;
 
@@ -42,97 +43,38 @@ namespace UnityTest
             // If this is the root foldout
             if (string.IsNullOrEmpty(path)) throw new System.Exception("Cannot call Draw() on the rootFoldout. This should never happen.");
 
-            GUILayout.BeginHorizontal();
+            bool wasExpanded = expanded;
+            bool wasSelected = selected;
+            bool wasMixed = IsMixed();
+            bool wasLocked = locked;
+
+            selected |= IsAllSelected(); // Set to the proper state ahead of time if needed
+            ui.DrawListItem(this, ref expanded, ref locked, ref selected, true, true, true, true);
+
+            // Process events
+            // Check if the user just expanded the Foldout while holding down the Alt key
+            if (Event.current.alt && expanded != wasExpanded) ExpandAll(expanded);
+            
+            if (wasSelected != selected)
             {
-                Rect controlRect = EditorGUILayout.GetControlRect(false);
-
-                // Draw the test result indicators
-                if (!expanded) controlRect = TestManagerUI.PaintResultFeatures(controlRect, GetTotalResult());
-
-                // Setup the indented area
-                Rect indentedRect;
-                if (ui.indentWidth == 0f)
+                // mixed is the same as the toggle not being selected
+                if (wasMixed)
                 {
-                    EditorGUI.indentLevel++;
-                    indentedRect = EditorGUI.IndentedRect(controlRect);
-                    EditorGUI.indentLevel--;
-                    ui.indentWidth = controlRect.width - indentedRect.width;
+                    if (selected) Select();
                 }
                 else
                 {
-                    indentedRect = new Rect(controlRect);
-                    indentedRect.x += ui.indentWidth * ui.indentLevel;
-                    indentedRect.width -= ui.indentWidth * ui.indentLevel;
-                }
-
-                // Draw the Foldout control
-                bool wasExpanded = expanded;
-                expanded = EditorGUI.Foldout(indentedRect, expanded, string.Empty, Style.Get("Foldout"));
-
-                // Check if the user just expanded the Foldout while holding down the Alt key
-                if (Event.current.alt && expanded != wasExpanded) ExpandAll(expanded);
-
-                // scan to the right by the toggle width to give space to the Foldout control
-                indentedRect.x += Style.GetWidth("Test/Foldout");
-                indentedRect.width -= Style.GetWidth("Test/Foldout");
-
-                bool drawSuite = isSuite && tests.Count > 0;
-
-                // If we're going to draw a suite, then we need to draw the settings cog and the object reference on the right side,
-                // so room is made for that here. We finish drawing those controls later, after drawing the toggle.
-                if (drawSuite) indentedRect.width -= Style.TestManagerUI.scriptWidth + Style.GetWidth("Test/Suite/SettingsButton");
-
-                // We need to separate out the user's actual actions from the button's state
-                // The toggle is only "selected" when it is not mixed. If it is mixed, then selected = false.
-
-                selected = IsAllSelected();
-
-                bool isMixed = IsMixed();
-
-                List<bool> results = TestManagerUI.DrawToggle(indentedRect, GetName(), selected, locked, true, isMixed);
-
-                // The logic here is confusing. It is the simplest I could make it with the tools Unity gave me
-                if (results[0] != selected)
-                {
-                    // mixed is the same as the toggle not being selected
-                    if (selected && isMixed) selected = false; // if the toggle was selected, but now it is mixed, it's because the user deselected a child Test
-                    else
-                    {
-                        // We only get into this logic if the user has clicked on the foldout toggle
-                        if (isMixed) Select();
-                        else if (!selected) Select();
-                        else Deselect();
-                    }
-                }
-
-                if (results[1] != locked)
-                {
-                    if (results[1] && !locked) Lock();
-                    else if (!results[1] && locked) Unlock();
-                }
-                else locked = IsAllLocked();
-
-
-                if (drawSuite) // Finish drawing the suite
-                {
-                    indentedRect.x += indentedRect.width;
-                    indentedRect.width = Style.GetWidth("Test/Suite/SettingsButton");
-
-                    if (GUI.Button(indentedRect, Style.GetIcon("Test/Suite/SettingsButton"), Style.Get("Test/Suite/SettingsButton")))
-                    {
-                        ui.settings.SetTest(tests[0]);
-                        ui.settings.SetVisible(true);
-                    }
-
-                    indentedRect.x += indentedRect.width;
-                    indentedRect.width = Style.TestManagerUI.scriptWidth;
-                    using (new EditorGUI.DisabledScope(true))
-                    {
-                        EditorGUI.ObjectField(indentedRect, GUIContent.none, tests[0].GetScript(), tests[0].method.DeclaringType, false);
-                    }
+                    if (wasSelected) Deselect();
+                    else Select();
                 }
             }
-            GUILayout.EndHorizontal();
+            
+            if (locked != wasLocked)
+            {
+                if (locked && !wasLocked) Lock();
+                else if (!locked && wasLocked) Unlock();
+            }
+            else locked = IsAllLocked();
 
             if (expanded)
             {
@@ -146,11 +88,11 @@ namespace UnityTest
             float indent = ui.indentLevel * ui.indentWidth;
             foreach (Test test in tests.OrderBy(x => x.attribute.name))
             {
-                Rect rect = EditorGUILayout.GetControlRect(false);
-                rect = TestManagerUI.PaintResultFeatures(rect, test);
-                rect.x += indent;
-                rect.width -= indent;
-                ui.DrawTest(rect, test, true, !test.IsInSuite(), true);
+                //Rect rect = EditorGUILayout.GetControlRect(false);
+                //rect = TestManagerUI.PaintResultFeatures(rect, test);
+                //rect.x += indent;
+                //rect.width -= indent;
+                ui.DrawTest(test, true, !test.isInSuite, true);
             }
 
             List<Foldout> children = new List<Foldout>(GetChildren(false).OrderBy(x => x.GetName()));

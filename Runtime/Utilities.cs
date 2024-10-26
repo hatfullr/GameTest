@@ -64,6 +64,18 @@ namespace UnityTest
         /// </summary>
         public static UnityEditor.PackageManager.PackageInfo GetPackageInfo() => UnityEditor.PackageManager.PackageInfo.FindForAssembly(typeof(Utilities).Assembly);
 
+        public static void DrawDebugOutline(Rect rect, Color color)
+        {
+            Rect left = new Rect(rect.xMin, rect.y, 1f, rect.height);
+            Rect right = new Rect(rect.xMax, rect.y, 1f, rect.height);
+            Rect top = new Rect(rect.x, rect.yMin, rect.width, 1f);
+            Rect bottom = new Rect(rect.x, rect.yMax, rect.width, 1f);
+            foreach (Rect r in new Rect[] { left, right, top, bottom })
+            {
+                EditorGUI.DrawRect(r, color);
+            }
+        }
+
         /// <summary>
         /// Given the path to a file, returns true if the path is located in the Samples folder, and false otherwise.
         /// </summary>
@@ -92,6 +104,8 @@ namespace UnityTest
             if (Path.GetExtension(path) != ".asset") path = Path.ChangeExtension(path, ".asset");
             return GetUnityPath(path);
         }
+
+        public static string GetAssetPath(Object asset) => GetUnityPath(AssetDatabase.GetAssetPath(asset));
 
         /// <summary>
         /// Check Assets/UnityTest/Data/[name].asset to see if it exists.
@@ -171,6 +185,11 @@ namespace UnityTest
         }
 
         public static void DeleteAsset(string name, string directory) => AssetDatabase.DeleteAsset(GetAssetPath(name, directory));
+        public static void DeleteAsset(Object asset)
+        {
+            string path = GetAssetPath(asset);
+            DeleteAsset(Path.GetFileName(path), GetUnityPath(Path.GetDirectoryName(path)));
+        }
 
         public static void DeleteFolder(string path) => AssetDatabase.DeleteAsset(GetUnityPath(path));
 

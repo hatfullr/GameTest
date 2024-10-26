@@ -28,7 +28,7 @@ namespace UnityTest
         
         public GameObject defaultGameObject;
 
-        public bool selected, locked, expanded;
+        public bool selected, locked, expanded, isInSuite;
 
         private GameObject gameObject;
         private Object script = null;
@@ -57,8 +57,6 @@ namespace UnityTest
         private class CoroutineMonoBehaviour : MonoBehaviour { }
 
         public override string ToString() => "Test(" + attribute.GetPath() + ")";
-
-        public bool IsInSuite() => method.DeclaringType.GetCustomAttribute(typeof(SuiteAttribute)) != null;
 
         public bool IsExample() => Utilities.IsSample(attribute.sourceFile);
 
@@ -96,7 +94,7 @@ namespace UnityTest
                 //object result = setUp.Invoke(null, null);
 
 
-                if (IsInSuite())
+                if (isInSuite)
                 {
                     if (result != null) throw new System.Exception("Return type of SetUp in Suite must be void: " + method.DeclaringType);
                 }
@@ -126,7 +124,7 @@ namespace UnityTest
             if (!string.IsNullOrEmpty(attribute.tearDown))
             {
                 MethodInfo tearDown = method.DeclaringType.GetMethod(attribute.tearDown, Utilities.bindingFlags);
-                if (IsInSuite()) tearDown.Invoke(null, null);
+                if (isInSuite) tearDown.Invoke(null, null);
                 else tearDown.Invoke(gameObject.GetComponent(method.DeclaringType), new object[] { gameObject });
             }
             else DefaultTearDown();
@@ -174,7 +172,7 @@ namespace UnityTest
             SetUp();
 
             // If not a Suite, check the game object
-            if (!IsInSuite())
+            if (!isInSuite)
             {
                 if (gameObject == null) throw new System.NullReferenceException("GameObject == null. Check your SetUp method for " + attribute.GetPath());
                 if (gameObject.GetComponent(method.DeclaringType) == null && instantiatedDefaultGO == null)
@@ -187,7 +185,7 @@ namespace UnityTest
                 if (coroutineGO != null) Object.DestroyImmediate(coroutineGO);
                 coroutineGO = new GameObject("Coroutine helper", typeof(CoroutineMonoBehaviour));
                 coroutineGO.hideFlags = HideFlags.HideAndDontSave;
-                if (IsInSuite())
+                if (isInSuite)
                 {
                     Suite suite = Suite.Get(method.DeclaringType);
                     StartCoroutine(method.Invoke(suite, null) as System.Collections.IEnumerator);
@@ -200,7 +198,7 @@ namespace UnityTest
             }
             else
             {
-                if (IsInSuite())
+                if (isInSuite)
                 {
                     Suite suite = Suite.Get(method.DeclaringType);
                     method.Invoke(suite, null); // probably of type void
@@ -310,20 +308,11 @@ namespace UnityTest
         public Object GetScript()
         {
             if (script != null) return script;
-            // Intercept trying to load the ExampleTests.cs script from the package folder
-            string pathToSearch;
-            //if (IsExample())
-            //{
-            //    // Get the internal directory in the style that Unity wants it in (starts with "Packages")
-            //    pathToSearch = Path.GetRelativePath(Path.GetDirectoryName(Utilities.packagesPath), Utilities.runtimePath);
-            //}
-            //else
-            //{
-                pathToSearch = Path.GetDirectoryName(Path.Join(
-                    Path.GetFileName(Application.dataPath),     // Usually it's "Assets", unless Unity ever changes that
-                    Path.GetRelativePath(Application.dataPath, attribute.sourceFile))
-                );
-            //}
+
+            string pathToSearch = Path.GetDirectoryName(Path.Join(
+                Path.GetFileName(Application.dataPath),     // Usually it's "Assets", unless Unity ever changes that
+                Path.GetRelativePath(Application.dataPath, attribute.sourceFile))
+            );
 
             string basename = Path.GetFileName(attribute.sourceFile);
 

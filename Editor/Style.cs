@@ -242,70 +242,41 @@ namespace UnityTest
 
                 #endregion TestManagerUI
 
-                #region Test
-                case "Test/Foldout":
+                #region List items
+                case "Foldout":
                     s = new GUIStyle(EditorStyles.foldout);
                     s.contentOffset = Vector2.zero;
                     break;
-                case "Test/Lock":
+                case "Lock":
                     s = new GUIStyle("IN LockButton");
-                    s.fixedHeight = Get("Test/Toggle").fixedHeight; // fill to the same height as the toggle
+                    s.fixedHeight = Get("Toggle").fixedHeight; // fill to the same height as the toggle
                     break;
-                case "Test/Toggle":
+                case "Toggle":
+                    s = new GUIStyle(EditorStyles.label);
+                    break;
+                case "Result":
                     s = new GUIStyle(EditorStyles.iconButton);
-                    GUIStyle s2 = new GUIStyle(EditorStyles.toggle);
-                    s.alignment = TextAnchor.MiddleLeft; //s2.alignment;
-                    s.fixedWidth = s2.fixedWidth;
-                    s.fixedHeight = s2.fixedHeight;
-                    s.font = s2.font;
-                    s.fontStyle = s2.fontStyle;
-                    s.fontSize = s2.fontSize;
-                    s.clipping = s2.clipping;
-                    s.border = s2.border;
-                    s.contentOffset = s2.contentOffset;
-                    s.imagePosition = s2.imagePosition;
-                    s.margin = s2.margin;
-                    s.overflow = s2.overflow;
-                    s.padding = s2.padding;
-                    s.richText = true; // enables searches to highlight matching text
-                    s.stretchHeight = s2.stretchHeight;
-                    s.stretchWidth = s2.stretchWidth;
-                    s.wordWrap = s2.wordWrap;
-                    s.padding = new RectOffset(s.padding.right, s.padding.right, s.padding.top, s.padding.bottom);
-                    s.margin = new RectOffset((int)GetWidth(EditorStyles.toggle), s.margin.right, s.margin.top, s.margin.bottom);
-                    break;
-                case "Test/Expanded":
-                    s = new GUIStyle("GroupBox");
-                    s.padding = GUI.skin.label.padding;
-                    s.margin = new RectOffset(0, (int)(0.5f * s.border.right), 0, 0);
-                    s.padding.left = (int)(GetWidth("Test/Toggle") * 2);
-                    s.padding.right -= s.margin.right;
-                    break;
-                case "Test/Result":
-                    s = new GUIStyle(GUIStyle.none);
-                    s.padding = EditorStyles.iconButton.padding;
-                    s.margin = EditorStyles.iconButton.margin;
                     s.imagePosition = ImagePosition.ImageOnly;
-                    s.contentOffset = new Vector2(-2, 0); // For some reason the icons are all off-center a bit.
+                    s.fixedHeight = Get("Toggle").fixedHeight;
+                    s.fixedWidth = Get("ClearResult").fixedWidth;
+                    s.stretchHeight = false;
+                    s.padding = new RectOffset(0, 0, 0, 0);
+                    s.margin = new RectOffset(0, 0, 0, 0);
+                    s.contentOffset = new Vector2(-1f, 0f);
                     break;
-                case "Test/ClearResult":
+                case "ClearResult":
                     s = new GUIStyle(EditorStyles.iconButton);
-                    s.fixedHeight = Get("Test/Toggle").fixedHeight;
-                    s.padding.top = 1; // The default icon seems to be 1 pixel off for some reason
-                    s.padding.bottom = 0;
+                    s.fixedHeight = Get("Toggle").fixedHeight;
+                    s.stretchHeight = false;
+                    s.margin = new RectOffset(0, 0, 0, 0);
+                    s.padding = new RectOffset(0, 0, 0, 0);
+                    s.contentOffset = new Vector2(0f, 1f);
+                    s.imagePosition = ImagePosition.ImageOnly;
                     break;
-                case "Test/Suite/SettingsButton":
+                case "SettingsButton":
                     s = new GUIStyle(EditorGUIUtility.GetBuiltinSkin(EditorSkin.Inspector).FindStyle("IconButton"));
                     break;
-                #endregion Test
-
-
-                #region Foldout
-                case "Foldout":
-                    s = new GUIStyle(EditorStyles.foldout);
-                    break;
-
-                #endregion Foldout
+                #endregion List items
 
                 #region GUIQueue
                 case "GUIQueue/Toolbar":
@@ -481,22 +452,22 @@ namespace UnityTest
                 #endregion TestManagerUI
 
                 #region Test
-                case "Test/Result/None":
+                case "Result/None":
                     c = new GUIContent(EditorGUIUtility.IconContent("TestNormal"));
                     break;
-                case "Test/Result/Pass":
+                case "Result/Pass":
                     c = new GUIContent(EditorGUIUtility.IconContent("TestPassed"));
                     c.tooltip = "Passed";
                     break;
-                case "Test/Result/Fail":
+                case "Result/Fail":
                     c = new GUIContent(EditorGUIUtility.IconContent("TestFailed"));
                     c.tooltip = "Failed";
                     break;
-                case "Test/ClearResult":
+                case "ClearResult":
                     c = new GUIContent(EditorGUIUtility.IconContent("clear"));
                     c.tooltip = "Clear test result";
                     break;
-                case "Test/Suite/SettingsButton":
+                case "Suite/SettingsButton":
                     c = new GUIContent(EditorGUIUtility.IconContent("_Popup"));
                     break;
 

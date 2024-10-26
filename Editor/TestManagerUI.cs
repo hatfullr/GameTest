@@ -14,10 +14,10 @@ namespace UnityTest
         [SerializeField] private Foldout _rootFoldout;
         [SerializeField] public List<Foldout> foldouts = new List<Foldout>();
         [SerializeField] private Vector2 scrollPosition;
-        [SerializeField] private bool refreshing = false;
         [SerializeField] private bool showWelcome = true;
         [SerializeField] private bool loadingWheelVisible = false;
         [SerializeField] private string search = null;
+        [SerializeField] private string loadingWheelText = null;
 
         public float indentWidth;
         public int indentLevel;
@@ -191,9 +191,9 @@ namespace UnityTest
 
             foldouts = new List<Foldout>();
             scrollPosition = default;
-            refreshing = false;
             showWelcome = true;
             loadingWheelVisible = false;
+            loadingWheelText = null;
             search = default;
 
             _settings = default;
@@ -202,52 +202,57 @@ namespace UnityTest
             spinStartTime = default;
             spinIndex = default;
 
-            Refresh();
-
-            Utilities.Log("Reset " + Style.TestManagerUI.windowTitle);
+            Refresh(() => 
+            {
+                Utilities.Log("Reset " + Style.TestManagerUI.windowTitle);
+            });
         }
 
-        private void Refresh()
+        private void Refresh(System.Action onFinished = null)
         {
-            refreshing = true;
+            StartLoadingWheel("Refreshing");
             Repaint();
 
-            manager.UpdateTests();
-
-            foreach (Test test in manager.tests)
+            manager.UpdateTests(() =>
             {
-                Foldout final = null;
-                foreach (string p in Utilities.IterateDirectories(test.attribute.GetPath(), true))
+                foreach (Test test in manager.tests)
                 {
-                    Foldout found = null;
-                    foreach (Foldout foldout in foldouts)
+                    Foldout final = null;
+                    foreach (string p in Utilities.IterateDirectories(test.attribute.GetPath(), true))
                     {
-                        if (foldout.path == p)
+                        Foldout found = null;
+                        foreach (Foldout foldout in foldouts)
                         {
-                            found = foldout;
-                            break;
-                        }
-                    }
-
-                    if (found == null)
-                    {
-                        found = Utilities.SearchForAsset<Foldout>((Foldout f) => f.path == p, Utilities.foldoutDataPath, false);
-                        if (found == null) // Failed to find a matching asset, so create a new one now
-                        {
-                            found = Utilities.CreateAsset<Foldout>(System.Guid.NewGuid().ToString(), Utilities.foldoutDataPath, (Foldout newFoldout) =>
+                            if (foldout.path == p)
                             {
-                                newFoldout.path = p;
-                            });
+                                found = foldout;
+                                break;
+                            }
                         }
-                        foldouts.Add(found);
+
+                        if (found == null)
+                        {
+                            found = Utilities.SearchForAsset<Foldout>((Foldout f) => f.path == p, Utilities.foldoutDataPath, false);
+                            if (found == null) // Failed to find a matching asset, so create a new one now
+                            {
+                                found = Utilities.CreateAsset<Foldout>(System.Guid.NewGuid().ToString(), Utilities.foldoutDataPath, (Foldout newFoldout) =>
+                                {
+                                    newFoldout.path = p;
+                                });
+                            }
+                            foldouts.Add(found);
+                        }
+                        final = found;
                     }
-                    final = found;
+                    if (final.tests.Contains(test)) continue;
+                    final.tests.Add(test);
                 }
-                if (final.tests.Contains(test)) continue;
-                final.tests.Add(test);
-            }
-            Repaint();
-            refreshing = false;
+
+                StopLoadingWheel();
+                Repaint();
+
+                if (onFinished != null) onFinished();
+            });
         }
 
         private void ResetSelected()
@@ -287,95 +292,89 @@ namespace UnityTest
             bool selectAll = false;
             bool deselectAll = false;
 
-            // The main window
-            EditorGUILayout.BeginVertical(GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
+            Rect fullRect = EditorGUILayout.BeginVertical(GUILayout.ExpandHeight(true), GUILayout.ExpandWidth(true));
             {
                 using (new EditorGUI.DisabledScope(loadingWheelVisible))
                 {
-                    // Toolbar controls
-                    EditorGUILayout.BeginHorizontal(Style.Get("TestManagerUI/Toolbar"));
+                    // The main window
+                    EditorGUILayout.BeginVertical(GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
                     {
-                        // Left
-                        DrawPlayButton(state);
-                        DrawPauseButton(state);
-                        DrawSkipButton();
-                        DrawGoToEmptySceneButton();
-
-                        using (new EditorGUI.DisabledScope(foldouts.Count == 0 || manager.tests.Count == 0))
+                        // Toolbar controls
+                        EditorGUILayout.BeginHorizontal(Style.Get("TestManagerUI/Toolbar"));
                         {
-                            bool[] result = DrawUniversalToggle(state);
-                            selectAll = result[0];
-                            deselectAll = result[1];
+                            // Left
+                            DrawPlayButton(state);
+                            DrawPauseButton(state);
+                            DrawSkipButton();
+                            DrawGoToEmptySceneButton();
+
+                            using (new EditorGUI.DisabledScope(foldouts.Count == 0 || manager.tests.Count == 0))
+                            {
+                                bool[] result = DrawUniversalToggle(state);
+                                selectAll = result[0];
+                                deselectAll = result[1];
+                            }
+
+                            DrawClearButton(state);
+
+                            // Left
+                            GUILayout.FlexibleSpace();
+                            // Right
+
+                            DrawSearchBar();
+                            DrawWelcomeButton();
+                            DrawDebugButton();
+                            refresh = DrawRefreshButton();
+                            // Right
                         }
+                        EditorGUILayout.EndHorizontal();
 
-                        DrawClearButton(state);
 
-                        // Left
-                        GUILayout.FlexibleSpace();
-                        // Right
+                        // The box that shows the Foldouts and Tests
+                        scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition, false, false, GUI.skin.horizontalScrollbar, GUI.skin.verticalScrollbar, Style.Get("TestManagerUI/TestView"));
+                        {
+                            if (showWelcome) // Welcome message
+                            {
+                                GUIContent content = Style.GetIcon("TestManagerUI/Welcome");
+                                GUIContent donate = Style.GetIcon("TestManagerUI/Donate");
+                                GUIStyle donateStyle = Style.Get("TestManagerUI/Donate");
 
-                        DrawSearchBar();
-                        DrawWelcomeButton();
-                        DrawDebugButton();
-                        refresh = DrawRefreshButton();
-                        // Right
-                    }
-                    EditorGUILayout.EndHorizontal();
-                }
+                                content.text = Style.welcomeMessage + "\n\n";
 
-                if (loadingWheelVisible)
-                {
-                    Rect rect = EditorGUILayout.BeginVertical(GUILayout.ExpandHeight(true), GUILayout.ExpandWidth(true));
-                    {
-                        string text = "Finding tests";
-                        if (refreshing) text = "Refreshing";
-                        DrawLoadingWheel(rect, text);
+                                GUILayout.Box(content, Style.Get("TestManagerUI/Welcome"));
+                                Rect rect = GUILayoutUtility.GetLastRect();
+                                float height = donateStyle.CalcSize(donate).y;
+                                float width = Style.GetWidth(donateStyle, donate);
+                                rect.y += rect.height - height - donateStyle.margin.bottom;
+                                rect.height = height;
+                                rect.x += rect.width - width - donateStyle.margin.right;
+                                rect.width = width;
+                                if (GUI.Button(rect, donate)) Application.OpenURL(Style.donationLink);
+
+                            }
+
+                            if (string.IsNullOrEmpty(search)) DrawNormalMode();
+                            else DrawSearchMode();
+                        }
+                        EditorGUILayout.EndScrollView();
                     }
                     EditorGUILayout.EndVertical();
-                }
-                else
-                {
-                    // The box that shows the Foldouts and Tests
-                    scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition, false, false, GUI.skin.horizontalScrollbar, GUI.skin.verticalScrollbar, Style.Get("TestManagerUI/TestView"));
+
+                    if (!manager.running) // Otherwise stuff will keep being added into the queue during testing time
                     {
-                        if (showWelcome) // Welcome message
+                        foreach (Test test in manager.tests)
                         {
-                            GUIContent content = Style.GetIcon("TestManagerUI/Welcome");
-                            GUIContent donate = Style.GetIcon("TestManagerUI/Donate");
-                            GUIStyle donateStyle = Style.Get("TestManagerUI/Donate");
-
-                            content.text = Style.welcomeMessage + "\n\n";
-
-                            GUILayout.Box(content, Style.Get("TestManagerUI/Welcome"));
-                            Rect rect = GUILayoutUtility.GetLastRect();
-                            float height = donateStyle.CalcSize(donate).y;
-                            float width = Style.GetWidth(donateStyle, donate);
-                            rect.y += rect.height - height - donateStyle.margin.bottom;
-                            rect.height = height;
-                            rect.x += rect.width - width - donateStyle.margin.right;
-                            rect.width = width;
-                            if (GUI.Button(rect, donate)) Application.OpenURL(Style.donationLink);
-
+                            if (test.selected && !manager.queue.Contains(test)) manager.AddToQueue(test);
+                            else if (manager.queue.Contains(test) && !test.selected) manager.queue.Remove(test);
                         }
-
-                        if (string.IsNullOrEmpty(search)) DrawNormalMode();
-                        else DrawSearchMode();
                     }
-                    EditorGUILayout.EndScrollView();
+
+                    guiQueue.Draw();
                 }
             }
             EditorGUILayout.EndVertical();
 
-            if (!manager.running) // Otherwise stuff will keep being added into the queue during testing time
-            {
-                foreach (Test test in manager.tests)
-                {
-                    if (test.selected && !manager.queue.Contains(test)) manager.AddToQueue(test);
-                    else if (manager.queue.Contains(test) && !test.selected) manager.queue.Remove(test);
-                }
-            }
-
-            guiQueue.Draw();
+            if (loadingWheelVisible) DrawLoadingWheel(fullRect);
 
             if (!loadingWheelVisible)
             {
@@ -423,8 +422,9 @@ namespace UnityTest
                 }
                 final += path[(matches[matches.Count - 1].Index + matches[matches.Count - 1].Length)..];
                 rect = EditorGUILayout.GetControlRect(false);
-                rect = PaintResultFeatures(rect, test);
-                DrawTest(rect, test, true, !test.IsInSuite(), true, final);
+                //rect = PaintResultFeatures(rect, test);
+                //DrawTest(rect, test, true, !test.isInSuite, true, final);
+                DrawTest(test, true, !test.isInSuite, true, final);
             }
         }
 
@@ -445,7 +445,7 @@ namespace UnityTest
         /// <summary>
         /// Draw the loading wheel shown during a refresh and whenever the assemblies are being checked for tests.
         /// </summary>
-        private void DrawLoadingWheel(Rect rect, string text)
+        private void DrawLoadingWheel(Rect rect)
         {
             float time = Time.realtimeSinceStartup;
             if (time - spinStartTime >= Style.TestManagerUI.spinRate)
@@ -455,12 +455,13 @@ namespace UnityTest
             }
 
             GUIContent content;
-            try { content = Style.GetIcon("TestManagerUI/LoadingWheel/" + spinIndex, text); }
+            try { content = Style.GetIcon("TestManagerUI/LoadingWheel/" + spinIndex); }
             catch (System.NotImplementedException)
             {
                 spinIndex = 0;
-                content = Style.GetIcon("TestManagerUI/LoadingWheel/" + spinIndex, text);
+                content = Style.GetIcon("TestManagerUI/LoadingWheel/" + spinIndex);
             }
+            content.text = loadingWheelText;
             GUI.Label(rect, content, Style.Get("TestManagerUI/LoadingWheel"));
         }
 
@@ -613,8 +614,9 @@ namespace UnityTest
             DoReset();
         }
 
-        private void StartLoadingWheel()
+        private void StartLoadingWheel(string text = null)
         {
+            loadingWheelText = text;
             spinStartTime = Time.realtimeSinceStartup;
             loadingWheelVisible = true;
         }
@@ -622,12 +624,39 @@ namespace UnityTest
         private void StopLoadingWheel()
         {
             loadingWheelVisible = false;
+            loadingWheelText = null;
         }
 
 
 
 
         #region Tests
+
+        public static void DrawTestResultControls(Rect rect, Test.Result result, bool showClearResultButton = true, System.Action onClearButtonPressed = null)
+        {
+            GUILayout.BeginArea(rect);
+            {
+                GUILayout.BeginHorizontal();
+                {
+                    GUILayout.FlexibleSpace(); // This causes the contents to be aligned to the right
+
+                    if (showClearResultButton)
+                    {
+                        using (new EditorGUI.DisabledScope(result == Test.Result.None))
+                        {
+                            if (GUILayout.Button(Style.GetIcon("Test/ClearResult"), Style.Get("Test/ClearResult")))
+                            {
+                                if (onClearButtonPressed != null) onClearButtonPressed();
+                            }
+                        }
+                    }
+
+                    GUILayout.Label(Style.GetIcon("Test/Result/" + result.ToString()), Style.Get("Test/Result")); // The result indicator
+                }
+                GUILayout.EndHorizontal();
+            }
+            GUILayout.EndArea();
+        }
 
         /// <summary>
         /// Show only the background color change and the result status icon on the right. The clear result button is not drawn.
@@ -642,11 +671,11 @@ namespace UnityTest
 
             EditorGUI.DrawRect(rect, color);
 
-            GUIStyle resultStyle = Style.Get("Test/Result");
-            Rect resultRect = new Rect(Vector2.zero, resultStyle.CalcSize(image));
-            resultRect = Style.AlignRect(resultRect, rect, TextAnchor.MiddleRight);
-            rect.width -= resultRect.width;
-            EditorGUI.LabelField(resultRect, image, resultStyle);
+            //GUIStyle resultStyle = Style.Get("Test/Result");
+            //Rect resultRect = new Rect(Vector2.zero, resultStyle.CalcSize(image));
+            //resultRect = Style.AlignRect(resultRect, rect, TextAnchor.MiddleRight);
+            //rect.width -= resultRect.width;
+            //EditorGUI.LabelField(resultRect, image, resultStyle);
 
             return rect;
         }
@@ -666,6 +695,7 @@ namespace UnityTest
             EditorGUI.DrawRect(rect, color);
 
             // Reserve space for the two objects
+            /*
             Rect newRect = new Rect(rect);
             newRect.width = Style.GetWidth("Test/Result", image) + Style.GetWidth("Test/ClearResult", clearImage);
             newRect = Style.AlignRect(newRect, rect, TextAnchor.MiddleRight);
@@ -688,10 +718,191 @@ namespace UnityTest
             }
 
             GUI.Label(r2, image, style); // The result indicator
-
+            */
             return rect;
         }
 
+        private void DrawListItemLeft(
+            Object item,
+            ref bool expanded, ref bool locked, ref bool selected,
+            bool showFoldout = true,
+            bool showLock = true,
+            bool showToggle = true
+        )
+        {
+            string name;
+            bool isMixed;
+            if (item.GetType() == typeof(Foldout))
+            {
+                Foldout foldout = item as Foldout;
+                name = foldout.GetName();
+                isMixed = foldout.IsMixed();
+            }
+            else if (item.GetType() == typeof(Test))
+            {
+                Test test = item as Test;
+                name = test.attribute.name;
+                isMixed = false;
+            }
+            else throw new System.NotImplementedException("Unimplemented type " + item);
+
+            // Save initial state information
+            int previousIndentLevel = EditorGUI.indentLevel;
+            float previousLabelWidth = EditorGUIUtility.labelWidth;
+            bool wasMixed = EditorGUI.showMixedValue;
+
+            // Setup styles
+            GUIStyle selectedStyle = Style.Get("Toggle");
+            GUIStyle lockedStyle = Style.Get("Lock");
+            GUIStyle foldoutStyle = Style.Get("Foldout");
+            EditorGUI.indentLevel = indentLevel;
+
+            // Setup Rects for drawing
+            Rect rect = EditorGUILayout.GetControlRect(false);
+            Rect indentedRect = EditorGUI.IndentedRect(rect);
+
+            Rect foldoutRect = new Rect(rect);
+            foldoutRect.width = Style.GetWidth(foldoutStyle, GUIContent.none);
+
+            Rect lockedRect = new Rect(indentedRect);
+            lockedRect.x += foldoutRect.width;
+            lockedRect.width = Style.GetWidth(lockedStyle, GUIContent.none);
+
+            Rect selectedRect = new Rect(rect);
+            selectedRect.x += foldoutRect.width + lockedRect.width;
+            selectedRect.width -= foldoutRect.width + lockedRect.width;
+
+            if (!showFoldout)
+            {
+                lockedRect.x -= foldoutRect.width;
+                selectedRect.x -= foldoutRect.width;
+            }
+            if (!showLock)
+            {
+                selectedRect.x -= lockedRect.width;
+            }
+
+            // Drawing
+            //EditorGUI.DrawRect(indentedRect, Color.red * 0.5f);
+            if (showFoldout) expanded = EditorGUI.Foldout(foldoutRect, expanded, GUIContent.none, foldoutStyle);
+            if (showLock) locked = EditorGUI.Toggle(lockedRect, locked, lockedStyle);
+            if (showToggle)
+            {
+                EditorGUI.showMixedValue = isMixed;
+                selected = EditorGUI.ToggleLeft(selectedRect, name, selected, selectedStyle);
+                EditorGUI.showMixedValue = wasMixed;
+            }
+            else
+            {
+                EditorGUI.LabelField(selectedRect, name);
+            }
+
+            // Reset GUI to previous state
+            EditorGUI.indentLevel = previousIndentLevel;
+            EditorGUIUtility.labelWidth = previousLabelWidth;
+        }
+
+        private void DrawListItemRight(Object item)
+        {
+            Rect rect = GUILayoutUtility.GetLastRect();
+
+            Test.Result result;
+            System.Action onClearPressed = () => { };
+            Object script = null;
+            if (item.GetType() == typeof(Test))
+            {
+                Test test = item as Test;
+                result = test.result;
+                onClearPressed += test.Reset;
+                script = test.GetScript();
+            }
+            else if (item.GetType() == typeof(Foldout))
+            {
+                Foldout foldout = item as Foldout;
+                result = foldout.GetTotalResult();
+                onClearPressed += () =>
+                {
+                    foreach (Test test in foldout.GetTests())
+                        test.Reset();
+                };
+            }
+            else throw new System.NotImplementedException("Unrecognized type " + item.GetType());
+
+            GUIContent clearIcon = Style.GetIcon("ClearResult");
+            GUIContent resultIcon = Style.GetIcon("Result/" + result.ToString());
+            GUIStyle clearStyle = Style.Get("ClearResult");
+            GUIStyle resultStyle = Style.Get("Result");
+            GUIStyle scriptStyle = new GUIStyle(EditorStyles.objectField);
+
+            float clearWidth = Style.GetWidth(clearStyle, clearIcon);
+            float resultWidth = Style.GetWidth(resultStyle, resultIcon);
+            float scriptWidth = 0f;
+            if (script != null) scriptWidth = Style.TestManagerUI.scriptWidth;
+
+            //Utilities.DrawDebugOutline(rect, Color.green); // DEBUGGING
+
+            // The following is ridiculously unstable to future releases, but it is the best possible layout that Unity can provide. (angry.)
+            GUILayout.Space(clearWidth + resultWidth + scriptWidth);
+            Rect last = GUILayoutUtility.GetLastRect();
+            last.height = rect.height;
+            last.y += 2;
+
+            Rect scriptRect = new Rect(last.x, last.y, scriptWidth, last.height);
+            Rect clearRect = new Rect(scriptRect.xMax, scriptRect.y, 0.5f * (last.width - scriptRect.width), scriptRect.height);
+            Rect resultRect = new Rect(clearRect.xMax, clearRect.y, clearRect.width - scriptRect.width, clearRect.height);
+
+            if (script != null)
+            {
+                using (new EditorGUI.DisabledScope(true)) EditorGUI.ObjectField(scriptRect, script, script.GetType(), false);
+            }
+
+            using (new EditorGUI.DisabledScope(result == Test.Result.None))
+            {
+                if (GUI.Button(clearRect, clearIcon, clearStyle)) onClearPressed(); // The X button to clear the result
+            }
+            EditorGUI.LabelField(resultRect, resultIcon, resultStyle);
+
+            // DEBUGGING:
+            //Utilities.DrawDebugOutline(scriptRect, Color.red);
+            //Utilities.DrawDebugOutline(clearRect, Color.red);
+            //Utilities.DrawDebugOutline(resultRect, Color.red);
+        }
+
+        /// <summary>
+        /// Draw an item in the manager's list, which will be either a Foldout or a Test. This method draws only the following controls:
+        /// the foldout button, the lock button, the toggle button, the label, the suite settings cog (if the item is a Suite), the script 
+        /// object reference, the "clear results" button, and the test results. It does not draw the contents of the foldout for a Test object.
+        /// </summary>
+        public void DrawListItem(
+            Object item,
+            ref bool expanded, ref bool locked, ref bool selected,
+            bool showFoldout = true,
+            bool showLock = true,
+            bool showToggle = true,
+            bool showRightContent = true
+        )
+        {
+            EditorGUILayout.BeginHorizontal();
+            {
+                DrawListItemLeft(item, ref expanded, ref locked, ref selected, showFoldout, showLock, showToggle);
+                if (showRightContent) DrawListItemRight(item);
+            }
+            EditorGUILayout.EndHorizontal();
+        }
+
+        public void DrawTest(Test test, bool showLock = true, bool showFoldout = true, bool allowExpand = true, string name = null)
+        {
+            DrawListItem(
+                test,
+                ref test.expanded,
+                ref test.locked,
+                ref test.selected,
+                showFoldout,
+                showLock
+            );
+        }
+
+        /*
         public static List<bool> DrawToggle(Rect rect, string name, bool selected, bool locked, bool showLock = true, bool isMixed = false)
         {
             bool wasMixed = EditorGUI.showMixedValue;
@@ -723,7 +934,8 @@ namespace UnityTest
         public void DrawTest(Rect rect, Test test, bool showLock = true, bool showFoldout = true, bool allowExpand = true, string name = null)
         {
             // Draw the expanded box first so it appears behind everything else
-            if (test.expanded && allowExpand && !test.IsInSuite())
+            bool expanded = test.expanded && allowExpand && !test.isInSuite;
+            if (expanded)
             {
                 float h = GUI.skin.label.CalcHeight(GUIContent.none, rect.width) + GUI.skin.label.margin.vertical;
 
@@ -769,14 +981,14 @@ namespace UnityTest
                 EditorGUIUtility.labelWidth = 0f;
                 using (new EditorGUI.DisabledScope(true))
                 {
-                    EditorGUI.ObjectField(scriptRect, GUIContent.none, test.GetScript(), test.method.DeclaringType, false);
+                    EditorGUI.ObjectField(scriptRect, GUIContent.none, test.GetScript(), typeof(Object), false);
                 }
                 EditorGUIUtility.labelWidth = previousLabelWidth;
             }
 
             float toggleWidth = Style.GetWidth("Test/Lock");
             Rect toggleRect = new Rect(rect);
-            if (!test.IsInSuite()) toggleRect.width -= Style.TestManagerUI.scriptWidth;
+            if (!test.isInSuite) toggleRect.width -= Style.TestManagerUI.scriptWidth;
 
             if (string.IsNullOrEmpty(name)) name = test.attribute.name;
             //EditorGUI.DrawRect(toggleRect, Color.red);
@@ -785,6 +997,7 @@ namespace UnityTest
             test.selected = res[0];
             test.locked = res[1];
         }
+        */
 
 
         [CustomPropertyDrawer(typeof(Test.TestPrefab))]
