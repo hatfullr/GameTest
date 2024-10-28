@@ -64,6 +64,8 @@ namespace UnityTest
         /// </summary>
         public static UnityEditor.PackageManager.PackageInfo GetPackageInfo() => UnityEditor.PackageManager.PackageInfo.FindForAssembly(typeof(Utilities).Assembly);
 
+        private static HashSet<string> loggedExceptions = new HashSet<string>();
+
         public static void DrawDebugOutline(Rect rect, Color color)
         {
             Rect left = new Rect(rect.xMin, rect.y, 1f, rect.height);
@@ -203,30 +205,23 @@ namespace UnityTest
             string parent, newFolderName;
 
             // reverse order begins with top-most directory
-            Debug.Log("Orig = " + directory);
             foreach (string dir in IterateDirectories(directory, true))
             {
-                Debug.Log("Trying for " + dir);
                 parent = Path.GetDirectoryName(dir);
                 newFolderName = Path.GetFileName(dir);
                 if (!AssetDatabase.IsValidFolder(dir))
                 {
-                    Debug.Log("Creating " + parent + " " + newFolderName);
                     AssetDatabase.CreateFolder(parent, newFolderName);
                 }
             }
 
             // Create the final directory at the destination path
-            Debug.Log("Final");
             parent = Path.GetDirectoryName(directory);
             newFolderName = Path.GetFileName(directory);
             if (!AssetDatabase.IsValidFolder(directory))
             {
-                Debug.Log("Creating " + parent + " " + newFolderName);
                 AssetDatabase.CreateFolder(parent, newFolderName);
             }
-
-            Debug.Log("");
 
             return directory;
         }
@@ -389,10 +384,21 @@ namespace UnityTest
         [HideInCallstack] public static void LogError(string message) => LogError(message, null, null);
 
         /// <summary>
-        /// Print an exception to the console. The color cannot be changed.
+        /// Print an exception to the console. The color cannot be changed. To ensure that an exception is logged only a single time
+        /// per assembly reload, set "once" to true. Only the exception's message is checked when "once" is true.
         /// </summary>
-        [HideInCallstack] public static void LogException(System.Exception exception, Object context) => Debug.LogException(exception, context);
-        [HideInCallstack] public static void LogException(System.Exception exception) => Debug.LogException(exception);
+        [HideInCallstack] public static void LogException(System.Exception exception, Object context, bool once = false)
+        {
+            if (once && loggedExceptions.Contains(exception.Message)) return;
+            Debug.LogException(exception, context);
+            loggedExceptions.Add(exception.Message);
+        }
+        [HideInCallstack] public static void LogException(System.Exception exception, bool once = false)
+        {
+            if (once && loggedExceptions.Contains(exception.Message)) return;
+            Debug.LogException(exception);
+            loggedExceptions.Add(exception.Message);
+        }
         
 
 

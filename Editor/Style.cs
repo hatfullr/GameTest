@@ -39,6 +39,9 @@ namespace UnityTest
             //public const float minWidth = 300f;
         }
 
+        public static Color failColor = new Color(1f, 0f, 0f, 0.1f);
+        public static Color passColor = new Color(0, 1f, 0f, 0.1f);
+
         public static GUIStyle Get(string style)
         {
             if (!styles.ContainsKey(style)) InitializeStyle(style);
@@ -247,12 +250,22 @@ namespace UnityTest
                     s = new GUIStyle(EditorStyles.foldout);
                     s.contentOffset = Vector2.zero;
                     break;
+                case "TestRect":
+                    s = new GUIStyle(GUI.skin.box);
+                    s.margin = new RectOffset(0, 0, 0, 0);
+                    s.padding = new RectOffset(0, 0, 0, 0);
+                    break;
                 case "Lock":
                     s = new GUIStyle("IN LockButton");
                     s.fixedHeight = Get("Toggle").fixedHeight; // fill to the same height as the toggle
                     break;
                 case "Toggle":
                     s = new GUIStyle(EditorStyles.label);
+                    s.richText = true;
+                    break;
+                case "ToggleHeader":
+                    s = new GUIStyle(Get("Toggle"));
+                    s.fontStyle = FontStyle.Bold;
                     break;
                 case "Result":
                     s = new GUIStyle(EditorStyles.iconButton);
@@ -312,11 +325,6 @@ namespace UnityTest
                     break;
                 case "GUIQueue/Queue/Clear":
                     s = new GUIStyle(GUI.skin.button);
-                    break;
-                case "GUIQueue/Test/Remove/Button":
-                    s = new GUIStyle(EditorStyles.label);
-                    s.padding = new RectOffset(0, 0, 0, 0);
-                    s.margin = new RectOffset(0, 0, 0, 0);
                     break;
                 #endregion GUIQueue
 
@@ -479,9 +487,6 @@ namespace UnityTest
                 #region GUIQueue
                 case "GUIQueue/Toolbar/Options":
                     c = new GUIContent(EditorGUIUtility.IconContent("pane options"));
-                    break;
-                case "GUIQueue/Test/Remove/Button":
-                    c = new GUIContent(EditorGUIUtility.IconContent("clear"));
                     break;
                 #endregion
                 default:

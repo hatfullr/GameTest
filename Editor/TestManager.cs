@@ -4,7 +4,6 @@ using UnityEditor;
 using UnityEditor.Compilation;
 using System.Reflection;
 using System.IO;
-using System.Threading;
 using System.Threading.Tasks;
 
 namespace UnityTest
@@ -218,14 +217,19 @@ namespace UnityTest
         /// <summary>
         /// Collect all the assemblies that Unity has compiled.
         /// </summary>
-        private List<System.Reflection.Assembly> GetAssemblies()
+        private HashSet<System.Reflection.Assembly> GetAssemblies()
         {
-            List<System.Reflection.Assembly> assemblies = new List<System.Reflection.Assembly>();
+            List<string> added = new List<string>();
+            HashSet<System.Reflection.Assembly> assemblies = new HashSet<System.Reflection.Assembly>();
+            string path;
             foreach (AssembliesType type in (AssembliesType[])System.Enum.GetValues(typeof(AssembliesType))) // Hit all assembly types
             {
                 foreach (UnityEditor.Compilation.Assembly assembly in CompilationPipeline.GetAssemblies(type))
                 {
-                    assemblies.Add(System.Reflection.Assembly.LoadFile(Path.Join(Utilities.projectPath, assembly.outputPath)));
+                    path = Path.Join(Utilities.projectPath, assembly.outputPath);
+                    if (added.Contains(path)) continue;
+                    assemblies.Add(System.Reflection.Assembly.LoadFile(path));
+                    added.Add(path);
                 }
             }
             return assemblies;
@@ -255,20 +259,21 @@ namespace UnityTest
             return test;
         }
         
-        private void UpdateTestAttributesAndMethods(List<System.Reflection.Assembly> assemblies)
+        private void UpdateTestAttributesAndMethods(HashSet<System.Reflection.Assembly> assemblies)
         {
             List<AttributeAndMethod> result = new List<AttributeAndMethod>();
+            object[] classAttributes, methodAttributes;
             foreach (System.Reflection.Assembly assembly in assemblies)
             {
                 foreach (System.Type type in assembly.GetTypes())
                 {
                     if (!type.IsClass) continue; // only work with classes
 
-                    object[] suiteAttributes = type.GetCustomAttributes(typeof(SuiteAttribute), false);
-                    if (suiteAttributes.Length != 0)
+                    classAttributes = type.GetCustomAttributes(typeof(SuiteAttribute), false);
+                    if (classAttributes.Length > 0)
                     {
                         // Locate the SuiteAttribute if there is one. It has to be done this way for some reason I can't understand.
-                        foreach (object attr in suiteAttributes)
+                        foreach (object attr in classAttributes)
                         {
                             if (attr.GetType() != typeof(SuiteAttribute)) continue;
                             SuiteAttribute suiteAttribute = attr as SuiteAttribute;
@@ -301,22 +306,20 @@ namespace UnityTest
                                 if (tearDown != null)
                                     if (method.Name == tearDown.Name) continue;
 
-                                string path = Path.Join(suiteAttribute.GetPath(), method.Name); // The path for the Test Manager UI
-
                                 TestAttribute testAttribute;
 
                                 if (setUp != null && tearDown != null)
-                                    testAttribute = new TestAttribute(setUp.Name, tearDown.Name, suiteAttribute.pauseOnFail, path, suiteAttribute.sourceFile);
+                                    testAttribute = new TestAttribute(setUp.Name, tearDown.Name, suiteAttribute.pauseOnFail, method.Name, suiteAttribute.sourceFile);
                                 else if (setUp != null && tearDown == null)
-                                    testAttribute = new TestAttribute(setUp.Name, suiteAttribute.pauseOnFail, path, suiteAttribute.sourceFile);
+                                    testAttribute = new TestAttribute(setUp.Name, suiteAttribute.pauseOnFail, method.Name, suiteAttribute.sourceFile);
                                 else
-                                    testAttribute = new TestAttribute(suiteAttribute.pauseOnFail, path, suiteAttribute.sourceFile);
+                                    testAttribute = new TestAttribute(suiteAttribute.pauseOnFail, method.Name, suiteAttribute.sourceFile);
 
                                 result.Add(new AttributeAndMethod(testAttribute, method));
                             }
-
                             break;
                         }
+                        continue;
                     }
 
 
@@ -326,9 +329,9 @@ namespace UnityTest
                         if (IsMethodIgnored(method)) continue;
 
                         // It has to be done this way for some reason I can't understand.
-                        object[] attributes = method.GetCustomAttributes(typeof(TestAttribute), false);
-                        if (attributes.Length == 0) continue;
-                        foreach (object attribute in attributes)
+                        methodAttributes = method.GetCustomAttributes(typeof(TestAttribute), false);
+                        if (methodAttributes.Length == 0) continue;
+                        foreach (object attribute in methodAttributes)
                         {
                             if (attribute.GetType() != typeof(TestAttribute)) continue;
                             result.Add(new AttributeAndMethod(attribute as TestAttribute, method));
@@ -340,11 +343,15 @@ namespace UnityTest
             attributesAndMethods = result;
         }
 
-        private async void UpdateTestsAsync(List<System.Reflection.Assembly> assemblies, System.Action onFinished = null)
+        private async void UpdateTestsAsync(HashSet<System.Reflection.Assembly> assemblies, System.Action onFinished = null)
         {
             if (task != null) return; // the task is already running, so do nothing and wait for it to finish
+
+            //Debug.Log("Running");
+
             task = Task.Run(() => UpdateTestAttributesAndMethods(assemblies));
             await task;
+            task = null;
 
             List<TestAttribute> foundAttributes = new List<TestAttribute>();
             foreach (AttributeAndMethod obj in attributesAndMethods)
@@ -364,7 +371,6 @@ namespace UnityTest
             //await Task.Delay(5000);
 
             if (onFinished != null) onFinished();
-            task = null;
         }
 
         /// <summary>

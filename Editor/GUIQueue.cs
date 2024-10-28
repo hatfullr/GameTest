@@ -66,7 +66,7 @@ namespace UnityTest
                 {
                     Rect left = new Rect(rect.x, rect.y, 0.5f * rect.width, rect.height);
                     Rect right = new Rect(rect.x + 0.5f * rect.width, rect.y, 0.5f * rect.width, rect.height);
-                    queueScrollPosition = DrawQueue(left, "Selected", ui.manager.queue, null, queueScrollPosition);
+                    queueScrollPosition = DrawQueue(left, "Selected", ui.manager.queue, null, queueScrollPosition, false);
                     finishedScrollPosition = DrawQueue(right, "Finished", ui.manager.finishedTests, ui.manager.finishedResults, finishedScrollPosition, true, true);
                 }
                 EditorGUILayout.EndHorizontal();
@@ -78,7 +78,7 @@ namespace UnityTest
             ProcessEvents();
         }
 
-        private Vector2 DrawQueue(Rect rect, string title, List<Test> queue, List<Test.Result> results, Vector2 scrollPosition, bool paintResultFeatures = false, bool reversed = false)
+        private Vector2 DrawQueue(Rect rect, string title, List<Test> queue, List<Test.Result> results, Vector2 scrollPosition, bool showResult = false, bool reversed = false)
         {
             EditorGUILayout.BeginVertical(GUILayout.MaxWidth(rect.width));
             {
@@ -117,11 +117,12 @@ namespace UnityTest
                     {
                         if (queue != null)
                         {
+                            ui.indentLevel = 0;
                             List<Test> tests = new List<Test>(queue);
                             if (reversed) tests.Reverse();
                             foreach (Test test in tests)
                             {
-                                DrawQueueTest(GUILayoutUtility.GetRect(GUIContent.none, Style.Get("GUIQueue/Test")), test, queue, paintResultFeatures);
+                                DrawQueueTest(test, queue, showResult);
                             }
                         }
                     }
@@ -167,31 +168,40 @@ namespace UnityTest
             GUILayout.EndVertical();
         }
 
-        private void DrawQueueTest(Rect rect, Test test, List<Test> queue, bool paintResultFeatures = true)
+        private void DrawQueueTest(Test test, List<Test> queue, bool showResult = false)
         {
-            if (paintResultFeatures)
+            GUIStyle clearStyle = Style.Get("ClearResult");
+            GUIContent clearIcon = Style.GetIcon("ClearResult", "Remove test from queue");
+
+            Rect rect = EditorGUILayout.BeginHorizontal();
             {
-                rect = TestManagerUI.PaintResultFeatures(rect, test.result);
+                GUILayout.Space(Style.GetWidth(clearStyle, clearIcon));
+                Rect last = GUILayoutUtility.GetLastRect(); // The Rect containing the empty space
+                last.height = rect.height;
+                last.y += 2; // This is the best possible layout that Unity can provide. (angry.)
+
+                if (GUI.Button(last, clearIcon, clearStyle)) queue.Remove(test);
+                //Utilities.DrawDebugOutline(last, Color.red);
+
+                bool dummy = false;
+                ui.DrawListItem(test, ref dummy, ref dummy, ref dummy, 
+                    showFoldout: false,
+                    showLock: false,
+                    showToggle: false,
+                    showResultBackground: showResult,
+                    showScript: false,
+                    showClearResult: false,
+                    showResult: showResult,
+                    name: test.attribute.GetPath()
+                );
+                //Utilities.DrawDebugOutline(GUILayoutUtility.GetLastRect(), Color.red);
             }
-
-            GUIContent content = Style.GetIcon("GUIQueue/Test/Remove/Button", "Remove test from queue");
-            GUIStyle style = Style.Get("GUIQueue/Test/Remove/Button");
-
-            Rect controlsRect = new Rect(rect);
-
-            controlsRect.width = Style.GetWidth(style, content);
-            if (GUI.Button(Style.ApplyMargins(controlsRect, style), content, style)) queue.Remove(test); // X button
-            rect.width -= controlsRect.width;
-            rect.x += controlsRect.width;
-
-            string s = test.attribute.GetPath();
-            GUI.Label(rect, s, Style.GetTextOverflowAlignmentStyle(rect, Style.Get("GUIQueue/Test"), s, TextAnchor.MiddleRight));
+            EditorGUILayout.EndHorizontal();
         }
 
 
-        private void DrawQueueTest(Rect rect, Test test, bool paintResultFeatures = true)
+        private void DrawQueueTest(Rect rect, Test test)
         {
-            if (paintResultFeatures) rect = TestManagerUI.PaintResultFeatures(rect, test.result);
             GUI.Label(rect, test.attribute.GetPath(), Style.Get("GUIQueue/Test"));
         }
 

@@ -45,7 +45,6 @@ namespace UnityTest
             [System.Runtime.CompilerServices.CallerMemberName] string name = default,
             [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = default)
         {
-            if (name.StartsWith("Test")) name = name.Substring("Test".Length);
             this.pauseOnFail = pauseOnFail;
             this.setUp = setUp;
             this.tearDown = tearDown;
@@ -64,7 +63,6 @@ namespace UnityTest
             [System.Runtime.CompilerServices.CallerMemberName] string name = default,
             [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = default)
         {
-            if (name.StartsWith("Test")) name = name.Substring("Test".Length);
             setUp = "";
             tearDown = "";
             this.pauseOnFail = pauseOnFail;
@@ -85,7 +83,6 @@ namespace UnityTest
             [System.Runtime.CompilerServices.CallerMemberName] string name = default,
             [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = default)
         {
-            if (name.StartsWith("Test")) name = name.Substring("Test".Length);
             this.setUp = setUp;
             tearDown = "";
             this.pauseOnFail = pauseOnFail;

@@ -33,8 +33,6 @@ namespace UnityTest
         private GameObject gameObject;
         private Object script = null;
 
-
-
         private GameObject instantiatedDefaultGO = null;
 
         private static GameObject coroutineGO = null;
@@ -171,13 +169,13 @@ namespace UnityTest
             result = Result.None;
             SetUp();
 
-            // If not a Suite, check the game object
-            if (!isInSuite)
-            {
-                if (gameObject == null) throw new System.NullReferenceException("GameObject == null. Check your SetUp method for " + attribute.GetPath());
-                if (gameObject.GetComponent(method.DeclaringType) == null && instantiatedDefaultGO == null)
-                    throw new System.NullReferenceException("Component of type " + method.DeclaringType + " not found in the GameObject returned by the SetUp method.");
-            }
+            // check the game object
+            if (gameObject == null) throw new System.NullReferenceException("GameObject == null. Check your SetUp method for " + attribute.GetPath());
+
+            Component component = gameObject.GetComponent(method.DeclaringType);
+
+            if (component == null && instantiatedDefaultGO == null)
+                throw new System.NullReferenceException("Component of type " + method.DeclaringType + " not found in the GameObject returned by the SetUp method.");
 
             // invoke the method
             if (method.ReturnType == typeof(System.Collections.IEnumerator))
@@ -185,29 +183,15 @@ namespace UnityTest
                 if (coroutineGO != null) Object.DestroyImmediate(coroutineGO);
                 coroutineGO = new GameObject("Coroutine helper", typeof(CoroutineMonoBehaviour));
                 coroutineGO.hideFlags = HideFlags.HideAndDontSave;
-                if (isInSuite)
-                {
-                    Suite suite = Suite.Get(method.DeclaringType);
-                    StartCoroutine(method.Invoke(suite, null) as System.Collections.IEnumerator);
-                }
-                else
-                {
-                    try { StartCoroutine(method.Invoke(gameObject.GetComponent(method.DeclaringType), new object[] { gameObject }) as System.Collections.IEnumerator); }
-                    catch (TargetException) { Utilities.LogError("TargetException was thrown (1). Please submit a bug report."); }
-                }
+                
+                try { StartCoroutine(method.Invoke(component, new object[] { gameObject }) as System.Collections.IEnumerator); }
+                catch (TargetException) { Utilities.LogError("TargetException was thrown (1). Please submit a bug report."); }
             }
             else
             {
-                if (isInSuite)
-                {
-                    Suite suite = Suite.Get(method.DeclaringType);
-                    method.Invoke(suite, null); // probably of type void
-                }
-                else
-                {
-                    try { method.Invoke(gameObject.GetComponent(method.DeclaringType), new object[] { gameObject }); } // probably of type void
-                    catch (TargetException) { Utilities.LogError("TargetException was thrown (2). Please submit a bug report."); }
-                }
+                try { method.Invoke(component, new object[] { gameObject }); } // probably of type void
+                catch (TargetException) { Utilities.LogError("TargetException was thrown (2). Please submit a bug report."); }
+                
                 OnRunComplete();
             }
         }

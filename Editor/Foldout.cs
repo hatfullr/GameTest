@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Runtime.CompilerServices;
 using UnityEditor;
 using UnityEngine;
 
@@ -15,15 +14,8 @@ namespace UnityTest
         /// </summary>
         [SerializeField] public string path;
         [SerializeField] private bool selected;
-        [SerializeField] private bool expanded;
+        [SerializeField] public bool expanded;
         [SerializeField] private bool locked;
-
-        [SerializeField] private bool _isSuite = false;
-        /// <summary>
-        /// true if this Foldout is a Suite, and false otherwise. This is set only after Add() is called with an input test that originates
-        /// from a Suite class.
-        /// </summary>
-        public bool isSuite { get => _isSuite; private set => _isSuite = value; }
 
         public List<Test> tests = new List<Test>();
 
@@ -37,6 +29,16 @@ namespace UnityTest
             }
         }
 
+        /// <summary>
+        /// Returns true if any tests in this Foldout come from a Suite, and false otherwise.
+        /// </summary>
+        public bool IsSuite()
+        {
+            foreach (Test test in tests)
+                if (test.isInSuite) return true;
+            return false;
+        }
+
         #region UI Methods
         public void Draw()
         {
@@ -48,58 +50,91 @@ namespace UnityTest
             bool wasMixed = IsMixed();
             bool wasLocked = locked;
 
-            selected |= IsAllSelected(); // Set to the proper state ahead of time if needed
-            ui.DrawListItem(this, ref expanded, ref locked, ref selected, true, true, true, true);
-
-            // Process events
-            // Check if the user just expanded the Foldout while holding down the Alt key
-            if (Event.current.alt && expanded != wasExpanded) ExpandAll(expanded);
-            
-            if (wasSelected != selected)
-            {
-                // mixed is the same as the toggle not being selected
-                if (wasMixed)
-                {
-                    if (selected) Select();
-                }
-                else
-                {
-                    if (wasSelected) Deselect();
-                    else Select();
-                }
-            }
-            
-            if (locked != wasLocked)
-            {
-                if (locked && !wasLocked) Lock();
-                else if (!locked && wasLocked) Unlock();
-            }
-            else locked = IsAllLocked();
-
-            if (expanded)
-            {
-                ui.indentLevel++;
-                DrawChildren();
-                ui.indentLevel--;
-            }
-        }
-        private void DrawChildren()
-        {
-            float indent = ui.indentLevel * ui.indentWidth;
-            foreach (Test test in tests.OrderBy(x => x.attribute.name))
-            {
-                //Rect rect = EditorGUILayout.GetControlRect(false);
-                //rect = TestManagerUI.PaintResultFeatures(rect, test);
-                //rect.x += indent;
-                //rect.width -= indent;
-                ui.DrawTest(test, true, !test.isInSuite, true);
-            }
-
             List<Foldout> children = new List<Foldout>(GetChildren(false).OrderBy(x => x.GetName()));
-            if (children.Count > 0 && tests.Count > 0) EditorGUILayout.Space(0.5f * EditorGUIUtility.singleLineHeight);
 
-            // Draw the child foldouts, leaving the Examples foldout for last.
-            foreach (Foldout child in children) child.Draw();
+            Rect rect = EditorGUILayout.BeginVertical();
+            {
+                Test.Result result = GetTotalResult();
+
+                // This creates a nice visual grouping for the tests to hang out in
+                if (expanded && tests.Count > 0)
+                {
+                    int previousIndentLevel = EditorGUI.indentLevel;
+                    EditorGUI.indentLevel = ui.indentLevel + 1;
+                    rect = EditorGUI.IndentedRect(rect);
+                    EditorGUI.indentLevel = previousIndentLevel;
+
+                    Rect header = new Rect(rect);
+                    header.height = EditorGUIUtility.singleLineHeight;
+
+                    GUIStyle style = Style.Get("TestRect");
+
+                    GUI.Box(rect, GUIContent.none, style);
+                    GUI.Box(header, GUIContent.none, style);
+                }
+
+                selected |= IsAllSelected(); // Set to the proper state ahead of time if needed
+                ui.DrawListItem(this, ref expanded, ref locked, ref selected, 
+                    showFoldout: true, 
+                    showLock: true, 
+                    showToggle: true, 
+                    showResultBackground: true, 
+                    showScript: tests.Count > 0, 
+                    showClearResult: tests.Count > 0, 
+                    showResult: tests.Count > 0
+                );
+
+                // Process events
+                // Check if the user just expanded the Foldout while holding down the Alt key
+                if (Event.current.alt && expanded != wasExpanded) ExpandAll(expanded);
+
+                if (wasSelected != selected)
+                {
+                    // mixed is the same as the toggle not being selected
+                    if (wasMixed)
+                    {
+                        if (selected) Select();
+                    }
+                    else
+                    {
+                        if (wasSelected) Deselect();
+                        else Select();
+                    }
+                }
+
+                if (locked != wasLocked)
+                {
+                    if (locked && !wasLocked) Lock();
+                    else if (!locked && wasLocked) Unlock();
+                }
+                else locked = IsAllLocked();
+
+                if (expanded)
+                {
+                    ui.indentLevel++;
+                    if (children.Count > 0)
+                    {
+                        foreach (Foldout child in children) child.Draw();
+                    }
+                    else
+                    {
+                        foreach (Test test in tests.OrderBy(x => x.attribute.name))
+                        {
+                            ui.DrawListItem(test, ref test.expanded, ref test.locked, ref test.selected, 
+                                showFoldout: false,
+                                showLock: true,
+                                showToggle: true,
+                                showResultBackground: true,
+                                showScript: false,
+                                showClearResult: true,
+                                showResult: true
+                            );
+                        }
+                    }
+                    ui.indentLevel--;
+                }
+            }
+            EditorGUILayout.EndVertical();
         }
         #endregion
 

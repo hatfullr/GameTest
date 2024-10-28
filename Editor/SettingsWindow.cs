@@ -7,11 +7,13 @@ namespace UnityTest
     /// <summary>
     /// The window that pops up when a settings cog button is clicked for a Suite
     /// </summary>
-    public class Settings : EditorWindow
+    [System.Serializable]
+    public class SettingsWindow : EditorWindow
     {
         private Test test;
-        private Suite currentSuite;
-        private Editor suiteEditor;
+
+        private Object content;
+        private Editor editor;
         private bool visible = false;
 
         private const float flashInterval = 0.25f;
@@ -32,11 +34,17 @@ namespace UnityTest
             if (test.attribute == this.test.attribute) return;
 
             // Search the Data for this test's class
-            currentSuite = Suite.Get(test.method.DeclaringType);
-            suiteEditor = Editor.CreateEditor(currentSuite);
+            //editor = Editor.CreateEditor(test.settings);
 
             this.test = test;
             titleContent = new GUIContent(test.method.DeclaringType.Name + " (Settings)");
+        }
+
+        public void SetContent(Test test)
+        {
+            content = test;
+            //suiteEditor = Editor.CreateEditor(Suite.Get(test));
+            titleContent = new GUIContent(test.attribute.GetPath() + " (Settings)");
         }
 
         public void SetVisible(bool value)
@@ -83,7 +91,7 @@ namespace UnityTest
 
         void OnGUI()
         {
-            if (test == null)
+            if (content == null)
             {
                 SetVisible(false);
                 return;
@@ -95,8 +103,7 @@ namespace UnityTest
                 Repaint();
             }
 
-            suiteEditor.OnInspectorGUI();
-
+            editor.OnInspectorGUI();
         }
     }
 }
