@@ -354,7 +354,7 @@ namespace UnityTest
         {
             string tag = "<size=10>" + debugTag + "</size>";
             if (!string.IsNullOrEmpty(color)) tag = ColorString(tag, color);
-            return string.Join(' ', tag, message);
+            return string.Join(' ', tag, message) + "\n<size=10>(Disable these messages with the debug toolbar button)</size>";
         }
 
 

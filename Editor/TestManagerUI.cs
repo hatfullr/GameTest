@@ -9,15 +9,6 @@ namespace UnityTest
 {
     public class TestManagerUI : EditorWindow, IHasCustomMenu
     {
-        [SerializeField] private GUIQueue _guiQueue;
-        [SerializeField] private Foldout _rootFoldout;
-        [SerializeField] public List<Foldout> foldouts = new List<Foldout>();
-        [SerializeField] private Vector2 scrollPosition;
-        [SerializeField] private bool showWelcome = true;
-        [SerializeField] private bool loadingWheelVisible = false;
-        [SerializeField] private string search = null;
-        [SerializeField] private string loadingWheelText = null;
-
         public int indentLevel;
         private float spinStartTime = 0f;
         private int spinIndex = 0;
@@ -35,33 +26,16 @@ namespace UnityTest
             }
         }
 
-        private GUIQueue guiQueue
-        {
-            get
-            {
-                if (_guiQueue == null) _guiQueue = Utilities.CreateAsset<GUIQueue>(GUIQueue.fileName, Utilities.dataPath);
-                return _guiQueue;
-            }
-        }
+        public Foldout rootFoldout => manager.rootFoldout;
+        public List<Foldout> foldouts => manager.foldouts;
+        public GUIQueue guiQueue => manager.guiQueue;
+        public SettingsWindow settingsWindow => manager.settingsWindow;
 
-        private Foldout rootFoldout
-        {
-            get
-            {
-                if (_rootFoldout == null) _rootFoldout = Utilities.CreateAsset<Foldout>("rootFoldout", Utilities.foldoutDataPath);
-                return _rootFoldout;
-            }
-        }
-
-        private SettingsWindow _settingsWindow;
-        public SettingsWindow settingsWindow
-        {
-            get
-            {
-                if (_settingsWindow == null) _settingsWindow = EditorWindow.GetWindow<SettingsWindow>();
-                return _settingsWindow;
-            }
-        }
+        public Vector2 scrollPosition { get => manager.scrollPosition; set => manager.scrollPosition = value; }
+        public bool showWelcome { get => manager.showWelcome; set => manager.showWelcome = value; }
+        public bool loadingWheelVisible { get => manager.loadingWheelVisible; set => manager.loadingWheelVisible = value; }
+        public string search { get => manager.search; set => manager.search = value; }
+        public string loadingWheelText { get => manager.loadingWheelText; set => manager.loadingWheelText = value; }
 
         #region Unity UI
         public void AddItemsToMenu(GenericMenu menu)
@@ -84,8 +58,7 @@ namespace UnityTest
         /// </summary>
         void Awake()
         {
-            // Only do a refresh if we think this is the first time the window has been opened.
-            if (foldouts.Count == 0) Refresh();
+            Refresh();
         }
 
         /// <summary>
@@ -117,6 +90,12 @@ namespace UnityTest
             manager.onStop -= OnTestManagerFinished;
         }
 
+        void OnDestroy()
+        {
+            if (manager.running) manager.Stop();
+            Utilities.SaveAsset(manager);
+        }
+
         private void OnAfterAssemblyReload()
         {
             Refresh();
@@ -142,16 +121,8 @@ namespace UnityTest
         {
             foreach (Test test in manager.tests)
             {
-                if (test.selected) manager.AddToQueue(test);  // manager.queue.Enqueue(test);
+                if (test.selected) manager.AddToQueue(test);
             }
-        }
-
-        /// <summary>
-        /// Called only when the window is closed.
-        /// </summary>
-        void OnDestroy()
-        {
-            //Save();
         }
 
         void OnLostFocus()
@@ -187,26 +158,19 @@ namespace UnityTest
 
             manager.Reset();
 
-            foldouts = new List<Foldout>();
-            scrollPosition = default;
-            showWelcome = true;
-            loadingWheelVisible = false;
-            loadingWheelText = null;
-            search = default;
-
             indentLevel = default;
             spinStartTime = default;
             spinIndex = default;
 
             Refresh(() => 
             {
-                Utilities.Log("Reset " + Style.TestManagerUI.windowTitle);
+                Utilities.Log("Reset");
             });
         }
 
-        private void Refresh(System.Action onFinished = null)
+        private void Refresh(System.Action onFinished = null, string message = "Refreshing")
         {
-            StartLoadingWheel("Refreshing");
+            StartLoadingWheel(message);
             Repaint();
 
             manager.UpdateTests(() =>

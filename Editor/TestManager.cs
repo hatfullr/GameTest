@@ -25,6 +25,43 @@ namespace UnityTest
         public List<Test> finishedTests = new List<Test>();
         public List<Test.Result> finishedResults = new List<Test.Result>();
 
+        [SerializeField] private GUIQueue _guiQueue;
+        [SerializeField] private Foldout _rootFoldout;
+        public List<Foldout> foldouts = new List<Foldout>();
+        public Vector2 scrollPosition;
+        public bool showWelcome = true;
+        public bool loadingWheelVisible = false;
+        public string search = null;
+        public string loadingWheelText = null;
+
+        public GUIQueue guiQueue
+        {
+            get
+            {
+                if (_guiQueue == null) _guiQueue = Utilities.CreateAsset<GUIQueue>(GUIQueue.fileName, Utilities.dataPath);
+                return _guiQueue;
+            }
+        }
+
+        public Foldout rootFoldout
+        {
+            get
+            {
+                if (_rootFoldout == null) _rootFoldout = Utilities.CreateAsset<Foldout>("rootFoldout", Utilities.foldoutDataPath);
+                return _rootFoldout;
+            }
+        }
+
+        private SettingsWindow _settingsWindow;
+        public SettingsWindow settingsWindow
+        {
+            get
+            {
+                if (_settingsWindow == null) _settingsWindow = EditorWindow.GetWindow<SettingsWindow>();
+                return _settingsWindow;
+            }
+        }
+
         public float timer;
         public uint nframes;
 
@@ -143,6 +180,13 @@ namespace UnityTest
         /// </summary>
         public void Reset()
         {
+            foldouts = new List<Foldout>();
+            scrollPosition = default;
+            showWelcome = true;
+            loadingWheelVisible = false;
+            loadingWheelText = null;
+            search = default;
+
             debug = true;
             previousFrameNumber = 0;
             timer = 0f;
@@ -380,6 +424,7 @@ namespace UnityTest
         public void UpdateTests(System.Action onFinished = null)
         {
             UpdateTestsAsync(GetAssemblies(), onFinished);
+            if (debug) Utilities.Log("Tests updated");
         }
 
         #endregion
