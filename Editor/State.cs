@@ -1,8 +1,3 @@
-using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
-using UnityTest;
-
 namespace UnityTest
 {
     /// <summary>
@@ -17,13 +12,13 @@ namespace UnityTest
         public bool anyResults { get; private set; }
         public bool anyFailed { get; private set; }
 
-        public State(Foldout rootFoldout)
+        public State(TestManagerUI ui, Foldout rootFoldout)
         {
             if (rootFoldout == null) return;
             allSelected = true;
             anyResults = false;
             anyFailed = false;
-            foreach (Test test in rootFoldout.GetTests())
+            foreach (Test test in rootFoldout.GetTests(ui))
             {
                 if (test.result != Test.Result.None) anyResults = true;
                 if (test.result == Test.Result.Fail) anyFailed = true;

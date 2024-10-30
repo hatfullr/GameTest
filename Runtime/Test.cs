@@ -1,5 +1,3 @@
-// TODO: Move into the Editor/ folder
-
 using System.Reflection;
 using UnityEngine;
 using System.IO;

@@ -5,6 +5,7 @@ using UnityEditor.Compilation;
 using System.Reflection;
 using System.IO;
 using System.Threading.Tasks;
+using System.Threading;
 
 namespace UnityTest
 {
@@ -83,6 +84,36 @@ namespace UnityTest
         private List<AttributeAndMethod> attributesAndMethods = new List<AttributeAndMethod>();
 
         private Task task;
+
+        /// <summary>
+        /// Save the TestManager asset as well as all assets linked to it.
+        /// </summary>
+        public void Save()
+        {
+            List<Object> assets = new List<Object>()
+            {
+                this,
+                guiQueue,
+                rootFoldout,
+            };
+            assets.AddRange(foldouts);
+            assets.AddRange(tests);
+
+            for (int i = 0; i < assets.Count; i++)
+            {
+                string message = AssetDatabase.GetAssetPath(assets[i]);
+                if (assets[i].GetType() == typeof(Test)) message = "test " + (assets[i] as Test).attribute.GetPath();
+                else if (assets[i].GetType() == typeof(Foldout)) message = "foldout " + (assets[i] as Foldout).path;
+
+                if (EditorUtility.DisplayCancelableProgressBar("UnityTest", "Saving " + message, (float)(i + 1) / assets.Count))
+                    break;
+
+                Utilities.SaveAsset(assets[i]);
+            }
+            EditorUtility.ClearProgressBar();
+        }
+
+        
 
         public void OnPlayStateChanged(PlayModeStateChange change)
         {

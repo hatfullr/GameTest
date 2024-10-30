@@ -12,22 +12,12 @@ namespace UnityTest
         /// <summary>
         /// All Test objects in this Foldout will have paths that start with this path.
         /// </summary>
-        [SerializeField] public string path;
+        public string path;
         [SerializeField] private bool selected;
-        [SerializeField] public bool expanded;
+        public bool expanded;
         [SerializeField] private bool locked;
 
         public List<Test> tests = new List<Test>();
-
-        private static TestManagerUI _ui;
-        private static TestManagerUI ui
-        {
-            get
-            {
-                if (_ui == null) _ui = EditorWindow.GetWindow<TestManagerUI>();
-                return _ui;
-            }
-        }
 
         /// <summary>
         /// Returns true if any tests in this Foldout come from a Suite, and false otherwise.
@@ -40,21 +30,21 @@ namespace UnityTest
         }
 
         #region UI Methods
-        public void Draw()
+        public void Draw(TestManagerUI ui)
         {
             // If this is the root foldout
             if (string.IsNullOrEmpty(path)) throw new System.Exception("Cannot call Draw() on the rootFoldout. This should never happen.");
 
             bool wasExpanded = expanded;
             bool wasSelected = selected;
-            bool wasMixed = IsMixed();
+            bool wasMixed = IsMixed(ui);
             bool wasLocked = locked;
 
-            List<Foldout> children = new List<Foldout>(GetChildren(false).OrderBy(x => x.GetName()));
+            List<Foldout> children = new List<Foldout>(GetChildren(ui, false).OrderBy(x => x.GetName()));
 
             Rect rect = EditorGUILayout.BeginVertical();
             {
-                Test.Result result = GetTotalResult();
+                Test.Result result = GetTotalResult(ui);
 
                 // This creates a nice visual grouping for the tests to hang out in
                 if (expanded && tests.Count > 0)
@@ -73,7 +63,7 @@ namespace UnityTest
                     GUI.Box(header, GUIContent.none, style);
                 }
 
-                selected |= IsAllSelected(); // Set to the proper state ahead of time if needed
+                selected |= IsAllSelected(ui); // Set to the proper state ahead of time if needed
                 ui.DrawListItem(this, ref expanded, ref locked, ref selected, 
                     showFoldout: true, 
                     showLock: true, 
@@ -86,35 +76,35 @@ namespace UnityTest
 
                 // Process events
                 // Check if the user just expanded the Foldout while holding down the Alt key
-                if (Event.current.alt && expanded != wasExpanded) ExpandAll(expanded);
+                if (Event.current.alt && expanded != wasExpanded) ExpandAll(ui, expanded);
 
                 if (wasSelected != selected)
                 {
                     // mixed is the same as the toggle not being selected
                     if (wasMixed)
                     {
-                        if (selected) Select();
+                        if (selected) Select(ui);
                     }
                     else
                     {
-                        if (wasSelected) Deselect();
-                        else Select();
+                        if (wasSelected) Deselect(ui);
+                        else Select(ui);
                     }
                 }
 
                 if (locked != wasLocked)
                 {
-                    if (locked && !wasLocked) Lock();
-                    else if (!locked && wasLocked) Unlock();
+                    if (locked && !wasLocked) Lock(ui);
+                    else if (!locked && wasLocked) Unlock(ui);
                 }
-                else locked = IsAllLocked();
+                else locked = IsAllLocked(ui);
 
                 if (expanded)
                 {
                     ui.indentLevel++;
                     if (children.Count > 0)
                     {
-                        foreach (Foldout child in children) child.Draw();
+                        foreach (Foldout child in children) child.Draw(ui);
                     }
                     else
                     {
@@ -142,49 +132,49 @@ namespace UnityTest
         /// <summary>
         /// Toggle on the Foldout, and thereby all its children. Does not affect locked items.
         /// </summary>
-        public void Select()
+        public void Select(TestManagerUI ui)
         {
             selected = true;
             foreach (Test test in tests)
                 if (!test.locked) test.selected = selected;
-            foreach (Foldout foldout in GetChildren()) foldout.Select();
+            foreach (Foldout foldout in GetChildren(ui)) foldout.Select(ui);
         }
         /// <summary>
         /// Toggle off the Foldout, and thereby all its children.
         /// </summary>
-        public void Deselect()
+        public void Deselect(TestManagerUI ui)
         {
             selected = false;
             foreach (Test test in tests)
                 if (!test.locked) test.selected = selected;
-            foreach (Foldout foldout in GetChildren()) foldout.Deselect();
+            foreach (Foldout foldout in GetChildren(ui)) foldout.Deselect(ui);
         }
         /// <summary>
         /// Lock the Foldout, and thereby all its children.
         /// </summary>
-        public void Lock()
+        public void Lock(TestManagerUI ui)
         {
             locked = true;
             foreach (Test test in tests) test.locked = locked;
-            foreach (Foldout foldout in GetChildren()) foldout.Lock();
+            foreach (Foldout foldout in GetChildren(ui)) foldout.Lock(ui);
         }
         /// <summary>
         /// Unlock the Foldout, and thereby all its children.
         /// </summary>
-        public void Unlock()
+        public void Unlock(TestManagerUI ui)
         {
             locked = false;
             foreach (Test test in tests) test.locked = locked;
-            foreach (Foldout foldout in GetChildren()) foldout.Unlock();
+            foreach (Foldout foldout in GetChildren(ui)) foldout.Unlock(ui);
         }
         /// <summary>
         /// When the user is holding Alt and clicks on the foldout arrow, expand also all child foldouts and Tests
         /// </summary>
-        public void ExpandAll(bool value)
+        public void ExpandAll(TestManagerUI ui, bool value)
         {
             expanded = value;
-            foreach (Test test in GetTests()) test.expanded = value;
-            foreach (Foldout child in GetChildren()) child.ExpandAll(value);
+            foreach (Test test in GetTests(ui)) test.expanded = value;
+            foreach (Foldout child in GetChildren(ui)) child.ExpandAll(ui, value);
         }
         #endregion
 
@@ -192,7 +182,7 @@ namespace UnityTest
         /// <summary>
         /// Locate all the Foldout objects that are children of this Foldout.
         /// </summary>
-        public IEnumerable<Foldout> GetChildren(bool includeSubdirectories = true)
+        public IEnumerable<Foldout> GetChildren(TestManagerUI ui, bool includeSubdirectories = true)
         {
             if (includeSubdirectories)
             {
@@ -221,12 +211,12 @@ namespace UnityTest
         /// <summary>
         /// Locate all the Test objects included in this Foldout.
         /// </summary>
-        public IEnumerable<Test> GetTests(bool includeSubdirectories = true)
+        public IEnumerable<Test> GetTests(TestManagerUI ui, bool includeSubdirectories = true)
         {
             if (tests != null)
             {
                 foreach (Test test in tests) yield return test;
-                foreach (Foldout child in GetChildren(includeSubdirectories))
+                foreach (Foldout child in GetChildren(ui, includeSubdirectories))
                     foreach (Test test in child.tests) yield return test;
             }
         }
@@ -234,10 +224,10 @@ namespace UnityTest
         /// <summary>
         /// Return the cumulative testing result from all child tests
         /// </summary>
-        public Test.Result GetTotalResult()
+        public Test.Result GetTotalResult(TestManagerUI ui)
         {
             bool anyPassed = false;
-            foreach (Test test in GetTests())
+            foreach (Test test in GetTests(ui))
             {
                 // If any children are Fail, we are Fail
                 if (test.result == Test.Result.Fail) return Test.Result.Fail;
@@ -267,10 +257,10 @@ namespace UnityTest
         /// Returns true if more than one of this Foldout's tests is selected, but not all of them. The tests that are checked are
         /// all of those in every subdirectory.
         /// </summary>
-        public bool IsMixed()
+        public bool IsMixed(TestManagerUI ui)
         {
             int nSelected = 0;
-            List<Test> tests = new List<Test>(GetTests());
+            List<Test> tests = new List<Test>(GetTests(ui));
             foreach (Test test in tests)
             {
                 if (test.selected) nSelected++;
@@ -280,22 +270,22 @@ namespace UnityTest
         /// <summary>
         /// Returns true if all tests and child Foldouts are selected, in every subdirectory.
         /// </summary>
-        public bool IsAllSelected()
+        public bool IsAllSelected(TestManagerUI ui)
         {
             foreach (Test test in tests)
                 if (!test.selected) return false;
-            foreach (Foldout child in GetChildren())
+            foreach (Foldout child in GetChildren(ui))
                 if (!child.selected) return false;
             return true;
         }
         /// <summary>
         /// Returns true if all tests and child Foldouts are locked, in every subdirectory.
         /// </summary>
-        public bool IsAllLocked()
+        public bool IsAllLocked(TestManagerUI ui)
         {
             foreach (Test test in tests)
                 if (!test.locked) return false;
-            foreach (Foldout child in GetChildren())
+            foreach (Foldout child in GetChildren(ui))
                 if (!child.locked) return false;
             return true;
         }

@@ -162,27 +162,30 @@ namespace UnityTest
             return (T)(object)result;
         }
 
-        public static void SaveAsset(Object asset)
+        public static void SaveAssets(IEnumerable<Object> assets)
         {
-            MarkAssetsForSave(asset);
-            SaveDirtyAssets(asset);
+            MarkAssetsForSave(assets);
+            SaveDirtyAssets(assets);
         }
+        public static void SaveAsset(Object asset) => SaveAssets(new List<Object> { asset });
 
-        public static void MarkAssetsForSave(params Object[] assets)
+        public static void SaveDirtyAsset(Object asset) => AssetDatabase.SaveAssetIfDirty(asset);
+        public static void SaveDirtyAssets(IEnumerable<Object> assets)
         {
             foreach (Object asset in assets)
             {
                 if (asset == null) continue;
-                EditorUtility.SetDirty(asset);
+                SaveDirtyAsset(asset);
             }
         }
 
-        public static void SaveDirtyAssets(params Object[] assets)
+        public static void MarkAssetForSave(Object asset) => EditorUtility.SetDirty(asset);
+        public static void MarkAssetsForSave(IEnumerable<Object> assets)
         {
             foreach (Object asset in assets)
             {
                 if (asset == null) continue;
-                AssetDatabase.SaveAssetIfDirty(asset);
+                MarkAssetForSave(asset);
             }
         }
 

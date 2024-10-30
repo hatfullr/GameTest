@@ -77,6 +77,10 @@ namespace UnityTest
 
             manager.onStop -= OnTestManagerFinished;
             manager.onStop += OnTestManagerFinished;
+
+            // Before the editor application quits, save the assets for next time
+            EditorApplication.quitting -= manager.Save;
+            EditorApplication.quitting += manager.Save;
         }
 
         /// <summary>
@@ -93,7 +97,9 @@ namespace UnityTest
         void OnDestroy()
         {
             if (manager.running) manager.Stop();
-            Utilities.SaveAsset(manager);
+
+            // Save all the loaded assets
+            manager.Save();
         }
 
         private void OnAfterAssemblyReload()
@@ -217,7 +223,7 @@ namespace UnityTest
 
         private void ResetSelected()
         {
-            foreach (Test test in rootFoldout.GetTests())
+            foreach (Test test in rootFoldout.GetTests(this))
                 if (test.selected) test.Reset();
         }
         private void ResetAll()
@@ -227,26 +233,11 @@ namespace UnityTest
         #endregion Methods
 
 
-        #region Persistence
-        /// <summary>
-        /// Save current data to Assets/UnityTest/Data
-        /// </summary>
-        private void Save()
-        {
-            Utilities.MarkAssetsForSave(guiQueue, manager, rootFoldout, this);
-            //Utilities.SaveDirtyAssets(guiQueue, manager, rootFoldout, this);
-            //if (foldouts != null)
-            //    foreach (Foldout foldout in foldouts)
-            //        Utilities.SaveAsset(foldout);
-        }
-        #endregion Persistence
-
-
         #region UI
         void OnGUI()
         {
             Utilities.isDarkTheme = GUI.skin.name == "DarkSkin";
-            State state = new State(rootFoldout);
+            State state = new State(this, rootFoldout);
 
             bool refresh = false;
             bool selectAll = false;
@@ -340,8 +331,8 @@ namespace UnityTest
             {
                 // Doing things this way avoids annoying GUI errors complaining about groups not being ended properly.
                 if (refresh) Refresh();
-                else if (selectAll) rootFoldout.Select(); // Simulate a press
-                else if (deselectAll) rootFoldout.Deselect(); // Simulate a press
+                else if (selectAll) rootFoldout.Select(this); // Simulate a press
+                else if (deselectAll) rootFoldout.Deselect(this); // Simulate a press
             }
         }
 
@@ -351,7 +342,7 @@ namespace UnityTest
         private void DrawNormalMode()
         {
             indentLevel = 0;
-            foreach (Foldout child in rootFoldout.GetChildren(false)) child.Draw();
+            foreach (Foldout child in rootFoldout.GetChildren(this, false)) child.Draw(this);
         }
 
         /// <summary>
@@ -365,7 +356,7 @@ namespace UnityTest
 
             string path, final;
             MatchCollection matches;
-            foreach (Test test in rootFoldout.GetTests().OrderBy(x => x.attribute.GetPath()))
+            foreach (Test test in rootFoldout.GetTests(this).OrderBy(x => x.attribute.GetPath()))
             {
                 path = test.attribute.GetPath();
                 matches = re.Matches(path);
@@ -619,7 +610,7 @@ namespace UnityTest
             {
                 Foldout foldout = item as Foldout;
                 if (string.IsNullOrEmpty(name)) name = foldout.GetName();
-                isMixed = foldout.IsMixed();
+                isMixed = foldout.IsMixed(this);
                 if (foldout.tests.Count > 0 && foldout.expanded) selectedStyle = Style.Get("ToggleHeader");
             }
             else if (item.GetType() == typeof(Test))
@@ -702,10 +693,10 @@ namespace UnityTest
             else if (item.GetType() == typeof(Foldout))
             {
                 Foldout foldout = item as Foldout;
-                result = foldout.GetTotalResult();
+                result = foldout.GetTotalResult(this);
                 onClearPressed += () =>
                 {
-                    foreach (Test test in foldout.GetTests()) test.Reset();
+                    foreach (Test test in foldout.GetTests(this)) test.Reset();
                 };
 
                 if (showScript) script = foldout.tests[0].GetScript();
@@ -797,7 +788,7 @@ namespace UnityTest
             Test.Result result = Test.Result.None;
             if (showResult)
             {
-                if (item.GetType() == typeof(Foldout)) result = (item as Foldout).GetTotalResult();
+                if (item.GetType() == typeof(Foldout)) result = (item as Foldout).GetTotalResult(this);
                 else if (item.GetType() == typeof(Test)) result = (item as Test).result;
                 else throw new System.NotImplementedException("Unrecognized item type " + item.GetType());
             }
