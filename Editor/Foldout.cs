@@ -40,8 +40,6 @@ namespace UnityTest
             bool wasMixed = IsMixed(ui);
             bool wasLocked = locked;
 
-            List<Foldout> children = new List<Foldout>(GetChildren(ui, false).OrderBy(x => x.GetName()));
-
             Rect rect = EditorGUILayout.BeginVertical();
             {
                 Test.Result result = GetTotalResult(ui);
@@ -101,6 +99,9 @@ namespace UnityTest
 
                 if (expanded)
                 {
+                    // Originally order the child Foldouts by their names
+                    List<Foldout> children = new List<Foldout>(GetChildren(ui, false).OrderBy(x => x.GetName()));
+
                     ui.indentLevel++;
                     if (children.Count > 0)
                     {
@@ -110,7 +111,7 @@ namespace UnityTest
                     {
                         foreach (Test test in tests.OrderBy(x => x.attribute.name))
                         {
-                            ui.DrawListItem(test, ref test.expanded, ref test.locked, ref test.selected, 
+                            ui.DrawListItem(test, ref test.expanded, ref test.locked, ref test.selected,
                                 showFoldout: false,
                                 showLock: true,
                                 showToggle: true,

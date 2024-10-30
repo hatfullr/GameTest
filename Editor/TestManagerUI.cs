@@ -37,6 +37,9 @@ namespace UnityTest
         public string search { get => manager.search; set => manager.search = value; }
         public string loadingWheelText { get => manager.loadingWheelText; set => manager.loadingWheelText = value; }
 
+        private float minWidth;
+
+
         #region Unity UI
         public void AddItemsToMenu(GenericMenu menu)
         {
@@ -282,7 +285,12 @@ namespace UnityTest
 
 
                         // The box that shows the Foldouts and Tests
-                        scrollPosition = EditorGUILayout.BeginScrollView(scrollPosition, false, false, GUI.skin.horizontalScrollbar, GUI.skin.verticalScrollbar, Style.Get("TestManagerUI/TestView"));
+                        scrollPosition = EditorGUILayout.BeginScrollView(
+                            scrollPosition,
+                            false, false,
+                            GUI.skin.horizontalScrollbar, GUI.skin.verticalScrollbar,
+                            Style.Get("TestManagerUI/TestView")
+                        );
                         {
                             if (showWelcome) // Welcome message
                             {
@@ -301,7 +309,6 @@ namespace UnityTest
                                 rect.x += rect.width - width - donateStyle.margin.right;
                                 rect.width = width;
                                 if (GUI.Button(rect, donate)) Application.OpenURL(Style.donationLink);
-
                             }
 
                             if (string.IsNullOrEmpty(search)) DrawNormalMode();
@@ -641,12 +648,22 @@ namespace UnityTest
                 lockedRect.x -= foldoutRect.width;
                 selectedRect.x -= foldoutRect.width;
                 selectedRect.width += foldoutRect.width;
+                foldoutRect.width = 0f;
             }
             if (!showLock)
             {
                 selectedRect.x -= lockedRect.width;
                 selectedRect.width += lockedRect.width;
+                lockedRect.width = 0f;
             }
+
+            Rect textRect = new Rect(indentedRect);
+            float w = 0f;
+            if (showFoldout) w += foldoutRect.width;
+            if (showLock) w += lockedRect.width;
+            if (showToggle) w += EditorStyles.toggle.padding.left;
+            textRect.x += w;
+            textRect.width -= w;
 
             // Drawing
             if (showFoldout) expanded = EditorGUI.Foldout(foldoutRect, expanded, GUIContent.none, foldoutStyle);
@@ -654,10 +671,9 @@ namespace UnityTest
             if (showToggle)
             {
                 EditorGUI.showMixedValue = isMixed;
-                
                 selected = EditorGUI.ToggleLeft(
                     selectedRect, name, selected,
-                    Style.GetTextOverflowAlignmentStyle(selectedRect, selectedStyle, name, TextAnchor.MiddleRight)
+                    Style.GetTextOverflowAlignmentStyle(textRect, selectedStyle, name, TextAnchor.MiddleRight)
                 );
                 EditorGUI.showMixedValue = wasMixed;
             }
@@ -665,12 +681,15 @@ namespace UnityTest
             {
                 EditorGUI.LabelField(
                     selectedRect, name,
-                    Style.GetTextOverflowAlignmentStyle(selectedRect, selectedStyle, name, TextAnchor.MiddleRight)
+                    Style.GetTextOverflowAlignmentStyle(textRect, selectedStyle, name, TextAnchor.MiddleRight)
                 );
             }
 
             // Reset GUI to previous state
             EditorGUIUtility.labelWidth = previousLabelWidth;
+
+            //Utilities.DrawDebugOutline(textRect, Color.red); // DEBUGGING
+            //Utilities.DrawDebugOutline(indentedRect, Color.green); // DEBUGGING
         }
 
         private void DrawListItemRight(Object item, bool showScript = true, bool showClearResult = true, bool showResult = true)
@@ -793,12 +812,10 @@ namespace UnityTest
                 else throw new System.NotImplementedException("Unrecognized item type " + item.GetType());
             }
 
-
             using (new EditorGUI.IndentLevelScope(indentLevel))
             {
                 Rect rect = EditorGUILayout.BeginHorizontal();
                 {
-
                     if (showResultBackground)
                     {
                         rect = new Rect(EditorGUI.IndentedRect(rect));
