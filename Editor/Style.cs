@@ -39,6 +39,26 @@ namespace UnityTest
             //public const float minWidth = 300f;
         }
 
+        public static class Tooltips
+        {
+            public const string clearSelected = "Clear selected Test results";
+            public const string playOff = "Run selected tests";
+            public const string playOn = "Stop testing";
+            public const string pauseOff = "Pause testing";
+            public const string pauseOn = "Resume testing";
+            public const string skip = "Stop the current test and skip to the next";
+            public const string goToEmptyScene = "Go to empty scene";
+            public const string debugOff = "Enable/disable debug messages";
+            public const string debugOn = "Enable/disable debug messages";
+            public const string refresh = "Refresh Test methods and classes by searching all assemblies. This should never be necessary, but could " +
+                        "be helpful if UnityTest is having trouble detecting your tests.";
+            public const string welcome = "Show/hide the welcome message";
+            public const string testPassed = "Passed";
+            public const string testFailed = "Failed";
+            public const string clearTest = "Clear test result";
+            public const string lockButton = "Keep item selected/deselected";
+        }
+
         public static Color failColor = new Color(1f, 0f, 0f, 0.1f);
         public static Color passColor = new Color(0, 1f, 0f, 0.1f);
 
@@ -246,6 +266,13 @@ namespace UnityTest
                 #endregion TestManagerUI
 
                 #region List items
+                case "Identifier":
+                    s = new GUIStyle(EditorStyles.label);
+                    s.margin = EditorStyles.iconButton.margin;
+                    s.padding = EditorStyles.iconButton.padding;
+                    s.contentOffset = EditorStyles.iconButton.contentOffset;
+                    s.fixedWidth = EditorStyles.iconButton.fixedWidth;
+                    break;
                 case "Foldout":
                     s = new GUIStyle(EditorStyles.foldout);
                     s.contentOffset = Vector2.zero;
@@ -256,7 +283,9 @@ namespace UnityTest
                     s.padding = new RectOffset(0, 0, 0, 0);
                     break;
                 case "Lock":
-                    s = new GUIStyle("IN LockButton");
+                    //s = new GUIStyle("IN LockButton");
+                    //s.fixedHeight = Get("Toggle").fixedHeight; // fill to the same height as the toggle
+                    s = new GUIStyle(EditorStyles.iconButton);
                     s.fixedHeight = Get("Toggle").fixedHeight; // fill to the same height as the toggle
                     break;
                 case "Toggle":
@@ -401,94 +430,100 @@ namespace UnityTest
 
                 case "TestManagerUI/Toolbar/Clear":
                     c = new GUIContent(EditorGUIUtility.IconContent("clear"));
-                    c.tooltip = "Clear selected Test results";
+                    c.tooltip = Tooltips.clearSelected;
                     break;
 
                 case "TestManagerUI/Toolbar/Play/Off":
                     c = new GUIContent(EditorGUIUtility.IconContent("PlayButton"));
-                    c.tooltip = "Run selected tests";
+                    c.tooltip = Tooltips.playOff;
                     break;
                 case "TestManagerUI/Toolbar/Play/On":
                     c = new GUIContent(EditorGUIUtility.IconContent("PlayButton On"));
-                    c.tooltip = "Stop testing";
+                    c.tooltip = Tooltips.playOn;
                     break;
 
                 case "TestManagerUI/Toolbar/Pause/Off":
                     c = new GUIContent(EditorGUIUtility.IconContent("PauseButton"));
-                    c.tooltip = "Pause testing";
+                    c.tooltip = Tooltips.pauseOff;
                     break;
                 case "TestManagerUI/Toolbar/Pause/On":
                     c = new GUIContent(EditorGUIUtility.IconContent("PauseButton On"));
-                    c.tooltip = "Resume testing";
+                    c.tooltip = Tooltips.pauseOn;
                     break;
 
                 case "TestManagerUI/Toolbar/Skip":
                     c = new GUIContent(EditorGUIUtility.IconContent("StepButton"));
-                    c.tooltip = "Stop the current test and skip to the next";
+                    c.tooltip = Tooltips.skip;
                     break;
 
                 case "TestManagerUI/Toolbar/GoToEmptyScene":
                     c = new GUIContent(EditorGUIUtility.IconContent("SceneLoadIn"));
-                    c.tooltip = "Go to empty scene";
+                    c.tooltip = Tooltips.goToEmptyScene;
                     break;
 
                 case "TestManagerUI/Toolbar/Debug/Off":
                     c = new GUIContent(EditorGUIUtility.IconContent("DebuggerDisabled"));
-                    c.tooltip = "Enable/disable debug messages";
+                    c.tooltip = Tooltips.debugOff;
                     break;
                 case "TestManagerUI/Toolbar/Debug/On":
                     c = new GUIContent(EditorGUIUtility.IconContent("DebuggerAttached"));
-                    c.tooltip = "Enable/disable debug messages";
+                    c.tooltip = Tooltips.debugOn;
                     break;
 
                 case "TestManagerUI/Toolbar/Refresh":
                     c = new GUIContent(EditorGUIUtility.IconContent("Refresh"));
-                    c.tooltip = "Refresh Test methods and classes by searching all assemblies. This should never be necessary, but could " +
-                        "be helpful if UnityTest is having trouble detecting your tests.";
+                    c.tooltip = Tooltips.refresh;
                     break;
 
-                case "TestManagerUI/Toolbar/Welcome":
+                case "TestManagerUI/Toolbar/Welcome": // the welcome button
                     c = new GUIContent(EditorGUIUtility.IconContent("console.infoicon.sml"));
-                    c.tooltip = "Show/hide the welcome message";
+                    c.tooltip = Tooltips.welcome;
                     break;
                 #endregion Toolbar
 
-                case "TestManagerUI/Welcome":
+                case "TestManagerUI/Welcome": // the speech bubble icon in the welcome message
                     c = new GUIContent(EditorGUIUtility.IconContent("console.infoicon"));
                     break;
-
+                case "TestManagerUI/Donate":
+                    c = new GUIContent("Donate");
+                    break;
                 #endregion TestManagerUI
 
-                #region Test
+                #region List items
+                case "LockOn":
+                    c = new GUIContent(EditorGUIUtility.IconContent("IN LockButton on"));
+                    c.tooltip = Tooltips.lockButton;
+                    break;
+                case "LockOff":
+                    c = new GUIContent(EditorGUIUtility.IconContent("IN LockButton"));
+                    c.tooltip = Tooltips.lockButton;
+                    break;
                 case "Result/None":
                     c = new GUIContent(EditorGUIUtility.IconContent("TestNormal"));
                     break;
                 case "Result/Pass":
                     c = new GUIContent(EditorGUIUtility.IconContent("TestPassed"));
-                    c.tooltip = "Passed";
+                    c.tooltip = Tooltips.testPassed;
                     break;
                 case "Result/Fail":
                     c = new GUIContent(EditorGUIUtility.IconContent("TestFailed"));
-                    c.tooltip = "Failed";
+                    c.tooltip = Tooltips.testFailed;
                     break;
                 case "ClearResult":
                     c = new GUIContent(EditorGUIUtility.IconContent("clear"));
-                    c.tooltip = "Clear test result";
+                    c.tooltip = Tooltips.clearTest;
                     break;
                 case "Suite/SettingsButton":
                     c = new GUIContent(EditorGUIUtility.IconContent("_Popup"));
                     break;
-
-                case "TestManagerUI/Donate":
-                    c = new GUIContent("Donate");
-                    break;
-                #endregion Test
+                #endregion List items
 
                 #region GUIQueue
                 case "GUIQueue/Toolbar/Options":
                     c = new GUIContent(EditorGUIUtility.IconContent("pane options"));
                     break;
                 #endregion
+                
                 default:
                     throw new System.NotImplementedException("Unrecognized icon name '" + icon + "'");
             }

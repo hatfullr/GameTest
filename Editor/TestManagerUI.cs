@@ -612,6 +612,10 @@ namespace UnityTest
             GUIStyle lockedStyle = Style.Get("Lock");
             GUIStyle foldoutStyle = Style.Get("Foldout");
 
+            GUIContent lockIcon;
+            if (locked) lockIcon = Style.GetIcon("LockOn");
+            else lockIcon = Style.GetIcon("LockOff");
+
             bool isMixed;
             if (item.GetType() == typeof(Foldout))
             {
@@ -667,14 +671,25 @@ namespace UnityTest
 
             // Drawing
             if (showFoldout) expanded = EditorGUI.Foldout(foldoutRect, expanded, GUIContent.none, foldoutStyle);
-            if (showLock) locked = EditorGUI.Toggle(lockedRect, locked, lockedStyle);
+            if (showLock)
+            {
+                if (GUI.Button(lockedRect, lockIcon, lockedStyle)) locked = !locked;
+            }
             if (showToggle)
             {
+                GUIContent content = new GUIContent(name);
+                GUIStyle style = Style.GetTextOverflowAlignmentStyle(textRect, selectedStyle, name, TextAnchor.MiddleRight);
+                if (item.GetType() == typeof(Foldout))
+                {
+                    if ((item as Foldout).tests.Count > 0)
+                    {
+                        style = selectedStyle;
+                        content.image = EditorGUIUtility.IconContent("cs Script Icon").image;
+                    }
+                }
+                
                 EditorGUI.showMixedValue = isMixed;
-                selected = EditorGUI.ToggleLeft(
-                    selectedRect, name, selected,
-                    Style.GetTextOverflowAlignmentStyle(textRect, selectedStyle, name, TextAnchor.MiddleRight)
-                );
+                selected = EditorGUI.ToggleLeft(selectedRect, content, selected, style);
                 EditorGUI.showMixedValue = wasMixed;
             }
             else
@@ -702,12 +717,17 @@ namespace UnityTest
             Test.Result result;
             System.Action onClearPressed = () => { };
             Object script = null;
+            int lineNumber = default;
             if (item.GetType() == typeof(Test))
             {
                 Test test = item as Test;
                 result = test.result;
                 onClearPressed += test.Reset;
-                if (!test.isInSuite) script = test.GetScript();
+                if (!test.isInSuite)
+                {
+                    script = test.GetScript();
+                    lineNumber = test.attribute.lineNumber;
+                }
             }
             else if (item.GetType() == typeof(Foldout))
             {
@@ -718,7 +738,11 @@ namespace UnityTest
                     foreach (Test test in foldout.GetTests(this)) test.Reset();
                 };
 
-                if (showScript) script = foldout.tests[0].GetScript();
+                if (showScript)
+                {
+                    script = foldout.tests[0].GetScript();
+                    lineNumber = foldout.tests[0].attribute.lineNumber;
+                }
             }
             else throw new System.NotImplementedException("Unrecognized type " + item.GetType());
 
@@ -762,7 +786,23 @@ namespace UnityTest
 
             if (showScript)
             {
-                using (new EditorGUI.DisabledScope(true)) EditorGUI.ObjectField(scriptRect, script, script.GetType(), false);
+                EditorGUI.LabelField(scriptRect, new GUIContent(script.name, EditorGUIUtility.IconContent("cs Script Icon").image), EditorStyles.objectField);
+                if (Event.current != null)
+                {
+                    if (Event.current.type == EventType.MouseDown)
+                    {
+                        if (Event.current.clickCount == 1)
+                        {
+                            EditorGUIUtility.PingObject(script);
+                            Event.current.Use();
+                        }
+                        else if (Event.current.clickCount == 2)
+                        {
+                            AssetDatabase.OpenAsset(script, lineNumber);
+                            GUIUtility.ExitGUI();
+                        }
+                    }
+                }
             }
 
             if (showClearResult)

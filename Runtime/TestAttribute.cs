@@ -31,6 +31,11 @@ namespace UnityTest
         public string sourceFile;
 
         /// <summary>
+        /// DO NOT MODIFY. This is the line number where this attribute was used in.</param>
+        /// </summary>
+        public int lineNumber;
+
+        /// <summary>
         /// This method will be added to Window > UnityTest Manager.
         /// </summary>
         /// <param name="setUp">Name of a static method which returns a GameObject and accepts no parameters.</param>
@@ -38,18 +43,21 @@ namespace UnityTest
         /// <param name="pauseOnFail">Pause the editor when this test fails. No other subsequent tests will run. default = false.</param>
         /// <param name="name">The test method name which appears in the test manager. The default is the name of the method. Names must be unique per-file.</param>
         /// <param name="sourceFile">DO NOT USE. It is used by reflection techniques to locate the source file that this attribute was used in.</param>
+        /// <param name="lineNumber">DO NOT USE. It is used by reflection techniques to locate the line number where this attribute was used in.</param>
         public TestAttribute(
             string setUp,
             string tearDown,
             bool pauseOnFail = false,
             [System.Runtime.CompilerServices.CallerMemberName] string name = default,
-            [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = default)
+            [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = default,
+            [System.Runtime.CompilerServices.CallerLineNumber] int lineNumber = default)
         {
             this.pauseOnFail = pauseOnFail;
             this.setUp = setUp;
             this.tearDown = tearDown;
             this.name = name;
             this.sourceFile = Path.GetFullPath(sourceFile);
+            this.lineNumber = lineNumber;
         }
 
         /// <summary>
@@ -58,16 +66,19 @@ namespace UnityTest
         /// <param name="pauseOnFail">Pause testing when this test fails. No other subsequent tests will run. default = false.</param>
         /// <param name="name">The test method name which appears in the test manager. The default is the name of the method. Names must be unique per-file.</param>
         /// <param name="sourceFile">DO NOT USE. It is used by reflection techniques to locate the source file that this attribute was used in.</param>
+        /// <param name="lineNumber">DO NOT USE. It is used by reflection techniques to locate the line number where this attribute was used in.</param>
         public TestAttribute(
             bool pauseOnFail = false,
             [System.Runtime.CompilerServices.CallerMemberName] string name = default,
-            [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = default)
+            [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = default,
+            [System.Runtime.CompilerServices.CallerLineNumber] int lineNumber = default)
         {
             setUp = "";
             tearDown = "";
             this.pauseOnFail = pauseOnFail;
             this.name = name;
             this.sourceFile = Path.GetFullPath(sourceFile);
+            this.lineNumber = lineNumber;
         }
 
         /// <summary>
@@ -77,17 +88,20 @@ namespace UnityTest
         /// <param name="pauseOnFail">Pause testing when this test fails. No other subsequent tests will run. default = false.</param>
         /// <param name="name">The test method name which appears in the test manager. The default is the name of the method. Names must be unique per-file.</param>
         /// <param name="sourceFile">DO NOT USE. It is used by reflection techniques to locate the source file that this attribute was used in.</param>
+        /// <param name="lineNumber">DO NOT USE. It is used by reflection techniques to locate the line number where this attribute was used in.</param>
         public TestAttribute(
             string setUp,
             bool pauseOnFail = false,
             [System.Runtime.CompilerServices.CallerMemberName] string name = default,
-            [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = default)
+            [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = default,
+            [System.Runtime.CompilerServices.CallerLineNumber] int lineNumber = default)
         {
             this.setUp = setUp;
             tearDown = "";
             this.pauseOnFail = pauseOnFail;
             this.name = name;
             this.sourceFile = Path.GetFullPath(sourceFile);
+            this.lineNumber = lineNumber;
         }
 
         /// <summary>

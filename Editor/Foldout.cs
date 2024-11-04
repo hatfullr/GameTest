@@ -62,13 +62,14 @@ namespace UnityTest
                 }
 
                 selected |= IsAllSelected(ui); // Set to the proper state ahead of time if needed
-                ui.DrawListItem(this, ref expanded, ref locked, ref selected, 
-                    showFoldout: true, 
-                    showLock: true, 
-                    showToggle: true, 
-                    showResultBackground: true, 
-                    showScript: tests.Count > 0, 
-                    showClearResult: tests.Count > 0, 
+                if (!IsAnySelected(ui)) selected = false;
+                ui.DrawListItem(this, ref expanded, ref locked, ref selected,
+                    showFoldout: true,
+                    showLock: true,
+                    showToggle: true,
+                    showResultBackground: true,
+                    showScript: false, //tests.Count > 0,
+                    showClearResult: tests.Count > 0,
                     showResult: tests.Count > 0
                 );
 
@@ -116,7 +117,7 @@ namespace UnityTest
                                 showLock: true,
                                 showToggle: true,
                                 showResultBackground: true,
-                                showScript: false,
+                                showScript: true,//false,
                                 showClearResult: true,
                                 showResult: true
                             );
@@ -278,6 +279,14 @@ namespace UnityTest
             foreach (Foldout child in GetChildren(ui))
                 if (!child.selected) return false;
             return true;
+        }
+        public bool IsAnySelected(TestManagerUI ui)
+        {
+            foreach (Test test in tests)
+                if (test.selected) return true;
+            foreach (Foldout child in GetChildren(ui))
+                if (child.selected) return true;
+            return false;
         }
         /// <summary>
         /// Returns true if all tests and child Foldouts are locked, in every subdirectory.
