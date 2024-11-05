@@ -6,6 +6,9 @@ using System.Reflection;
 using System.IO;
 using System.Threading.Tasks;
 using System.Threading;
+using System.Text.RegularExpressions;
+using System.Linq;
+using PlasticGui.Configuration.Saml;
 
 namespace UnityTest
 {
@@ -34,6 +37,7 @@ namespace UnityTest
         public bool loadingWheelVisible = false;
         public string search = null;
         public string loadingWheelText = null;
+        public List<Test> searchMatches = new List<Test>();
 
         public GUIQueue guiQueue
         {
@@ -217,6 +221,7 @@ namespace UnityTest
             loadingWheelVisible = false;
             loadingWheelText = null;
             search = default;
+            searchMatches = new List<Test>();
 
             debug = true;
             previousFrameNumber = 0;
@@ -268,6 +273,23 @@ namespace UnityTest
 
 
         #region Assembly and Test Management
+        public void UpdateSearchMatches(TestManagerUI ui, string newSearch)
+        {
+            searchMatches.Clear();
+            search = newSearch;
+            Regex re = new Regex(search, RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.IgnorePatternWhitespace);
+
+            string path;
+            MatchCollection matches;
+            foreach (Test test in rootFoldout.GetTests(this).OrderBy(x => x.attribute.GetPath()))
+            {
+                path = test.attribute.GetPath();
+                matches = re.Matches(path);
+                if (matches.Count == 0) continue;
+
+                searchMatches.Add(test);
+            }
+        }
         public void AddToQueue(Test test)
         {
             queue.Insert(0, test);

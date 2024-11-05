@@ -333,7 +333,7 @@ namespace UnityTest
         /// </summary>
         public static bool IsMouseOverRect(Rect rect)
         {
-            if (Event.current != null) return rect.Contains(Event.current.mousePosition) && GUI.enabled;
+            if (Event.current != null) return rect.Contains(Event.current.mousePosition);
             return false;
         }
 

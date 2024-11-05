@@ -168,7 +168,7 @@ namespace UnityTest
             SetUp();
 
             // check the game object
-            if (gameObject == null) throw new System.NullReferenceException("GameObject == null. Check your SetUp method for " + attribute.GetPath());
+            if (gameObject == null) throw new System.NullReferenceException("GameObject == null. Check your SetUp method for " + attribute.name + " in " + Utilities.GetUnityPath(attribute.sourceFile));
 
             Component component = gameObject.GetComponent(method.DeclaringType);
 
@@ -245,7 +245,11 @@ namespace UnityTest
             string message = attribute.GetPath();
             if (result == Result.Pass) message = string.Join(' ', Utilities.ColorString("(Passed)", Utilities.green), message);
             else if (result == Result.Fail) message = string.Join(' ', Utilities.ColorString("(Failed)", Utilities.red), message);
-            else if (result == Result.None) message = string.Join(' ', "(Finished)", message);
+            else if (result == Result.None)
+            {
+                if (skipped) message = string.Join(' ', "(Skipped)", message);
+                else message = string.Join(' ', "(Finished)", message);
+            }
             else throw new System.NotImplementedException(result.ToString());
             
             Utilities.Log(message, GetScript());

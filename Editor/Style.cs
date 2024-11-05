@@ -1,3 +1,4 @@
+using Codice.Client.BaseCommands.Import;
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
@@ -13,6 +14,7 @@ namespace UnityTest
         private static Dictionary<string, GUIContent> icons = new Dictionary<string, GUIContent>();
 
         public const string donationLink = "https://www.google.com";
+        public const string documentationLink = "https://github.com/hatfullr/UnityTest";
         public const string welcomeMessage = "Welcome to UnityTest! To get started, select a test below and click the Play button in the toolbar. " +
             "Press the X button in the toolbar to clear test results. You can open the code for each test by double-clicking its script object. " +
             "Create your tests in any C# class in the Assets folder by simply writing a method with a UnityTest.Test attribute. " +
@@ -25,13 +27,19 @@ namespace UnityTest
             "If you would like to support this project, please donate at <color=blue>" + donationLink + "</color>. Any amount is greatly appreciated; it keeps me fed :)"
         ;
 
+        public static float lineHeight = EditorGUIUtility.singleLineHeight;
+
         public static class TestManagerUI
         {
             public const string windowTitle = "UnityTest Manager";
             public const float minHeight = 300f;
-            public const float minWidth = 500f;
+            public const float minWidth = 350f;
             public const float spinRate = 0.05f;
-            public const float scriptWidth = 150f;
+            /// <summary>
+            /// The small margin that appears after a Foldout's Tests have been drawn.
+            /// </summary>
+            public const float foldoutMargin = 4f;
+            public const float minTextWidth = 50f;
         }
         public static class GUIQueue
         {
@@ -41,7 +49,7 @@ namespace UnityTest
 
         public static class Tooltips
         {
-            public const string clearSelected = "Clear selected Test results";
+            public const string clearSelected = "Clear selected test results";
             public const string playOff = "Run selected tests";
             public const string playOn = "Stop testing";
             public const string pauseOff = "Pause testing";
@@ -50,13 +58,16 @@ namespace UnityTest
             public const string goToEmptyScene = "Go to empty scene";
             public const string debugOff = "Enable/disable debug messages";
             public const string debugOn = "Enable/disable debug messages";
-            public const string refresh = "Refresh Test methods and classes by searching all assemblies. This should never be necessary, but could " +
+            public const string refresh = "Refresh test methods and classes by searching all assemblies. This should never be necessary, but could " +
                         "be helpful if UnityTest is having trouble detecting your tests.";
             public const string welcome = "Show/hide the welcome message";
             public const string testPassed = "Passed";
             public const string testFailed = "Failed";
             public const string clearTest = "Clear test result";
             public const string lockButton = "Keep item selected/deselected";
+            public const string toolbarToggle = "Select/deselect all unlocked tests";
+            public const string donate = "Go to " + donationLink;
+            public const string documentation = "Go to " + documentationLink;
         }
 
         public static Color failColor = new Color(1f, 0f, 0f, 0.1f);
@@ -257,25 +268,52 @@ namespace UnityTest
                     s = new GUIStyle(EditorStyles.helpBox);
                     s.richText = true;
                     s.imagePosition = ImagePosition.ImageLeft;
+                    s.fontSize = 12;
                     break;
                 case "TestManagerUI/Donate":
-                    s = new GUIStyle(GUI.skin.button);
+                    s = new GUIStyle("LargeButton");
+                    s.alignment = TextAnchor.MiddleCenter;
+                    Vector2 textSizeDonate = s.CalcSize(new GUIContent(GetIcon("TestManagerUI/Donate").text));
+                    // Afford enough space for the regular text, plus the icon, limiting the icon's height to fit inside the button.
+                    Font fontDonate = s.font;
+                    if (fontDonate == null) fontDonate = GUI.skin.font;
+                    s.fixedWidth = textSizeDonate.x + Mathf.Min(fontDonate.lineHeight, textSizeDonate.y);
+                    break;
+                case "TestManagerUI/Documentation":
+                    s = new GUIStyle(Get("TestManagerUI/Donate"));
+                    Vector2 textSizeDoc = s.CalcSize(new GUIContent(GetIcon("TestManagerUI/Documentation").text));
+                    // Afford enough space for the regular text, plus the icon, limiting the icon's height to fit inside the button.
+                    Font fontDoc = s.font;
+                    if (fontDoc == null) fontDoc = GUI.skin.font;
+                    s.fixedWidth = textSizeDoc.x + Mathf.Min(fontDoc.lineHeight, textSizeDoc.y);
                     break;
                 #endregion Toolbar
 
                 #endregion TestManagerUI
 
                 #region List items
-                case "Identifier":
+                // Most other styles rely on the Toggle style to set their height etc.
+                case "Toggle":
                     s = new GUIStyle(EditorStyles.label);
+                    s.fixedHeight = lineHeight;
+                    s.richText = true;
+                    s.alignment = TextAnchor.MiddleLeft;
+                    break;
+                case "Script":
+                    //s = new GUIStyle(EditorStyles.label);
+                    s = new GUIStyle(EditorStyles.objectField);
                     s.margin = EditorStyles.iconButton.margin;
                     s.padding = EditorStyles.iconButton.padding;
                     s.contentOffset = EditorStyles.iconButton.contentOffset;
                     s.fixedWidth = EditorStyles.iconButton.fixedWidth;
+                    s.fixedHeight = Get("Toggle").fixedHeight;
+                    s.alignment = TextAnchor.MiddleCenter;
                     break;
                 case "Foldout":
                     s = new GUIStyle(EditorStyles.foldout);
                     s.contentOffset = Vector2.zero;
+                    s.alignment = TextAnchor.MiddleCenter;
+                    s.fixedHeight = Get("Toggle").fixedHeight;
                     break;
                 case "TestRect":
                     s = new GUIStyle(GUI.skin.box);
@@ -287,10 +325,7 @@ namespace UnityTest
                     //s.fixedHeight = Get("Toggle").fixedHeight; // fill to the same height as the toggle
                     s = new GUIStyle(EditorStyles.iconButton);
                     s.fixedHeight = Get("Toggle").fixedHeight; // fill to the same height as the toggle
-                    break;
-                case "Toggle":
-                    s = new GUIStyle(EditorStyles.label);
-                    s.richText = true;
+                    s.alignment = TextAnchor.MiddleCenter;
                     break;
                 case "ToggleHeader":
                     s = new GUIStyle(Get("Toggle"));
@@ -304,7 +339,8 @@ namespace UnityTest
                     s.stretchHeight = false;
                     s.padding = new RectOffset(0, 0, 0, 0);
                     s.margin = new RectOffset(0, 0, 0, 0);
-                    s.contentOffset = new Vector2(-1f, 0f);
+                    //s.contentOffset = new Vector2(-1f, 0f);
+                    s.alignment = TextAnchor.MiddleCenter;
                     break;
                 case "ClearResult":
                     s = new GUIStyle(EditorStyles.iconButton);
@@ -314,6 +350,7 @@ namespace UnityTest
                     s.padding = new RectOffset(0, 0, 0, 0);
                     s.contentOffset = new Vector2(0f, 1f);
                     s.imagePosition = ImagePosition.ImageOnly;
+                    s.alignment = TextAnchor.MiddleCenter;
                     break;
                 case "SettingsButton":
                     s = new GUIStyle(EditorGUIUtility.GetBuiltinSkin(EditorSkin.Inspector).FindStyle("IconButton"));
@@ -347,7 +384,6 @@ namespace UnityTest
                     break;
                 case "GUIQueue/Queue":
                     s = new GUIStyle(EditorStyles.helpBox);
-                    //s.padding = new RectOffset(0, 0, 0, 0);
                     break;
                 case "GUIQueue/Queue/Title":
                     s = new GUIStyle(EditorStyles.boldLabel);
@@ -411,21 +447,27 @@ namespace UnityTest
                 #region Toolbar
                 case "TestManagerUI/Toolbar/Toggle/On":
                     c = new GUIContent(EditorGUIUtility.IconContent("toggle_on"));
+                    c.tooltip = Tooltips.toolbarToggle;
                     break;
                 case "TestManagerUI/Toolbar/Toggle/On/Hover":
                     c = new GUIContent(EditorGUIUtility.IconContent("toggle_on_hover"));
+                    c.tooltip = Tooltips.toolbarToggle;
                     break;
                 case "TestManagerUI/Toolbar/Toggle/Off":
                     c = new GUIContent(EditorGUIUtility.IconContent("toggle_bg"));
+                    c.tooltip = Tooltips.toolbarToggle;
                     break;
                 case "TestManagerUI/Toolbar/Toggle/Off/Hover":
                     c = new GUIContent(EditorGUIUtility.IconContent("toggle_bg_hover"));
+                    c.tooltip = Tooltips.toolbarToggle;
                     break;
                 case "TestManagerUI/Toolbar/Toggle/Mixed":
                     c = new GUIContent(EditorGUIUtility.IconContent("toggle_mixed_bg"));
+                    c.tooltip = Tooltips.toolbarToggle;
                     break;
                 case "TestManagerUI/Toolbar/Toggle/Mixed/Hover":
                     c = new GUIContent(EditorGUIUtility.IconContent("toggle_mixed_bg_hover"));
+                    c.tooltip = Tooltips.toolbarToggle;
                     break;
 
                 case "TestManagerUI/Toolbar/Clear":
@@ -485,11 +527,21 @@ namespace UnityTest
                     c = new GUIContent(EditorGUIUtility.IconContent("console.infoicon"));
                     break;
                 case "TestManagerUI/Donate":
-                    c = new GUIContent("Donate");
+                    c = new GUIContent(" Donate   ");
+                    c.tooltip = Tooltips.donate;
+                    c.image = GetIcon("Result/Pass").image;
+                    break;
+                case "TestManagerUI/Documentation":
+                    c = new GUIContent("GitHub");
+                    c.image = EditorGUIUtility.IconContent("TextAsset Icon").image;
+                    c.tooltip = Tooltips.documentation;
                     break;
                 #endregion TestManagerUI
 
                 #region List items
+                case "Script":
+                    c = new GUIContent(EditorGUIUtility.IconContent("cs Script Icon"));
+                    break;
                 case "LockOn":
                     c = new GUIContent(EditorGUIUtility.IconContent("IN LockButton on"));
                     c.tooltip = Tooltips.lockButton;

@@ -18,7 +18,7 @@ namespace UnityTest
             allSelected = true;
             anyResults = false;
             anyFailed = false;
-            foreach (Test test in rootFoldout.GetTests(ui))
+            foreach (Test test in rootFoldout.GetTests(ui.manager))
             {
                 if (test.result != Test.Result.None) anyResults = true;
                 if (test.result == Test.Result.Fail) anyFailed = true;
