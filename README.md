@@ -1,3 +1,5 @@
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/K3K415S8MR)
+
 # UnityTest
 A testing framework for the Unity editor that helps you maintain and debug your code without requiring "assembly definition" (`*.asmdef`) files, unlike the [Unity Test Framework](https://docs.unity3d.com/Packages/com.unity.test-framework@1.4/manual/index.html) (UTF). However, `UnityTest` also still works with `*.asmdef` files.
 
