@@ -316,57 +316,13 @@ namespace UnityTest
                                 GUI.skin.verticalScrollbar
                             );
                             {
-                                if (showWelcome) // Welcome message
-                                {
-                                    GUIContent content = Style.GetIcon("TestManagerUI/Welcome");
-                                    GUIContent donate = Style.GetIcon("TestManagerUI/Donate");
-                                    GUIContent doc = Style.GetIcon("TestManagerUI/Documentation");
-                                    GUIStyle donateStyle = Style.Get("TestManagerUI/Donate");
-                                    GUIStyle docStyle = Style.Get("TestManagerUI/Documentation");
-
-                                    content.text = Style.welcomeMessage + "\n\n";
-
-                                    GUIStyle welcomeStyle = Style.Get("TestManagerUI/Welcome");
-
-                                    Rect welcomeRect = new Rect(viewRect);
-                                    welcomeRect.height = welcomeStyle.CalcHeight(content, welcomeRect.width);
-
-                                    viewRect.y += welcomeRect.height;
-
-                                    GUI.Box(welcomeRect, content, welcomeStyle);
-
-                                    float donateHeight = donateStyle.CalcSize(donate).y;
-                                    float donateWidth = Style.GetWidth(donateStyle, donate);
-                                    float docHeight = docStyle.CalcSize(doc).y;
-                                    float docWidth = Style.GetWidth(docStyle, doc);
-
-                                    Rect welcomeButtonTrayRect = new Rect(welcomeRect);
-
-                                    float width = donateWidth + docWidth;
-                                    float height = Mathf.Max(donateHeight, docHeight);
-
-                                    welcomeButtonTrayRect.x = welcomeRect.xMax - width - donateStyle.margin.right;
-                                    welcomeButtonTrayRect.y = welcomeRect.yMax - height - Mathf.Max(donateStyle.margin.bottom, docStyle.margin.bottom);
-                                    welcomeButtonTrayRect.width = width;
-                                    welcomeButtonTrayRect.height = height;
-
-                                    Rect donateRect = new Rect(welcomeButtonTrayRect);
-                                    donateRect.x = welcomeButtonTrayRect.xMax - donateWidth;
-                                    donateRect.width = donateWidth;
-                                    donateRect.height = donateHeight;
-                                    donateRect.y = welcomeButtonTrayRect.yMax - donateHeight;
-
-                                    Rect docRect = new Rect(welcomeButtonTrayRect);
-                                    docRect.x = donateRect.x - docWidth;
-                                    docRect.width = docWidth;
-                                    docRect.height = docHeight;
-                                    docRect.y = welcomeButtonTrayRect.yMax - docHeight;
-
-                                    if (GUI.Button(donateRect, donate)) Application.OpenURL(Style.donationLink);
-                                    if (GUI.Button(docRect, doc)) Application.OpenURL(Style.documentationLink);
-                                }
+                                if (showWelcome) DrawWelcome(); // Welcome message
 
                                 itemRect = new Rect(viewRect.x, viewRect.y, viewRect.width, Style.lineHeight);
+                                // Apply padding
+                                itemRect.x += style.padding.left;
+                                itemRect.y += style.padding.top;
+                                itemRect.width -= style.padding.horizontal;
 
                                 if (string.IsNullOrEmpty(search)) DrawNormalMode();
                                 else DrawSearchMode();
@@ -400,6 +356,85 @@ namespace UnityTest
                 else if (selectAll) rootFoldout.Select(manager); // Simulate a press
                 else if (deselectAll) rootFoldout.Deselect(manager); // Simulate a press
             }
+        }
+
+        private void DrawWelcome()
+        {
+            // Setup styles and content
+            //GUIContent content = Style.GetIcon("TestManagerUI/Welcome");
+            GUIContent icon = Style.GetIcon("TestManagerUI/Welcome");
+            GUIContent title = new GUIContent(Style.welcomeTitle, icon.image);
+            GUIContent message = new GUIContent(Style.welcomeMessage);
+            GUIContent donate = Style.GetIcon("TestManagerUI/Donate");
+            GUIContent doc = Style.GetIcon("TestManagerUI/Documentation");
+
+            //GUIStyle mainStyle = Style.Get("TestManagerUI/TestView");
+            GUIStyle welcomeStyle = Style.Get("TestManagerUI/Welcome");
+            GUIStyle titleStyle = Style.Get("TestManagerUI/Welcome/Title");
+            GUIStyle messageStyle = Style.Get("TestManagerUI/Welcome/Message");
+            GUIStyle donateStyle = Style.Get("TestManagerUI/Donate");
+            GUIStyle docStyle = Style.Get("TestManagerUI/Documentation");
+
+            // Setup stuff relating to the link buttons
+            const int nLinks = 2;
+            string[] links = new string[nLinks] { Style.donationLink, Style.documentationLink };
+            GUIStyle[] linkStyles = new GUIStyle[nLinks] { donateStyle, docStyle };
+            GUIContent[] linkContent = new GUIContent[nLinks] { donate, doc };
+            RectOffset[] padding = new RectOffset[nLinks];
+            for (int i = 0; i < nLinks; i++) padding[i] = linkStyles[i].margin;
+
+            Rect[] linkRects = new Rect[nLinks];
+            for (int i = 0; i < nLinks; i++) linkRects[i] = new Rect(Vector2.zero, linkStyles[i].CalcSize(linkContent[i]));
+
+            // Setup Rects
+
+            Rect rect = new Rect(viewRect);
+            rect.y -= welcomeStyle.padding.top;
+
+            Rect titleRect = new Rect(rect);
+            titleRect.y += welcomeStyle.padding.top;
+            titleRect.height = 0;
+            for (int i = 0; i < nLinks; i++) titleRect.height = Mathf.Max(titleRect.height, linkRects[i].height);
+            //titleRect = Utilities.AlignRect(titleRect, rect, Utilities.RectAlignment.UpperCenter);
+            Rect body = new Rect(
+                titleRect.x, titleRect.yMax + messageStyle.margin.top, 
+                titleRect.width - messageStyle.margin.horizontal, 
+                messageStyle.CalcHeight(message, titleRect.width) + messageStyle.margin.vertical
+            );
+
+            rect.height = body.yMax - titleRect.yMin;
+
+            // Alignment
+            linkRects = Utilities.AlignRects(
+                linkRects,
+                titleRect,
+                Utilities.RectAlignment.LowerRight,
+                Utilities.RectAlignment.MiddleLeft,
+                padding: padding
+            );
+
+
+            // Drawing
+            GUI.Box(rect, GUIContent.none, welcomeStyle);
+
+            EditorGUI.DropShadowLabel(titleRect, title, titleStyle);
+            //GUI.Box(header, title, titleStyle);
+
+            for (int i = 0; i < nLinks; i++)
+            {
+                if (EditorGUI.LinkButton(linkRects[i], linkContent[i])) Application.OpenURL(links[i]);
+            }
+
+            //EditorGUI.LabelField(titleRect, title, titleStyle);
+
+            EditorGUI.LabelField(body, message, messageStyle);
+
+            // DEBUGGING
+            //Utilities.DrawDebugOutline(titleRect, Color.red);
+            //Utilities.DrawDebugOutline(header, Color.red);
+
+            viewRect.y = rect.yMax;
+            viewRect.height -= rect.height;
         }
 
         private Mode GetMode()
@@ -756,6 +791,9 @@ namespace UnityTest
                 else throw new System.NotImplementedException("Unimplemented type " + item);
 
                 GUIContent resultIcon = Style.GetIcon("Result/" + result.ToString());
+                GUIContent toggleContent = new GUIContent(name);
+                if (result == Test.Result.Fail) toggleContent.tooltip = Style.Tooltips.testFailed;
+                else if (result == Test.Result.Pass) toggleContent.tooltip = Style.Tooltips.testPassed;
 
 
                 float clearWidth = Style.GetWidth(clearStyle, clearIcon);
@@ -790,14 +828,16 @@ namespace UnityTest
 
                 float rightOffset = 0f;
                 Rect resultRect = new Rect(itemRect);
-                resultRect.x = resultRect.xMax - resultWidth - (itemRect.width - indentedRect.width);
+                resultRect.x = resultRect.xMax - resultWidth - (itemRect.width - indentedRect.width) - resultStyle.margin.right;
                 resultRect.width = resultWidth;
                 rightOffset += resultRect.width;
+                if (showResult) rightOffset += resultStyle.margin.left;
 
                 Rect clearRect = new Rect(itemRect);
-                clearRect.x = clearRect.xMax - (rightOffset + clearWidth);
+                clearRect.x = clearRect.xMax - (rightOffset + clearWidth) - clearStyle.margin.right;
                 clearRect.width = clearWidth;
                 rightOffset += clearRect.width;
+                if (showClearResult) rightOffset += clearStyle.margin.left;
 
                 Rect toggleRect = new Rect(itemRect);
                 toggleRect.x += leftOffset;
@@ -814,7 +854,7 @@ namespace UnityTest
                     minWidth = itemRect.width + (Style.TestManagerUI.minTextWidth - textRect.width);
                 }
 
-                toggleStyle = new GUIStyle(Style.GetTextOverflowAlignmentStyle(textRect, toggleStyle, name, TextAnchor.MiddleRight));
+                toggleStyle = new GUIStyle(Style.GetTextOverflowAlignmentStyle(textRect, toggleStyle, toggleContent.text, TextAnchor.MiddleRight));
 
                 // Drawing
                 Color resultColor = Color.clear;
@@ -849,12 +889,12 @@ namespace UnityTest
                 if (showToggle)
                 {
                     EditorGUI.showMixedValue = isMixed;
-                    using (new EditorGUI.DisabledScope(locked)) selected = EditorGUI.ToggleLeft(toggleRect, name, selected, toggleStyle);
+                    using (new EditorGUI.DisabledScope(locked)) selected = EditorGUI.ToggleLeft(toggleRect, toggleContent, selected, toggleStyle);
                     EditorGUI.showMixedValue = wasMixed;
                 }
                 else
                 {
-                    EditorGUI.LabelField(toggleRect, name, toggleStyle);
+                    EditorGUI.LabelField(toggleRect, toggleContent, toggleStyle);
                 }
 
                 if (showClearResult)

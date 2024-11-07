@@ -13,19 +13,22 @@ namespace UnityTest
         private static Dictionary<string, GUIStyle> styles = new Dictionary<string, GUIStyle>();
         private static Dictionary<string, GUIContent> icons = new Dictionary<string, GUIContent>();
 
-        public const string donationLink = "https://www.google.com";
+        public const string donationLink = "https://ko-fi.com/rogerhatfull";
         public const string documentationLink = "https://github.com/hatfullr/UnityTest";
-        public const string welcomeMessage = "Welcome to UnityTest! To get started, select a test below and click the Play button in the toolbar. " +
-            "Press the X button in the toolbar to clear test results. You can open the code for each test by double-clicking its script object. " +
-            "Create your tests in any C# class in the Assets folder by simply writing a method with a UnityTest.Test attribute. " +
-            "See the included README for additional information. Happy testing!" + 
+        public const string welcomeMessage = "" +
+            "Create a C# class method with a [UnityTest.Test] attribute, recompile, then select the test below and click the Play button in the toolbar. " +
+            "Open test code by clicking the script icons." +
+            "" +
+            "See the included README or click the \"GitHub\" button for additional information. Happy testing!" +
             "\n" +
             "\n" +
-            "To hide this message, press the speech bubble in the toolbar above." +
-            "\n" + 
+            "I really hope UnityTest helps you make cool games faster. If this tool has helped you, please consider helping me by clicking " +
+            "the \"Donate\" button. Thank you for using UnityTest." +
             "\n" +
-            "If you would like to support this project, please donate at <color=blue>" + donationLink + "</color>. Any amount is greatly appreciated; it keeps me fed :)"
+            "\n" +
+            "<i><size=10>To hide this message, press the speech bubble in the toolbar.</size></i>"
         ;
+        public const string welcomeTitle = "Welcome";
 
         public static float lineHeight = EditorGUIUtility.singleLineHeight;
 
@@ -66,8 +69,8 @@ namespace UnityTest
             public const string clearTest = "Clear test result";
             public const string lockButton = "Keep item selected/deselected";
             public const string toolbarToggle = "Select/deselect all unlocked tests";
-            public const string donate = "Go to " + donationLink;
-            public const string documentation = "Go to " + documentationLink;
+            public const string donate = donationLink + "\nAny amount is greatly appreciated. It keeps me fed :)";
+            public const string documentation = documentationLink;
         }
 
         public static Color failColor = new Color(1f, 0f, 0f, 0.1f);
@@ -217,6 +220,8 @@ namespace UnityTest
                 #region TestManagerUI
                 case "TestManagerUI/TestView":
                     s = new GUIStyle(EditorStyles.inspectorFullWidthMargins);
+                    s.padding.right = 0;
+                    s.padding.top = 2;
                     break;
 
                 case "TestManagerUI/LoadingWheel":
@@ -266,18 +271,37 @@ namespace UnityTest
 
                 case "TestManagerUI/Welcome":
                     s = new GUIStyle(EditorStyles.helpBox);
+                    break;
+                case "TestManagerUI/Welcome/Title":
+                    s = new GUIStyle(EditorStyles.largeLabel);
                     s.richText = true;
                     s.imagePosition = ImagePosition.ImageLeft;
+                    s.fontSize = 18;
+                    s.fontStyle = FontStyle.Bold;
+                    s.normal.background = new Texture2D(1, 1);
+
+                    Color bg;
+                    if (Utilities.isDarkTheme) bg = new Color(0f, 0f, 0f, 0.2f);
+                    else bg = new Color(1f, 1f, 1f, 0.2f);
+
+                    s.normal.background.SetPixel(0, 0, bg);
+                    s.normal.background.Apply();
+                    break;
+                case "TestManagerUI/Welcome/Message":
+                    s = new GUIStyle(EditorStyles.wordWrappedLabel);
+                    s.richText = true;
                     s.fontSize = 12;
                     break;
                 case "TestManagerUI/Donate":
-                    s = new GUIStyle("LargeButton");
-                    s.alignment = TextAnchor.MiddleCenter;
+                    s = new GUIStyle(EditorStyles.linkLabel);
+                    s.fixedHeight = new GUIStyle("LargeButton").fixedHeight;
+                    s.alignment = TextAnchor.LowerCenter;
                     Vector2 textSizeDonate = s.CalcSize(new GUIContent(GetIcon("TestManagerUI/Donate").text));
                     // Afford enough space for the regular text, plus the icon, limiting the icon's height to fit inside the button.
                     Font fontDonate = s.font;
                     if (fontDonate == null) fontDonate = GUI.skin.font;
                     s.fixedWidth = textSizeDonate.x + Mathf.Min(fontDonate.lineHeight, textSizeDonate.y);
+                    //s.contentOffset = new Vector2(0f, 10f);
                     break;
                 case "TestManagerUI/Documentation":
                     s = new GUIStyle(Get("TestManagerUI/Donate"));
@@ -338,7 +362,7 @@ namespace UnityTest
                     s.fixedWidth = Get("ClearResult").fixedWidth;
                     s.stretchHeight = false;
                     s.padding = new RectOffset(0, 0, 0, 0);
-                    s.margin = new RectOffset(0, 0, 0, 0);
+                    s.margin = new RectOffset(0, 3, 0, 0);
                     //s.contentOffset = new Vector2(-1f, 0f);
                     s.alignment = TextAnchor.MiddleCenter;
                     break;
@@ -348,7 +372,7 @@ namespace UnityTest
                     s.stretchHeight = false;
                     s.margin = new RectOffset(0, 0, 0, 0);
                     s.padding = new RectOffset(0, 0, 0, 0);
-                    s.contentOffset = new Vector2(0f, 1f);
+                    //s.contentOffset = new Vector2(0f, 1f);
                     s.imagePosition = ImagePosition.ImageOnly;
                     s.alignment = TextAnchor.MiddleCenter;
                     break;
@@ -527,9 +551,9 @@ namespace UnityTest
                     c = new GUIContent(EditorGUIUtility.IconContent("console.infoicon"));
                     break;
                 case "TestManagerUI/Donate":
-                    c = new GUIContent(" Donate   ");
+                    c = new GUIContent(EditorGUIUtility.IconContent("RightHandZoomSilhouette"));
+                    c.text = "Donate";
                     c.tooltip = Tooltips.donate;
-                    c.image = GetIcon("Result/Pass").image;
                     break;
                 case "TestManagerUI/Documentation":
                     c = new GUIContent("GitHub");

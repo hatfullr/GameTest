@@ -66,6 +66,97 @@ namespace UnityTest
 
         private static HashSet<string> loggedExceptions = new HashSet<string>();
 
+        public enum  RectAlignment
+        {
+            LowerLeft,
+            MiddleLeft,
+            UpperLeft,
+            UpperCenter,
+            UpperRight,
+            MiddleRight,
+            LowerRight,
+            LowerCenter,
+            MiddleCenter,
+        }
+
+        /// <summary>
+        /// Returns a new Rect the same size as toAlign, positioned relative to relativeTo according to alignment.
+        /// </summary>
+        public static Rect AlignRect(Rect toAlign, Rect relativeTo, RectAlignment alignment, RectOffset padding = null)
+        {
+            Rect rect = new Rect(toAlign);
+            if (padding == null) padding = new RectOffset(0, 0, 0, 0);
+
+            if (alignment == RectAlignment.LowerLeft || alignment == RectAlignment.MiddleLeft || alignment == RectAlignment.UpperLeft)
+            {
+                rect.x = relativeTo.x + padding.left;
+            }
+            else if (alignment == RectAlignment.LowerCenter || alignment == RectAlignment.MiddleCenter || alignment == RectAlignment.UpperCenter)
+            {
+                rect.x = relativeTo.center.x - 0.5f * rect.width;
+            }
+            else if (alignment == RectAlignment.LowerRight || alignment == RectAlignment.MiddleRight || alignment == RectAlignment.UpperRight)
+            {
+                rect.x = relativeTo.xMax - rect.width - padding.right;
+            }
+
+
+            if (alignment == RectAlignment.LowerLeft || alignment == RectAlignment.LowerCenter || alignment == RectAlignment.LowerRight)
+            {
+                rect.y = relativeTo.yMax - rect.height - padding.bottom;
+            }
+            else if (alignment == RectAlignment.MiddleLeft || alignment == RectAlignment.MiddleCenter || alignment == RectAlignment.MiddleRight)
+            {
+                rect.y = relativeTo.center.y - 0.5f * rect.height;
+            }
+            else if (alignment == RectAlignment.UpperLeft || alignment == RectAlignment.UpperCenter || alignment == RectAlignment.UpperRight)
+            {
+                rect.y = relativeTo.y + padding.top;
+            }
+
+            return rect;
+        }
+
+        /// <summary>
+        /// Align many Rects. Each given Rect is "stacked" such that its edge or corner touches the next Rect in the array at the given stacking order.
+        /// If a padding is given, each Rect will be positioned in a way that respects the padding.
+        /// </summary>
+        public static Rect[] AlignRects(
+            Rect[] toAlign, Rect relativeTo, RectAlignment alignment, RectAlignment stacking,
+            RectOffset[] padding = null
+        )
+        {
+            Rect[] ret = new Rect[toAlign.Length];
+            Rect rel = new Rect(relativeTo);
+            if (padding == null)
+            {
+                padding = new RectOffset[toAlign.Length];
+                for (int i = 0; i < toAlign.Length; i++) padding[i] = null;
+            }
+
+            for (int i = 0; i < ret.Length; i++)
+            {
+                ret[i] = AlignRect(toAlign[i], rel, alignment, padding[i]);
+                if (stacking == RectAlignment.LowerLeft || stacking == RectAlignment.MiddleLeft || stacking == RectAlignment.UpperLeft)
+                {
+                    rel.x -= ret[i].width;
+                }
+                else if (stacking == RectAlignment.LowerRight || stacking == RectAlignment.MiddleRight || stacking == RectAlignment.UpperRight)
+                {
+                    rel.x += ret[i].width;
+                }
+                if (stacking == RectAlignment.LowerLeft || stacking == RectAlignment.LowerCenter || stacking == RectAlignment.LowerRight)
+                {
+                    rel.y -= ret[i].height;
+                }
+                else if (stacking == RectAlignment.UpperLeft || stacking == RectAlignment.UpperCenter || stacking == RectAlignment.UpperRight)
+                {
+                    rel.y += ret[i].height;
+                }
+            }
+            return ret;
+        }
+
         public static void DrawDebugOutline(Rect rect, Color color)
         {
             Rect left = new Rect(rect.xMin, rect.y, 1f, rect.height);
@@ -402,8 +493,6 @@ namespace UnityTest
             Debug.LogException(exception);
             loggedExceptions.Add(exception.Message);
         }
-        
-
 
         /// <summary>
         /// Signifies that a path is not located in either the "Assets" or "Packages" folder of a project.
