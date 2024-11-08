@@ -157,6 +157,16 @@ namespace UnityTest
             return ret;
         }
 
+        public static Rect GetPaddedRect(Rect rect, RectOffset padding)
+        {
+            return new Rect(
+                rect.x + padding.left,
+                rect.y + padding.top,
+                rect.width - padding.horizontal,
+                rect.height - padding.vertical
+            );
+        }
+
         public static void DrawDebugOutline(Rect rect, Color color)
         {
             Rect left = new Rect(rect.xMin, rect.y, 1f, rect.height);
@@ -444,7 +454,7 @@ namespace UnityTest
         }
 
         [HideInCallstack]
-        private static string GetLogString(string message, string color = null)
+        private static string GetLogString(string message, string color = null, bool hideMessage = true)
         {
             string tag = "<size=10>" + debugTag + "</size>";
             if (!string.IsNullOrEmpty(color)) tag = ColorString(tag, color);
@@ -455,7 +465,7 @@ namespace UnityTest
         /// <summary>
         /// Print a log message to the console, intended for debug messages.
         /// </summary>
-        [HideInCallstack] public static void Log(string message, Object context, string color) => Debug.LogFormat(LogType.Log, LogOption.NoStacktrace, context, "{0}", GetLogString(message, color));
+        [HideInCallstack] public static void Log(string message, Object context, string color, bool hideMessage = true) => Debug.LogFormat(LogType.Log, LogOption.NoStacktrace, context, "{0}", GetLogString(message, color, hideMessage));
         [HideInCallstack] public static void Log(string message, Object context) => Log(message, context, null);
         [HideInCallstack] public static void Log(string message, string color) => Log(message, null, color);
         [HideInCallstack] public static void Log(string message) => Log(message, null, null);
@@ -463,7 +473,7 @@ namespace UnityTest
         /// <summary>
         /// Print a warning message to the console.
         /// </summary>
-        [HideInCallstack] public static void LogWarning(string message, Object context, string color) => Debug.LogWarning(GetLogString(message, color), context);
+        [HideInCallstack] public static void LogWarning(string message, Object context, string color, bool hideMessage = true) => Debug.LogWarning(GetLogString(message, color, hideMessage), context);
         [HideInCallstack] public static void LogWarning(string message, Object context) => LogWarning(message, context, null);
         [HideInCallstack] public static void LogWarning(string message, string color) => LogWarning(message, null, color);
         [HideInCallstack] public static void LogWarning(string message) => LogWarning(message, null, null);
@@ -472,7 +482,7 @@ namespace UnityTest
         /// <summary>
         /// Print a warning message to the console.
         /// </summary>
-        [HideInCallstack] public static void LogError(string message, Object context, string color) => Debug.LogError(GetLogString(message, color), context);
+        [HideInCallstack] public static void LogError(string message, Object context, string color, bool hideMessage = true) => Debug.LogError(GetLogString(message, color, hideMessage), context);
         [HideInCallstack] public static void LogError(string message, Object context) => LogError(message, context, null);
         [HideInCallstack] public static void LogError(string message, string color) => LogError(message, null, color);
         [HideInCallstack] public static void LogError(string message) => LogError(message, null, null);

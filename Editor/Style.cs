@@ -1,4 +1,3 @@
-using Codice.Client.BaseCommands.Import;
 using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
@@ -15,19 +14,21 @@ namespace UnityTest
 
         public const string donationLink = "https://ko-fi.com/rogerhatfull";
         public const string documentationLink = "https://github.com/hatfullr/UnityTest";
-        public const string welcomeMessage = "" +
-            "Create a C# class method with a [UnityTest.Test] attribute, recompile, then select the test below and click the Play button in the toolbar. " +
-            "Open test code by clicking the script icons." +
-            "" +
-            "See the included README or click the \"GitHub\" button for additional information. Happy testing!" +
-            "\n" +
-            "\n" +
-            "I really hope UnityTest helps you make cool games faster. If this tool has helped you, please consider helping me by clicking " +
-            "the \"Donate\" button. Thank you for using UnityTest." +
-            "\n" +
-            "\n" +
+        public static string welcomeMessage = string.Join('\n',
+            "<b>1.</b> Create a method in a MonoBehaviour with a [UnityTest.Test] attribute and UnityTest.Assert statements.",
+            "<b>2.</b> Recompile.",
+            "<b>3.</b> Select your test below to add it to the queue.",
+            "<b>4.</b> Click the Play button in the toolbar. A test fails if it throws an AssertionException, " +
+            "and passes otherwise. Check the Console for detailed results.",
+            "Click the GitHub button or see README.md for additional information. <b>If this tool has helped you, please consider donating " +
+            "to help me create more cool stuff.</b> Thank you for using UnityTest.",
+            "",
+            "• Click on script icons to open your code",
+            "• Check for tooltips in this window, also Edit > Preferences > Enable PlayMode Tooltips",
+            "• Hide UnityTest from stack traces by enabling \"Strip logging callstack\" in the triple-dot menu at the top right of the Console",
+            "",
             "<i><size=10>To hide this message, press the speech bubble in the toolbar.</size></i>"
-        ;
+        );
         public const string welcomeTitle = "Welcome";
 
         public static float lineHeight = EditorGUIUtility.singleLineHeight;
@@ -278,19 +279,23 @@ namespace UnityTest
                     s.imagePosition = ImagePosition.ImageLeft;
                     s.fontSize = 18;
                     s.fontStyle = FontStyle.Bold;
-                    s.normal.background = new Texture2D(1, 1);
+                    s.alignment = TextAnchor.LowerLeft;
 
-                    Color bg;
-                    if (Utilities.isDarkTheme) bg = new Color(0f, 0f, 0f, 0.2f);
-                    else bg = new Color(1f, 1f, 1f, 0.2f);
+                    s.padding.left = 0;
+                    s.padding.right = 0;
+                    s.padding.top = 0;
+                    s.padding.bottom = 0;
 
-                    s.normal.background.SetPixel(0, 0, bg);
-                    s.normal.background.Apply();
+                    s.margin.bottom = 1;
+
+                    s.contentOffset = new Vector2(Get("TestManagerUI/Welcome").padding.left, 0f);
                     break;
                 case "TestManagerUI/Welcome/Message":
                     s = new GUIStyle(EditorStyles.wordWrappedLabel);
                     s.richText = true;
                     s.fontSize = 12;
+                    s.margin.top = 1;
+                    //s.margin.bottom = 10;
                     break;
                 case "TestManagerUI/Donate":
                     s = new GUIStyle(EditorStyles.linkLabel);

@@ -4,11 +4,9 @@ using UnityEditor;
 using UnityEditor.Compilation;
 using System.Reflection;
 using System.IO;
-using System.Threading.Tasks;
-using System.Threading;
 using System.Text.RegularExpressions;
 using System.Linq;
-using PlasticGui.Configuration.Saml;
+
 
 namespace UnityTest
 {
@@ -73,7 +71,7 @@ namespace UnityTest
         /// <summary>
         /// When true, debug messages are printed to Console.
         /// </summary>
-        public bool debug = true;
+        public DebugMode debug = DebugMode.Everything;
 
         public bool paused = false;
         public bool running = false;
@@ -87,7 +85,17 @@ namespace UnityTest
 
         private List<AttributeAndMethod> attributesAndMethods = new List<AttributeAndMethod>();
 
-        private Task task;
+        private System.Threading.Tasks.Task task;
+
+        [System.Flags]
+        public enum DebugMode
+        {
+            Nothing = 0,
+            Log = 1 << 0,
+            LogWarning = 1 << 1,
+            LogError = 1 << 2,
+            Everything = ~(-1 << 3),
+        }
 
         /// <summary>
         /// Save the TestManager asset as well as all assets linked to it.
@@ -113,6 +121,8 @@ namespace UnityTest
                     break;
 
                 Utilities.SaveAsset(assets[i]);
+
+                //System.Threading.Thread.Sleep(2 * (int)1e3); // for testing the cancelable functionality
             }
             EditorUtility.ClearProgressBar();
         }
@@ -223,7 +233,7 @@ namespace UnityTest
             search = default;
             searchMatches = new List<Test>();
 
-            debug = true;
+            debug = DebugMode.Everything;
             previousFrameNumber = 0;
             timer = 0f;
             nframes = 0;
@@ -250,7 +260,7 @@ namespace UnityTest
             }
             else
             {
-                if (debug) Utilities.Log("Starting");
+                if (debug.HasFlag(DebugMode.Log)) Utilities.Log("Starting");
             }
         }
 
@@ -259,7 +269,7 @@ namespace UnityTest
         /// </summary>
         public void Stop()
         {
-            if (debug) Utilities.Log("Finished", null, null);
+            if (debug.HasFlag(DebugMode.Log)) Utilities.Log("Finished", null, null);
             queue.Clear();
             paused = false;
             running = false;
@@ -446,7 +456,7 @@ namespace UnityTest
 
             //Debug.Log("Running");
 
-            task = Task.Run(() => UpdateTestAttributesAndMethods(assemblies));
+            task = System.Threading.Tasks.Task.Run(() => UpdateTestAttributesAndMethods(assemblies));
             await task;
             task = null;
 
@@ -477,7 +487,7 @@ namespace UnityTest
         public void UpdateTests(System.Action onFinished = null)
         {
             UpdateTestsAsync(GetAssemblies(), onFinished);
-            if (debug) Utilities.Log("Tests updated");
+            if (debug.HasFlag(DebugMode.Log)) Utilities.Log("Tests updated");
         }
 
         #endregion

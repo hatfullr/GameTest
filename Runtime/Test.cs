@@ -157,7 +157,7 @@ namespace UnityTest
                 }
                 if (!ignore)
                 {
-                    Utilities.LogWarning("You are not in an empty scene. Unit Test results might be misleading. Perhaps your previous TearDown function " +
+                    Utilities.LogWarning("You are not in an empty scene. Test results might be misleading. Perhaps your previous TearDown function " +
                         "didn't correctly remove all the GameObjects, or you used Destroy instead of DestroyImmediate. Otherwise this might be intended behavior for " +
                         "the custom tests you wrote, in which case you can ignore this error.");
                     sceneWarningPrinted = true;

@@ -387,22 +387,25 @@ namespace UnityTest
             for (int i = 0; i < nLinks; i++) linkRects[i] = new Rect(Vector2.zero, linkStyles[i].CalcSize(linkContent[i]));
 
             // Setup Rects
-
-            Rect rect = new Rect(viewRect);
-            rect.y -= welcomeStyle.padding.top;
-
-            Rect titleRect = new Rect(rect);
-            titleRect.y += welcomeStyle.padding.top;
+            Rect titleRect = new Rect(viewRect.x, viewRect.y, viewRect.width, 0f);
             titleRect.height = 0;
             for (int i = 0; i < nLinks; i++) titleRect.height = Mathf.Max(titleRect.height, linkRects[i].height);
-            //titleRect = Utilities.AlignRect(titleRect, rect, Utilities.RectAlignment.UpperCenter);
+
             Rect body = new Rect(
-                titleRect.x, titleRect.yMax + messageStyle.margin.top, 
-                titleRect.width - messageStyle.margin.horizontal, 
-                messageStyle.CalcHeight(message, titleRect.width) + messageStyle.margin.vertical
+                viewRect.x,
+                titleRect.yMax,
+                viewRect.width,
+                messageStyle.CalcHeight(message, titleRect.width) + messageStyle.padding.vertical
             );
 
-            rect.height = body.yMax - titleRect.yMin;
+            Rect bgRect = new Rect(viewRect.x, viewRect.y, viewRect.width, titleRect.height + body.height);
+            bgRect.y -= welcomeStyle.padding.top; // This hides the top part of the background, making it look kinda like a tab in the UI
+            bgRect.height += welcomeStyle.padding.top;
+
+            // Apply margins
+            float dy = titleStyle.margin.bottom + messageStyle.margin.top;
+            body.y += dy;
+            bgRect.height += dy;
 
             // Alignment
             linkRects = Utilities.AlignRects(
@@ -413,28 +416,40 @@ namespace UnityTest
                 padding: padding
             );
 
+            Color bg;
+            if (Utilities.isDarkTheme) bg = new Color(0f, 0f, 0f, 0.2f);
+            else bg = new Color(1f, 1f, 1f, 0.2f);
 
             // Drawing
-            GUI.Box(rect, GUIContent.none, welcomeStyle);
+            GUI.Box(bgRect, GUIContent.none, welcomeStyle);
+            EditorGUI.DrawRect(titleRect, bg);
+            EditorGUI.DrawRect(new Rect(titleRect.x, titleRect.yMax, titleRect.width, dy), bg + new Color(0f, 0f, 0f, 0.1f));
 
-            EditorGUI.DropShadowLabel(titleRect, title, titleStyle);
+            using (new EditorGUIUtility.IconSizeScope(new Vector2(titleRect.height - welcomeStyle.padding.vertical, titleRect.height - welcomeStyle.padding.vertical)))
+            {
+                EditorGUI.DropShadowLabel(Utilities.GetPaddedRect(titleRect, titleStyle.padding), title, titleStyle);
+            }
             //GUI.Box(header, title, titleStyle);
 
             for (int i = 0; i < nLinks; i++)
             {
-                if (EditorGUI.LinkButton(linkRects[i], linkContent[i])) Application.OpenURL(links[i]);
+                if (EditorGUI.LinkButton(Utilities.GetPaddedRect(linkRects[i], EditorStyles.linkLabel.padding), linkContent[i])) Application.OpenURL(links[i]);
             }
 
             //EditorGUI.LabelField(titleRect, title, titleStyle);
 
-            EditorGUI.LabelField(body, message, messageStyle);
+            EditorGUI.LabelField(Utilities.GetPaddedRect(body, messageStyle.padding), message, messageStyle);
 
             // DEBUGGING
-            //Utilities.DrawDebugOutline(titleRect, Color.red);
-            //Utilities.DrawDebugOutline(header, Color.red);
+            foreach (System.Tuple<Rect, Color> kvp in new System.Tuple<Rect, Color>[]
+            {
+                //new System.Tuple<Rect,Color>(rect,      Color.green),
+                //new System.Tuple<Rect,Color>(titleRect, Color.red),
+                //new System.Tuple<Rect,Color>(body,      Color.red)
+            }) Utilities.DrawDebugOutline(kvp.Item1, kvp.Item2);
 
-            viewRect.y = rect.yMax;
-            viewRect.height -= rect.height;
+            viewRect.y = bgRect.yMax;
+            viewRect.height -= bgRect.height;
         }
 
         private Mode GetMode()
@@ -672,8 +687,60 @@ namespace UnityTest
         private void DrawDebugButton()
         {
             GUIContent debugContent = Style.GetIcon("TestManagerUI/Toolbar/Debug/Off");
-            if (manager.debug) debugContent = Style.GetIcon("TestManagerUI/Toolbar/Debug/On");
-            manager.debug = GUILayout.Toggle(manager.debug, debugContent, Style.Get("TestManagerUI/Toolbar/Debug"));
+            if (manager.debug != TestManager.DebugMode.Nothing) debugContent = Style.GetIcon("TestManagerUI/Toolbar/Debug/On");
+
+            Rect clearRect = Style.GetRect("TestManagerUI/Toolbar/Debug", debugContent);
+            if (EditorGUI.DropdownButton(clearRect, debugContent, FocusType.Passive, Style.Get("TestManagerUI/Toolbar/Clear")))
+            {
+                GenericMenu toolsMenu = new GenericMenu();
+                foreach (TestManager.DebugMode mode in System.Enum.GetValues(typeof(TestManager.DebugMode)))
+                {
+                    toolsMenu.AddItem(new GUIContent(mode.ToString()), manager.debug.HasFlag(mode), () => {
+
+                        if (mode == TestManager.DebugMode.Nothing)
+                        {
+                            manager.debug = mode;
+                        }
+                        else if (mode == TestManager.DebugMode.Everything)
+                        {
+                            manager.debug = mode;
+                        }
+                        else
+                        {
+                            manager.debug &= ~TestManager.DebugMode.Nothing;
+                            if (manager.debug.HasFlag(mode))
+                            {
+                                manager.debug &= ~mode;
+                                manager.debug &= ~TestManager.DebugMode.Everything;
+                            }
+                            else manager.debug |= mode;
+
+                            bool anyLeft = false;
+                            foreach (TestManager.DebugMode m in System.Enum.GetValues(typeof(TestManager.DebugMode)))
+                            {
+                                if (m == TestManager.DebugMode.Nothing || m == TestManager.DebugMode.Everything) continue;
+                                if (manager.debug.HasFlag(m))
+                                {
+                                    anyLeft = true;
+                                    break;
+                                }
+                            }
+                            if (!anyLeft) manager.debug = TestManager.DebugMode.Nothing;
+                        }
+                    });
+                }
+                
+
+                //if (state.anySelected) toolsMenu.AddItem(new GUIContent("Reset Selected"), false, ResetSelected);
+                //else toolsMenu.AddDisabledItem(new GUIContent("Reset Selected"));
+
+                //if (state.anyResults) toolsMenu.AddItem(new GUIContent("Reset All"), false, ResetAll);
+                //else toolsMenu.AddDisabledItem(new GUIContent("Reset All"));
+
+                toolsMenu.DropDown(clearRect);
+            }
+
+            //manager.debug = GUILayout.Toggle(manager.debug, debugContent, Style.Get("TestManagerUI/Toolbar/Debug"));
         }
 
         private bool DrawRefreshButton()
@@ -963,15 +1030,6 @@ namespace UnityTest
             }
 
             itemRect.y += itemRect.height;
-        }
-
-        public void DrawTestResult(Rect rect, Test.Result result)
-        {
-            Color color;
-            if (result == Test.Result.Fail) color = Style.failColor;
-            else if (result == Test.Result.Pass) color = Style.passColor;
-            else return;
-            EditorGUI.DrawRect(rect, color);
         }
 
 
