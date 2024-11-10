@@ -253,8 +253,8 @@ namespace UnityTest
             State state = new State(this, rootFoldout);
 
             bool refresh = false;
-            bool selectAll = false;
-            bool deselectAll = false;
+            //bool selectAll = false;
+            //bool deselectAll = false;
 
             Rect fullRect = EditorGUILayout.BeginVertical(GUILayout.ExpandHeight(true), GUILayout.ExpandWidth(true));
             {
@@ -272,12 +272,12 @@ namespace UnityTest
                             DrawSkipButton();
                             DrawGoToEmptySceneButton();
 
-                            using (new EditorGUI.DisabledScope(foldouts.Count == 0 || manager.tests.Count == 0))
-                            {
-                                bool[] result = DrawUniversalToggle(state);
-                                selectAll = result[0];
-                                deselectAll = result[1];
-                            }
+                            //using (new EditorGUI.DisabledScope(foldouts.Count == 0 || manager.tests.Count == 0))
+                            //{
+                            //    bool[] result = DrawUniversalToggle(state);
+                            //    selectAll = result[0];
+                            //    deselectAll = result[1];
+                            //}
 
                             DrawClearButton(state);
 
@@ -353,8 +353,8 @@ namespace UnityTest
             {
                 // Doing things this way avoids annoying GUI errors complaining about groups not being ended properly.
                 if (refresh) Refresh();
-                else if (selectAll) rootFoldout.Select(manager); // Simulate a press
-                else if (deselectAll) rootFoldout.Deselect(manager); // Simulate a press
+                //else if (selectAll) rootFoldout.Select(manager); // Simulate a press
+                //else if (deselectAll) rootFoldout.Deselect(manager); // Simulate a press
             }
         }
 
@@ -494,6 +494,7 @@ namespace UnityTest
         {
             foreach (Foldout child in rootFoldout.GetChildren(manager, false)) child.Draw(this);
         }
+            
 
         /// <summary>
         /// Shows the tests as their full paths when text is present in the search bar. Only shows the tests matching the search regex.
@@ -503,7 +504,7 @@ namespace UnityTest
             Regex re = new Regex(search, RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.IgnorePatternWhitespace);
             MatchCollection matches;
             string path, final;
-            foreach (Test match in manager.searchMatches)
+            foreach (Test match in new List<Test>(manager.searchMatches))
             {
                 path = match.attribute.GetPath();
                 matches = re.Matches(path);
@@ -517,6 +518,7 @@ namespace UnityTest
                     final += "<b>" + path[matches[i].Index..(matches[i].Index + matches[i].Length)] + "</b>";
                 }
                 final += path[(matches[matches.Count - 1].Index + matches[matches.Count - 1].Length)..];
+
                 DrawListItem(match, ref match.expanded, ref match.locked, ref match.selected,
                     showFoldout: false,
                     showScript: true,
@@ -525,6 +527,7 @@ namespace UnityTest
                     showResultBackground: true,
                     showClearResult: true,
                     showResult: true,
+                    showGoTo: true,
                     name: final
                 );
             }
@@ -686,47 +689,51 @@ namespace UnityTest
 
         private void DrawDebugButton()
         {
+            System.Array values = System.Enum.GetValues(typeof(TestManager.DebugMode));
+
+            bool hasNothing = true;
+            bool hasEverything = true;
+            bool hasAnything = false;
+            
+            foreach (TestManager.DebugMode mode in values)
+            {
+                if (manager.debug.HasFlag(mode))
+                {
+                    hasNothing = false;
+                    hasAnything = true;
+                }
+                else hasEverything = false;
+            }
+
             GUIContent debugContent = Style.GetIcon("TestManagerUI/Toolbar/Debug/Off");
-            if (manager.debug != TestManager.DebugMode.Nothing) debugContent = Style.GetIcon("TestManagerUI/Toolbar/Debug/On");
+            if (hasAnything) debugContent = Style.GetIcon("TestManagerUI/Toolbar/Debug/On");
+
+            void ClearFlags()
+            {
+                foreach (TestManager.DebugMode mode in values) manager.debug &= ~mode;
+            }
+            void SetAllFlags()
+            {
+                foreach (TestManager.DebugMode mode in values) manager.debug |= mode;
+            }
 
             Rect clearRect = Style.GetRect("TestManagerUI/Toolbar/Debug", debugContent);
             if (EditorGUI.DropdownButton(clearRect, debugContent, FocusType.Passive, Style.Get("TestManagerUI/Toolbar/Clear")))
             {
                 GenericMenu toolsMenu = new GenericMenu();
+
+                if (hasNothing) toolsMenu.AddDisabledItem(new GUIContent("Nothing"), true);
+                else toolsMenu.AddItem(new GUIContent("Nothing"), hasNothing, ClearFlags);
+
+                if (hasEverything) toolsMenu.AddDisabledItem(new GUIContent("Everything"), true);
+                else toolsMenu.AddItem(new GUIContent("Everything"), hasEverything, SetAllFlags);
+
                 foreach (TestManager.DebugMode mode in System.Enum.GetValues(typeof(TestManager.DebugMode)))
                 {
-                    toolsMenu.AddItem(new GUIContent(mode.ToString()), manager.debug.HasFlag(mode), () => {
-
-                        if (mode == TestManager.DebugMode.Nothing)
-                        {
-                            manager.debug = mode;
-                        }
-                        else if (mode == TestManager.DebugMode.Everything)
-                        {
-                            manager.debug = mode;
-                        }
-                        else
-                        {
-                            manager.debug &= ~TestManager.DebugMode.Nothing;
-                            if (manager.debug.HasFlag(mode))
-                            {
-                                manager.debug &= ~mode;
-                                manager.debug &= ~TestManager.DebugMode.Everything;
-                            }
-                            else manager.debug |= mode;
-
-                            bool anyLeft = false;
-                            foreach (TestManager.DebugMode m in System.Enum.GetValues(typeof(TestManager.DebugMode)))
-                            {
-                                if (m == TestManager.DebugMode.Nothing || m == TestManager.DebugMode.Everything) continue;
-                                if (manager.debug.HasFlag(m))
-                                {
-                                    anyLeft = true;
-                                    break;
-                                }
-                            }
-                            if (!anyLeft) manager.debug = TestManager.DebugMode.Nothing;
-                        }
+                    toolsMenu.AddItem(new GUIContent(mode.ToString()), manager.debug.HasFlag(mode), () =>
+                    {
+                        if (manager.debug.HasFlag(mode)) manager.debug &= ~mode;
+                        else manager.debug |= mode;
                     });
                 }
                 
@@ -798,6 +805,7 @@ namespace UnityTest
             bool showResultBackground = true,
             bool showClearResult = true,
             bool showResult = true,
+            bool showGoTo = false,
             bool changeItemRectWidthOnTextOverflow = false,
             string name = null
         )
@@ -816,6 +824,7 @@ namespace UnityTest
                 GUIStyle scriptStyle = Style.Get("Script");
                 GUIStyle clearStyle = Style.Get("ClearResult");
                 GUIStyle resultStyle = Style.Get("Result");
+                GUIStyle goToStyle = Style.Get("GoToSearch");
 
                 GUIContent lockIcon;
                 if (locked) lockIcon = Style.GetIcon("LockOn");
@@ -823,6 +832,7 @@ namespace UnityTest
 
                 GUIContent scriptIcon = Style.GetIcon("Script");
                 GUIContent clearIcon = Style.GetIcon("ClearResult");
+                GUIContent goToIcon = Style.GetIcon("GoToSearch");
 
 
 
@@ -880,6 +890,12 @@ namespace UnityTest
                 foldoutRect.width = Style.GetWidth(foldoutStyle);
                 if (!showFoldout) foldoutRect.width = 0f;
                 leftOffset += foldoutRect.width;
+
+                Rect goToRect = new Rect(itemRect);
+                goToRect.x += leftOffset;
+                goToRect.width = Style.GetWidth(goToStyle, goToIcon);
+                if (!showGoTo) goToRect.width = 0f;
+                leftOffset += goToRect.width;
 
                 Rect scriptRect = new Rect(itemRect);
                 scriptRect.x += leftOffset;
@@ -943,6 +959,19 @@ namespace UnityTest
                     expanded = EditorGUI.Foldout(foldoutRect, expanded, GUIContent.none, foldoutStyle);
                 }
 
+                if (showGoTo)
+                {
+                    if (GUI.Button(goToRect, goToIcon, goToStyle))
+                    {
+                        foreach (Foldout foldout in foldouts)
+                        {
+                            List<Test> tests = new List<Test>(foldout.GetTests(manager));
+                            if (tests.Contains((item as Test))) foldout.expanded = true;
+                        }
+                        manager.UpdateSearchMatches(this, null);
+                    }
+                }
+
                 if (result != Test.Result.None && showResultBackground) GUI.backgroundColor = new Color(resultColor.r, resultColor.g, resultColor.b, 1f);
                 if (showScript)
                 {
@@ -987,9 +1016,21 @@ namespace UnityTest
                 foldoutRect.x += indent;
                 scriptRect.x += indent;
                 toggleRect.x += indent;
-                //resultRect.x += indent;
-                //clearRect.x += indent;
 
+                // Process right-mouse clicks on the foldout button for our left-handed friends
+                if (Utilities.IsMouseOverRect(foldoutRect))
+                {
+
+                    if (Event.current != null)
+                    {
+                        if (Event.current.button == 1 && Event.current.type == EventType.MouseUp)
+                        {
+                            if (expanded) expanded = false;
+                            else expanded = true;
+                            Repaint();
+                        }
+                    }
+                }
 
                 // Process clicks on the script
                 if (Utilities.IsMouseButtonReleased())
@@ -1009,6 +1050,8 @@ namespace UnityTest
                     }
                 }
 
+                
+
 
                 // DEBUGGING: Uncomment lines below to see the Rects.
                 foreach (System.Tuple<Rect, Color> kvp in new List<System.Tuple<Rect, Color>>()
@@ -1022,11 +1065,9 @@ namespace UnityTest
                     //new System.Tuple < Rect, Color >(rect,            Color.red),
                     //new System.Tuple < Rect, Color >(resultRect,      Color.red),
                     //new System.Tuple < Rect, Color >(clearRect,       Color.red),
-                    //new System.Tuple < Rect, Color >(itemRect,       Color.red),
-                })
-                {
-                    Utilities.DrawDebugOutline(kvp.Item1, kvp.Item2);
-                }
+                    //new System.Tuple < Rect, Color >(itemRect,        Color.red),
+                    //new System.Tuple < Rect, Color >(goToRect,        Color.red),
+                }) Utilities.DrawDebugOutline(kvp.Item1, kvp.Item2);
             }
 
             itemRect.y += itemRect.height;

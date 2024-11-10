@@ -68,6 +68,7 @@ namespace UnityTest
             public const string testPassed = "Passed";
             public const string testFailed = "Failed";
             public const string clearTest = "Clear test result";
+            public const string goToSearch = "Go to foldout";
             public const string lockButton = "Keep item selected/deselected";
             public const string toolbarToggle = "Select/deselect all unlocked tests";
             public const string donate = donationLink + "\nAny amount is greatly appreciated. It keeps me fed :)";
@@ -261,7 +262,7 @@ namespace UnityTest
                     s = new GUIStyle(EditorStyles.toolbarButton);
                     break;
                 case "TestManagerUI/Toolbar/Debug":
-                    s = new GUIStyle(EditorStyles.toolbarButton);
+                    s = new GUIStyle(EditorStyles.toolbarDropDown);
                     break;
                 case "TestManagerUI/Toolbar/Refresh":
                     s = new GUIStyle(EditorStyles.toolbarButton);
@@ -327,6 +328,11 @@ namespace UnityTest
                     s.fixedHeight = lineHeight;
                     s.richText = true;
                     s.alignment = TextAnchor.MiddleLeft;
+                    break;
+                case "GoToSearch":
+                    s = new GUIStyle(EditorStyles.iconButton);
+                    s.padding = new RectOffset(0, 0, 0, 0);
+                    s.alignment = TextAnchor.MiddleCenter;
                     break;
                 case "Script":
                     //s = new GUIStyle(EditorStyles.label);
@@ -552,6 +558,7 @@ namespace UnityTest
                     break;
                 #endregion Toolbar
 
+                #region Welcome
                 case "TestManagerUI/Welcome": // the speech bubble icon in the welcome message
                     c = new GUIContent(EditorGUIUtility.IconContent("console.infoicon"));
                     break;
@@ -565,9 +572,13 @@ namespace UnityTest
                     c.image = EditorGUIUtility.IconContent("TextAsset Icon").image;
                     c.tooltip = Tooltips.documentation;
                     break;
-                #endregion TestManagerUI
+                #endregion
 
                 #region List items
+                case "GoToSearch":
+                    c = new GUIContent(EditorGUIUtility.IconContent("back"));
+                    c.tooltip = Tooltips.goToSearch;
+                    break;
                 case "Script":
                     c = new GUIContent(EditorGUIUtility.IconContent("cs Script Icon"));
                     break;
@@ -598,6 +609,7 @@ namespace UnityTest
                     c = new GUIContent(EditorGUIUtility.IconContent("_Popup"));
                     break;
                 #endregion List items
+                #endregion TestManagerUI
 
                 #region GUIQueue
                 case "GUIQueue/Toolbar/Options":

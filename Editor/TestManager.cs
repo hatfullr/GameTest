@@ -71,7 +71,7 @@ namespace UnityTest
         /// <summary>
         /// When true, debug messages are printed to Console.
         /// </summary>
-        public DebugMode debug = DebugMode.Everything;
+        public DebugMode debug = DebugMode.Log | DebugMode.LogWarning | DebugMode.LogError;
 
         public bool paused = false;
         public bool running = false;
@@ -90,11 +90,9 @@ namespace UnityTest
         [System.Flags]
         public enum DebugMode
         {
-            Nothing = 0,
             Log = 1 << 0,
             LogWarning = 1 << 1,
             LogError = 1 << 2,
-            Everything = ~(-1 << 3),
         }
 
         /// <summary>
@@ -233,7 +231,7 @@ namespace UnityTest
             search = default;
             searchMatches = new List<Test>();
 
-            debug = DebugMode.Everything;
+            debug = DebugMode.Log | DebugMode.LogWarning | DebugMode.LogError;
             previousFrameNumber = 0;
             timer = 0f;
             nframes = 0;
@@ -287,6 +285,7 @@ namespace UnityTest
         {
             searchMatches.Clear();
             search = newSearch;
+            if (string.IsNullOrEmpty(search)) return;
             Regex re = new Regex(search, RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.IgnorePatternWhitespace);
 
             string path;
