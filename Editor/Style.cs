@@ -70,6 +70,7 @@ namespace UnityTest
             public const string clearTest = "Clear test result";
             public const string goToSearch = "Go to foldout";
             public const string lockButton = "Keep item selected/deselected";
+            public const string settings = "Modify Test settings";
             public const string toolbarToggle = "Select/deselect all unlocked tests";
             public const string donate = donationLink + "\nAny amount is greatly appreciated. It keeps me fed :)";
             public const string documentation = documentationLink;
@@ -329,13 +330,16 @@ namespace UnityTest
                     s.richText = true;
                     s.alignment = TextAnchor.MiddleLeft;
                     break;
+                case "ToggleHeader":
+                    s = new GUIStyle(Get("Toggle"));
+                    s.fontStyle = FontStyle.Bold;
+                    break;
                 case "GoToSearch":
                     s = new GUIStyle(EditorStyles.iconButton);
                     s.padding = new RectOffset(0, 0, 0, 0);
                     s.alignment = TextAnchor.MiddleCenter;
                     break;
                 case "Script":
-                    //s = new GUIStyle(EditorStyles.label);
                     s = new GUIStyle(EditorStyles.objectField);
                     s.margin = EditorStyles.iconButton.margin;
                     s.padding = EditorStyles.iconButton.padding;
@@ -362,10 +366,6 @@ namespace UnityTest
                     s.fixedHeight = Get("Toggle").fixedHeight; // fill to the same height as the toggle
                     s.alignment = TextAnchor.MiddleCenter;
                     break;
-                case "ToggleHeader":
-                    s = new GUIStyle(Get("Toggle"));
-                    s.fontStyle = FontStyle.Bold;
-                    break;
                 case "Result":
                     s = new GUIStyle(EditorStyles.iconButton);
                     s.imagePosition = ImagePosition.ImageOnly;
@@ -387,8 +387,9 @@ namespace UnityTest
                     s.imagePosition = ImagePosition.ImageOnly;
                     s.alignment = TextAnchor.MiddleCenter;
                     break;
-                case "SettingsButton":
-                    s = new GUIStyle(EditorGUIUtility.GetBuiltinSkin(EditorSkin.Inspector).FindStyle("IconButton"));
+                case "Settings":
+                    s = new GUIStyle(EditorStyles.iconButton);
+                    s.alignment = TextAnchor.MiddleCenter;
                     break;
                 #endregion List items
 
@@ -575,6 +576,10 @@ namespace UnityTest
                 #endregion
 
                 #region List items
+                case "Settings":
+                    c = new GUIContent(EditorGUIUtility.IconContent("Settings"));
+                    c.tooltip = Tooltips.settings;
+                    break;
                 case "GoToSearch":
                     c = new GUIContent(EditorGUIUtility.IconContent("back"));
                     c.tooltip = Tooltips.goToSearch;

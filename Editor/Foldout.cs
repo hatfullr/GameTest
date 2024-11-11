@@ -73,6 +73,7 @@ namespace UnityTest
                     showResultBackground: true,
                     showClearResult: tests.Count > 0,
                     showResult: tests.Count > 0,
+                    showSettings: false,
                     changeItemRectWidthOnTextOverflow: true
                 );
 

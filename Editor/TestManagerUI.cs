@@ -528,6 +528,7 @@ namespace UnityTest
                     showClearResult: true,
                     showResult: true,
                     showGoTo: true,
+                    showSettings: false,
                     name: final
                 );
             }
@@ -806,6 +807,7 @@ namespace UnityTest
             bool showClearResult = true,
             bool showResult = true,
             bool showGoTo = false,
+            bool showSettings = true,
             bool changeItemRectWidthOnTextOverflow = false,
             string name = null
         )
@@ -825,6 +827,7 @@ namespace UnityTest
                 GUIStyle clearStyle = Style.Get("ClearResult");
                 GUIStyle resultStyle = Style.Get("Result");
                 GUIStyle goToStyle = Style.Get("GoToSearch");
+                GUIStyle settingsStyle = Style.Get("Settings");
 
                 GUIContent lockIcon;
                 if (locked) lockIcon = Style.GetIcon("LockOn");
@@ -833,6 +836,7 @@ namespace UnityTest
                 GUIContent scriptIcon = Style.GetIcon("Script");
                 GUIContent clearIcon = Style.GetIcon("ClearResult");
                 GUIContent goToIcon = Style.GetIcon("GoToSearch");
+                GUIContent settingsIcon = Style.GetIcon("Settings");
 
 
 
@@ -875,10 +879,11 @@ namespace UnityTest
 
                 float clearWidth = Style.GetWidth(clearStyle, clearIcon);
                 float resultWidth = Style.GetWidth(resultStyle, resultIcon);
+                float settingsWidth = Style.GetWidth(settingsStyle, settingsIcon);
                 
                 if (!showClearResult) clearWidth = 0f;
                 if (!showResult) resultWidth = 0f;
-
+                if (!showSettings) settingsWidth = 0f;
 
 
 
@@ -921,6 +926,12 @@ namespace UnityTest
                 clearRect.width = clearWidth;
                 rightOffset += clearRect.width;
                 if (showClearResult) rightOffset += clearStyle.margin.left;
+
+                Rect settingsRect = new Rect(itemRect);
+                settingsRect.x = settingsRect.xMax - (rightOffset + settingsWidth) - settingsStyle.margin.right;
+                settingsRect.width = settingsWidth;
+                rightOffset += settingsRect.width;
+                if (showSettings) rightOffset += settingsStyle.margin.left;
 
                 Rect toggleRect = new Rect(itemRect);
                 toggleRect.x += leftOffset;
@@ -977,6 +988,10 @@ namespace UnityTest
                 {
                     if (script == null) throw new System.Exception("Failed to find script for list item '" + item + "'");
                     EditorGUI.LabelField(scriptRect, scriptIcon, scriptStyle);
+                }
+                if (showSettings)
+                {
+                    if (GUI.Button(settingsRect, settingsIcon, settingsStyle)) { }
                 }
                 if (showLock)
                 {
