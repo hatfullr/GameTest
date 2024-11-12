@@ -40,7 +40,9 @@ namespace UnityTest
             bool wasMixed = IsMixed(ui.manager);
             bool wasLocked = locked;
 
-            Rect rect = EditorGUILayout.BeginVertical();
+            EditorGUILayout.VerticalScope scope = new EditorGUILayout.VerticalScope();
+            Rect rect = scope.rect;
+            using (scope)
             {
                 Test.Result result = GetTotalResult(ui.manager);
 
@@ -107,7 +109,6 @@ namespace UnityTest
                     ui.indentLevel--;
                 }
             }
-            EditorGUILayout.EndVertical();
 
 
             // Process events

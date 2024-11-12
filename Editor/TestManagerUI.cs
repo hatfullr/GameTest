@@ -26,10 +26,11 @@ namespace UnityTest
             }
         }
 
+        private SettingsWindow settingsWindow;
+
         public Foldout rootFoldout => manager.rootFoldout;
         public List<Foldout> foldouts => manager.foldouts;
         public GUIQueue guiQueue => manager.guiQueue;
-        public SettingsWindow settingsWindow => manager.settingsWindow;
 
         public Vector2 scrollPosition { get => manager.scrollPosition; set => manager.scrollPosition = value; }
         public bool showWelcome { get => manager.showWelcome; set => manager.showWelcome = value; }
@@ -192,10 +193,19 @@ namespace UnityTest
             StartLoadingWheel(message);
             Repaint();
 
+            Test previousSettingsTest = null;
+            if (settingsWindow != null) previousSettingsTest = settingsWindow.GetTest();
+
             manager.UpdateTests(() =>
             {
+                Test newSettingsTest = null;
                 foreach (Test test in manager.tests)
                 {
+                    if (previousSettingsTest != null)
+                    {
+                        if (test.attribute == previousSettingsTest.attribute) newSettingsTest = test;
+                    }
+                    
                     Foldout final = null;
                     foreach (string p in Utilities.IterateDirectories(test.attribute.GetPath(), true))
                     {
@@ -230,6 +240,12 @@ namespace UnityTest
                 StopLoadingWheel();
                 Repaint();
 
+                if (settingsWindow != null)
+                {
+                    if (newSettingsTest == null) settingsWindow.Close();
+                    else settingsWindow.SetTest(newSettingsTest);
+                }
+
                 if (onFinished != null) onFinished();
             });
         }
@@ -256,15 +272,17 @@ namespace UnityTest
             //bool selectAll = false;
             //bool deselectAll = false;
 
-            Rect fullRect = EditorGUILayout.BeginVertical(GUILayout.ExpandHeight(true), GUILayout.ExpandWidth(true));
+            EditorGUILayout.VerticalScope mainScope = new EditorGUILayout.VerticalScope(GUILayout.ExpandHeight(true), GUILayout.ExpandWidth(true));
+
+            using (mainScope)
             {
                 using (new EditorGUI.DisabledScope(loadingWheelVisible))
                 {
                     // The main window
-                    EditorGUILayout.BeginVertical(GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
+                    using (new EditorGUILayout.VerticalScope(GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true)))
                     {
                         // Toolbar controls
-                        EditorGUILayout.BeginHorizontal(Style.Get("TestManagerUI/Toolbar"));
+                        using (new EditorGUILayout.HorizontalScope(Style.Get("TestManagerUI/Toolbar")))
                         {
                             // Left
                             DrawPlayButton(state);
@@ -291,23 +309,23 @@ namespace UnityTest
                             refresh = DrawRefreshButton();
                             // Right
                         }
-                        EditorGUILayout.EndHorizontal();
 
                         // The box that shows the Foldouts and Tests
                         GUIStyle style = Style.Get("TestManagerUI/TestView");
-                        Rect scrollRect = EditorGUILayout.BeginVertical(style, GUILayout.ExpandHeight(true), GUILayout.ExpandWidth(true));
+                        EditorGUILayout.VerticalScope scrollScope = new EditorGUILayout.VerticalScope(style, GUILayout.ExpandHeight(true), GUILayout.ExpandWidth(true));
+                        using (scrollScope)
                         {
                             indentLevel = 0;
 
                             viewRect.x = 0f;
                             viewRect.y = 0f;
-                            viewRect.width = Mathf.Max(minWidth, scrollRect.width);
+                            viewRect.width = Mathf.Max(minWidth, scrollScope.rect.width);
                             viewRect.height = GetListHeight();
 
                             //Utilities.DrawDebugOutline(new Rect(scrollRect.x + viewRect.x, scrollRect.y + viewRect.y, viewRect.width, viewRect.height), Color.red);
 
                             scrollPosition = GUI.BeginScrollView(
-                                scrollRect,
+                                scrollScope.rect,
                                 scrollPosition,
                                 viewRect,
                                 false,
@@ -329,9 +347,7 @@ namespace UnityTest
                             }
                             GUI.EndScrollView();
                         }
-                        EditorGUILayout.EndVertical();
                     }
-                    EditorGUILayout.EndVertical();
 
                     if (!manager.running) // Otherwise stuff will keep being added into the queue during testing time
                     {
@@ -341,13 +357,12 @@ namespace UnityTest
                             else if (manager.queue.Contains(test) && !test.selected) manager.queue.Remove(test);
                         }
                     }
-
-                    guiQueue.Draw();
                 }
-            }
-            EditorGUILayout.EndVertical();
 
-            if (loadingWheelVisible) DrawLoadingWheel(fullRect);
+                guiQueue.Draw();
+            }
+
+            if (loadingWheelVisible) DrawLoadingWheel(mainScope.rect);
 
             if (!loadingWheelVisible)
             {
@@ -766,7 +781,7 @@ namespace UnityTest
         /// </summary>
         private void ShowResetConfirmation()
         {
-            if (!EditorUtility.DisplayDialog("Reset UnityTest Manager?", "Are you sure? This will clear all saved information about tests, GameObjects, etc. " +
+            if (!EditorUtility.DisplayDialog("Reset UnityTest Manager?", "This will clear all saved information about tests, GameObjects, etc. " +
                 "If you have encountered a bug, first try closing the UnityTest Manager and opening it again.",
                 "Yes", "No"
             )) return;
@@ -991,7 +1006,12 @@ namespace UnityTest
                 }
                 if (showSettings)
                 {
-                    if (GUI.Button(settingsRect, settingsIcon, settingsStyle)) { }
+                    if (GUI.Button(settingsRect, settingsIcon, settingsStyle))
+                    {
+                        if (settingsWindow == null) settingsWindow = SettingsWindow.Init();
+                        settingsWindow.SetTest(item as Test);
+                        settingsWindow.SetVisible(true);
+                    }
                 }
                 if (showLock)
                 {
@@ -1082,6 +1102,7 @@ namespace UnityTest
                     //new System.Tuple < Rect, Color >(clearRect,       Color.red),
                     //new System.Tuple < Rect, Color >(itemRect,        Color.red),
                     //new System.Tuple < Rect, Color >(goToRect,        Color.red),
+                    //new System.Tuple < Rect, Color >(settingsRect,     Color.red),
                 }) Utilities.DrawDebugOutline(kvp.Item1, kvp.Item2);
             }
 

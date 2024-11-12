@@ -12,6 +12,11 @@ namespace UnityTest
     /// </summary>
     public class Test : ScriptableObject
     {
+        /// <summary>
+        /// The user-set prefab that is instantiated when running this test. If null, then "defaultPrefab" is used instead.
+        /// </summary>
+        public GameObject prefab;
+
         public Result result;
         /// <summary>
         /// The test method to be executed.
@@ -21,12 +26,10 @@ namespace UnityTest
         /// The attribute on the method to be executed.
         /// </summary>
         public TestAttribute attribute;
-
-        [HideInInspector] public bool skipped;
-        
-        public GameObject defaultGameObject;
-
+        public bool skipped;
         public bool selected, locked, expanded, isInSuite;
+        public static Test current;
+        public System.Action onFinished, onSelected, onDeselected;
 
         private GameObject gameObject;
         private Object script = null;
@@ -36,11 +39,10 @@ namespace UnityTest
         private static GameObject coroutineGO = null;
         private static List<System.Collections.IEnumerator> coroutines = new List<System.Collections.IEnumerator>();
         private static List<Coroutine> cos = new List<Coroutine>();
-        public static Test current;
 
         private static bool sceneWarningPrinted = false;
 
-        public System.Action onFinished, onSelected, onDeselected;
+        private GameObject defaultPrefab;
 
         [System.Serializable]
         public enum Result
@@ -56,12 +58,46 @@ namespace UnityTest
 
         public bool IsExample() => Utilities.IsSample(attribute.sourceFile);
 
+        /// <summary>
+        /// Get the prefab that is saved in the project and is used when "prefab" is null. This is set immediately after a Test is created.
+        /// </summary>
+        public GameObject GetDefaultPrefab()
+        {
+            // The default prefab should be linked up already, but in case it isn't, we make sure
+            if (defaultPrefab == null) defaultPrefab = Utilities.SearchForAsset<GameObject>((GameObject g) => g.name == name, Utilities.testPrefabPath);
+            return defaultPrefab;
+        }
+
+        /// <summary>
+        /// Create the default prefab, which is stored in this project.
+        /// </summary>
+        public void CreateDefaultPrefab()
+        {
+            GameObject gameObject = new GameObject(name, method.DeclaringType);
+            string path = Utilities.GetUnityPath(Utilities.GetAssetPath(gameObject.name, Utilities.testPrefabPath));
+            path = Path.ChangeExtension(path, ".prefab");
+
+            bool success;
+            defaultPrefab = PrefabUtility.SaveAsPrefabAsset(gameObject, path, out success);
+            DestroyImmediate(gameObject);
+            if (!success) throw new System.Exception("Failed to create prefab: " + gameObject.name);
+        }
+
+        /// <summary>
+        /// Destroy the default prefab, which is stored in this project.
+        /// </summary>
+        public bool DestroyDefaultPrefab()
+        {
+            if (defaultPrefab == null) return false;
+            return AssetDatabase.DeleteAsset(PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(defaultPrefab));
+        }
+
         public GameObject DefaultSetUp()
         {
-            if (defaultGameObject != null)
+            if (prefab != null)
             {
                 instantiatedDefaultGO = null;
-                instantiatedDefaultGO = Object.Instantiate(defaultGameObject);
+                instantiatedDefaultGO = Object.Instantiate(prefab);
                 return instantiatedDefaultGO;
             }
             // Checking if the method is a part of a Unit Test Suite
@@ -88,7 +124,6 @@ namespace UnityTest
                 MethodInfo setUp = method.DeclaringType.GetMethod(attribute.setUp, Utilities.bindingFlags);
                 object result = setUp.Invoke(method.DeclaringType, null);
                 //object result = setUp.Invoke(null, null);
-
 
                 if (isInSuite)
                 {

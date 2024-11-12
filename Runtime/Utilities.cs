@@ -43,6 +43,11 @@ namespace UnityTest
         public static string testDataPath { get => EnsureDirectoryExists(Path.Join(dataPath, "Tests")); }
 
         /// <summary>
+        /// Location where Test defaultPrefab are stored.
+        /// </summary>
+        public static string testPrefabPath { get => EnsureDirectoryExists(Path.Join(testDataPath, "Default Prefabs")); }
+
+        /// <summary>
         /// True if the editor is using the theme called "DarkSkin". Otherwise, false.
         /// </summary>
         public static bool isDarkTheme = true;
@@ -221,7 +226,7 @@ namespace UnityTest
         /// </summary>
         public static T SearchForAsset<T>(System.Func<T, bool> criteria, string searchDirectory, bool errorOnMissing = true)
         {
-            foreach (string path in Directory.GetFiles(searchDirectory, "*.asset", SearchOption.TopDirectoryOnly))
+            foreach (string path in Directory.GetFiles(searchDirectory, "*", SearchOption.TopDirectoryOnly))
             {
                 T asset = LoadAssetAtPath<T>(GetUnityPath(path));
                 if (asset == null) continue; // No asset of the given type exists at the given path
@@ -290,11 +295,11 @@ namespace UnityTest
             }
         }
 
-        public static void DeleteAsset(string name, string directory) => AssetDatabase.DeleteAsset(GetAssetPath(name, directory));
-        public static void DeleteAsset(Object asset)
+        public static bool DeleteAsset(string name, string directory) => AssetDatabase.DeleteAsset(GetAssetPath(name, directory));
+        public static bool DeleteAsset(Object asset)
         {
             string path = GetAssetPath(asset);
-            DeleteAsset(Path.GetFileName(path), GetUnityPath(Path.GetDirectoryName(path)));
+            return DeleteAsset(Path.GetFileName(path), GetUnityPath(Path.GetDirectoryName(path)));
         }
 
         public static void DeleteFolder(string path) => AssetDatabase.DeleteAsset(GetUnityPath(path));

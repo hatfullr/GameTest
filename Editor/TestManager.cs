@@ -6,6 +6,7 @@ using System.Reflection;
 using System.IO;
 using System.Text.RegularExpressions;
 using System.Linq;
+using UnityEngine.Windows;
 
 
 namespace UnityTest
@@ -55,16 +56,6 @@ namespace UnityTest
             }
         }
 
-        private SettingsWindow _settingsWindow;
-        public SettingsWindow settingsWindow
-        {
-            get
-            {
-                if (_settingsWindow == null) _settingsWindow = EditorWindow.GetWindow<SettingsWindow>();
-                return _settingsWindow;
-            }
-        }
-
         public float timer;
         public uint nframes;
 
@@ -93,6 +84,12 @@ namespace UnityTest
             Log = 1 << 0,
             LogWarning = 1 << 1,
             LogError = 1 << 2,
+        }
+
+        public static DebugMode GetDebugMode()
+        {
+            TestManagerUI window = EditorWindow.GetWindow<TestManagerUI>();
+            return window.manager.debug;
         }
 
         /// <summary>
@@ -323,7 +320,7 @@ namespace UnityTest
         /// <summary>
         /// Collect all the assemblies that Unity has compiled.
         /// </summary>
-        private HashSet<System.Reflection.Assembly> GetAssemblies()
+        public HashSet<System.Reflection.Assembly> GetAssemblies()
         {
             List<string> added = new List<string>();
             HashSet<System.Reflection.Assembly> assemblies = new HashSet<System.Reflection.Assembly>();
@@ -341,6 +338,8 @@ namespace UnityTest
             return assemblies;
         }
 
+        
+
         private Test CreateTest(TestAttribute attribute, MethodInfo method)
         {
             // Try to locate an existing Test asset that matches the given TestAttribute.
@@ -350,18 +349,23 @@ namespace UnityTest
             Test test = Utilities.SearchForAsset<Test>((Test t) => t.attribute == attribute, Utilities.testDataPath, false);
             if (test == null) // Didn't find it
             {
-                test = Utilities.CreateAsset<Test>(System.Guid.NewGuid().ToString(), Utilities.testDataPath, (Test t) =>
+                string name = System.Guid.NewGuid().ToString();
+                test = Utilities.CreateAsset<Test>(name, Utilities.testDataPath, (Test t) =>
                 {
                     t.method = method;
                     t.isInSuite = method.DeclaringType.GetCustomAttribute(typeof(SuiteAttribute)) != null;
                     t.attribute = attribute;
                 });
+
+                // Each Test needs a "Default GameObject" that is stored in the UnityTest Data folder.
+                test.CreateDefaultPrefab();
             }
             else
             {
                 test.method = method;
                 test.isInSuite = method.DeclaringType.GetCustomAttribute(typeof(SuiteAttribute)) != null;
             }
+
             return test;
         }
         

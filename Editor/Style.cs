@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+ï»¿using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 
@@ -23,9 +23,9 @@ namespace UnityTest
             "Click the GitHub button or see README.md for additional information. <b>If this tool has helped you, please consider donating " +
             "to help me create more cool stuff.</b> Thank you for using UnityTest.",
             "",
-            "• Click on script icons to open your code",
-            "• Check for tooltips in this window, also Edit > Preferences > Enable PlayMode Tooltips",
-            "• Hide UnityTest from stack traces by enabling \"Strip logging callstack\" in the triple-dot menu at the top right of the Console",
+            "â€¢ Click on script icons to open your code",
+            "â€¢ Check for tooltips in this window, also Edit > Preferences > Enable PlayMode Tooltips",
+            "â€¢ Hide UnityTest from stack traces by enabling \"Strip logging callstack\" in the triple-dot menu at the top right of the Console",
             "",
             "<i><size=10>To hide this message, press the speech bubble in the toolbar.</size></i>"
         );
@@ -74,6 +74,9 @@ namespace UnityTest
             public const string toolbarToggle = "Select/deselect all unlocked tests";
             public const string donate = donationLink + "\nAny amount is greatly appreciated. It keeps me fed :)";
             public const string documentation = documentationLink;
+            public const string settingsWindowPrefab = "When this test runs, a copy of this GameObject is instantiated as the testing environment. " +
+                "If no GameObject is given, a new GameObject is instantiated with the MonoBehaviour that contains the test method, and " +
+                "the properties of the MonoBehaviour are updated to match the properties below.";
         }
 
         public static Color failColor = new Color(1f, 0f, 0f, 0.1f);
@@ -389,6 +392,7 @@ namespace UnityTest
                     break;
                 case "Settings":
                     s = new GUIStyle(EditorStyles.iconButton);
+                    s.contentOffset = new Vector2(0, 1); // centers the image
                     s.alignment = TextAnchor.MiddleCenter;
                     break;
                 #endregion List items
@@ -428,6 +432,20 @@ namespace UnityTest
                     s = new GUIStyle(GUI.skin.button);
                     break;
                 #endregion GUIQueue
+
+
+                #region Settings Window
+                case "Settings/Header":
+                    s = new GUIStyle(EditorStyles.helpBox);
+                    break;
+                case "Settings/Inspector":
+                    s = new GUIStyle(EditorStyles.helpBox);
+                    break;
+                case "Settings/Footer":
+                    s = new GUIStyle(EditorStyles.helpBox);
+                    s.margin = new RectOffset(-1, -1, s.margin.top, 0);
+                    break;
+                #endregion Settings Window
 
                 default: // Accesses the built-in GUIStyles by their string names
                     throw new System.NotImplementedException("Unrecognized style '" + style + "'");
