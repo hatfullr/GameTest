@@ -56,35 +56,43 @@ namespace UnityTest
             }
 
             // The queue window
-            EditorGUILayout.BeginVertical(GUILayout.ExpandWidth(true), GUILayout.Height(height));
+            using (new EditorGUILayout.VerticalScope(GUILayout.ExpandWidth(true), GUILayout.Height(height)))
             {
                 DrawQueueRunning();
 
                 EditorGUILayout.Space();
 
                 // "Queue" space
-                EditorGUILayout.BeginHorizontal(GUILayout.ExpandHeight(true), GUILayout.ExpandWidth(true));
+                using (new EditorGUILayout.HorizontalScope(GUILayout.ExpandHeight(true), GUILayout.ExpandWidth(true)))
                 {
                     //Rect left = new Rect(rect.x, rect.y, 0.5f * rect.width, rect.height);
                     //Rect right = new Rect(rect.x + 0.5f * rect.width, rect.y, 0.5f * rect.width, rect.height);
-                    queueScrollPosition = DrawQueue("Selected", ui.manager.queue, null, queueScrollPosition, false);
-                    finishedScrollPosition = DrawQueue("Finished", ui.manager.finishedTests, ui.manager.finishedResults, finishedScrollPosition, true, true);
+                    queueScrollPosition = DrawQueue("Selected", ui.manager.queue, null, queueScrollPosition, 
+                        showResult: false
+                    );
+                    finishedScrollPosition = DrawQueue("Finished", ui.manager.finishedTests, ui.manager.finishedResults, finishedScrollPosition, 
+                        showResult: true,
+                        showSettings : false,
+                        reversed: true
+                    );
                 }
-                EditorGUILayout.EndHorizontal();
             }
-            EditorGUILayout.EndVertical();
 
             mainRect = GUILayoutUtility.GetLastRect();
 
             ProcessEvents();
         }
 
-        private Vector2 DrawQueue(string title, List<Test> queue, List<Test.Result> results, Vector2 scrollPosition, bool showResult = false, bool reversed = false)
+        private Vector2 DrawQueue(string title, List<Test> queue, List<Test.Result> results, Vector2 scrollPosition, 
+            bool showResult = false,
+            bool showSettings = true,
+            bool reversed = false
+        )
         {
-            EditorGUILayout.BeginVertical(GUILayout.ExpandWidth(true));//GUILayout.MaxWidth(rect.width));
+            using (new EditorGUILayout.VerticalScope(GUILayout.ExpandWidth(true)))
             {
                 // header labels for the queue
-                EditorGUILayout.BeginHorizontal(GUILayout.ExpandWidth(true));//GUILayout.MaxWidth(rect.width));
+                using (new EditorGUILayout.HorizontalScope(GUILayout.ExpandWidth(true)))
                 {
                     GUIStyle style = Style.Get("GUIQueue/Queue/Title");
                     Rect r = EditorGUILayout.GetControlRect(false);
@@ -107,13 +115,14 @@ namespace UnityTest
                         }
                     }
                 }
-                EditorGUILayout.EndHorizontal();
 
 
 
                 // Queue area
                 GUIStyle queueStyle = Style.Get("GUIQueue/Queue");
-                Rect queueRect = EditorGUILayout.BeginVertical(queueStyle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true)); //GUILayout.MaxWidth(rect.width), 
+                EditorGUILayout.VerticalScope s = new EditorGUILayout.VerticalScope(queueStyle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
+                Rect queueRect = s.rect;
+                using (s)
                 {
                     // Respect proper padding
                     queueRect.x += queueStyle.padding.left;
@@ -148,25 +157,26 @@ namespace UnityTest
                     {
                         foreach (Test test in tests)
                         {
-                            DrawQueueTest(test, queue, showResult);
+                            DrawQueueTest(test, queue, 
+                                showResult: showResult,
+                                showSettings: showSettings
+                            );
                         }
                     }
                     GUI.EndScrollView();
                 }
-                EditorGUILayout.EndVertical();
 
                 GUILayout.Space(Style.Get("GUIQueue/Queue").margin.bottom);
             }
-            EditorGUILayout.EndVertical();
 
             return scrollPosition;
         }
 
         private void DrawQueueRunning()
         {
-            GUILayout.BeginVertical();
+            using (new GUILayout.VerticalScope())
             {
-                GUILayout.BeginHorizontal();
+                using (new GUILayout.HorizontalScope())
                 {
                     float previousLabelWidth = EditorGUIUtility.labelWidth;
                     //EditorGUIUtility.labelWidth = 0f;
@@ -178,7 +188,6 @@ namespace UnityTest
 
                     EditorGUIUtility.labelWidth = previousLabelWidth;
                 }
-                GUILayout.EndHorizontal();
 
                 GUIStyle box = Style.Get("GUIQueue/Queue");
                 Rect rect = GUILayoutUtility.GetRect(GUIContent.none, box);
@@ -190,10 +199,12 @@ namespace UnityTest
                 rect.height -= box.padding.vertical;
                 if (Test.current != null) DrawQueueTest(rect, Test.current);
             }
-            GUILayout.EndVertical();
         }
 
-        private void DrawQueueTest(Test test, List<Test> queue, bool showResult = false)
+        private void DrawQueueTest(Test test, List<Test> queue,
+            bool showResult = false,
+            bool showSettings = true
+        )
         {
             GUIStyle clearStyle = Style.Get("ClearResult");
             GUIContent clearIcon = Style.GetIcon("ClearResult", "Remove test from queue");
@@ -216,6 +227,7 @@ namespace UnityTest
                     showResultBackground: showResult,
                     showClearResult: false,
                     showResult: showResult,
+                    showSettings: showSettings,
                     name: test.attribute.GetPath()
                 );
             ui.itemRect.x = previousItemRectX;
@@ -231,25 +243,23 @@ namespace UnityTest
 
         private void DrawSplitter()
         {
-            GUILayout.BeginHorizontal(Style.Get("GUIQueue/Toolbar"));
+            using (new GUILayout.HorizontalScope(Style.Get("GUIQueue/Toolbar")))
             {
                 GUIContent label = new GUIContent("Tests");
                 GUIStyle labelStyle = Style.Get("GUIQueue/Toolbar/BoldLabel");
                 GUILayout.Label(label, labelStyle, GUILayout.Width(Style.GetWidth(labelStyle, label)));
 
-                GUILayout.BeginHorizontal(Style.Get("GUIQueue/Toolbar/Label"), GUILayout.ExpandWidth(true));
+                using (new GUILayout.HorizontalScope(Style.Get("GUIQueue/Toolbar/Label"), GUILayout.ExpandWidth(true)))
                 {
                     GUILayout.Space(GUI.skin.box.padding.left);
-                    GUILayout.BeginVertical();
+                    using (new GUILayout.VerticalScope())
                     {
                         GUILayout.FlexibleSpace();
                         GUILayout.Box(GUIContent.none, Style.Get("GUIQueue/Toolbar/Splitter"), GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
                         GUILayout.FlexibleSpace();
                     }
-                    GUILayout.EndVertical();
                     GUILayout.Space(GUI.skin.box.padding.right);
                 }
-                GUILayout.EndHorizontal();
 
                 splitterRect = GUILayoutUtility.GetLastRect();
 
@@ -276,7 +286,6 @@ namespace UnityTest
                     menu.DropDown(optionsRect);
                 }
             }
-            GUILayout.EndHorizontal();
         }
 
 

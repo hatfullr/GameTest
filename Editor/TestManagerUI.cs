@@ -4,6 +4,7 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using System.Linq;
 using System.Text.RegularExpressions;
+using UnityEngine.EventSystems;
 
 namespace UnityTest
 {
@@ -42,7 +43,6 @@ namespace UnityTest
         public Rect itemRect;
 
         private float minWidth = 0f;
-
 
         public enum Mode
         {
@@ -455,16 +455,17 @@ namespace UnityTest
 
             EditorGUI.LabelField(Utilities.GetPaddedRect(body, messageStyle.padding), message, messageStyle);
 
+            viewRect.y = bgRect.yMax;
+            viewRect.height -= bgRect.height;
+
             // DEBUGGING
             foreach (System.Tuple<Rect, Color> kvp in new System.Tuple<Rect, Color>[]
             {
-                //new System.Tuple<Rect,Color>(rect,      Color.green),
+                //new System.Tuple<Rect,Color>(bgRect,      Color.green),
                 //new System.Tuple<Rect,Color>(titleRect, Color.red),
                 //new System.Tuple<Rect,Color>(body,      Color.red)
+                //new System.Tuple<Rect,Color>(viewRect,      Color.red)
             }) Utilities.DrawDebugOutline(kvp.Item1, kvp.Item2);
-
-            viewRect.y = bgRect.yMax;
-            viewRect.height -= bgRect.height;
         }
 
         private Mode GetMode()
@@ -733,8 +734,8 @@ namespace UnityTest
                 foreach (TestManager.DebugMode mode in values) manager.debug |= mode;
             }
 
-            Rect clearRect = Style.GetRect("TestManagerUI/Toolbar/Debug", debugContent);
-            if (EditorGUI.DropdownButton(clearRect, debugContent, FocusType.Passive, Style.Get("TestManagerUI/Toolbar/Clear")))
+            Rect rect = Style.GetRect("TestManagerUI/Toolbar/Debug", debugContent);
+            if (EditorGUI.DropdownButton(rect, debugContent, FocusType.Passive, Style.Get("TestManagerUI/Toolbar/Clear")))
             {
                 GenericMenu toolsMenu = new GenericMenu();
 
@@ -752,18 +753,9 @@ namespace UnityTest
                         else manager.debug |= mode;
                     });
                 }
-                
 
-                //if (state.anySelected) toolsMenu.AddItem(new GUIContent("Reset Selected"), false, ResetSelected);
-                //else toolsMenu.AddDisabledItem(new GUIContent("Reset Selected"));
-
-                //if (state.anyResults) toolsMenu.AddItem(new GUIContent("Reset All"), false, ResetAll);
-                //else toolsMenu.AddDisabledItem(new GUIContent("Reset All"));
-
-                toolsMenu.DropDown(clearRect);
+                toolsMenu.DropDown(rect);
             }
-
-            //manager.debug = GUILayout.Toggle(manager.debug, debugContent, Style.Get("TestManagerUI/Toolbar/Debug"));
         }
 
         private bool DrawRefreshButton()
@@ -917,7 +909,7 @@ namespace UnityTest
                 if (!showGoTo) goToRect.width = 0f;
                 leftOffset += goToRect.width;
 
-                Rect scriptRect = new Rect(itemRect);
+                Rect scriptRect = new Rect(indentedRect); // use itemRect when using EditorGUI, like LabelField, and indentedRect when using GUI, like Label.
                 scriptRect.x += leftOffset;
                 scriptRect.width = Style.GetWidth(scriptStyle, scriptIcon);
                 if (!showScript) scriptRect.width = 0f;
@@ -1002,7 +994,27 @@ namespace UnityTest
                 if (showScript)
                 {
                     if (script == null) throw new System.Exception("Failed to find script for list item '" + item + "'");
-                    EditorGUI.LabelField(scriptRect, scriptIcon, scriptStyle);
+
+                    GUI.Label(scriptRect, scriptIcon, scriptStyle);
+
+                    // We actually detect both single click and double click when a double click is issued, but doing both single and double
+                    // click behaviors at the same time isn't really a deal breaker here.
+                    if (Utilities.IsMouseOverRect(scriptRect) && Event.current != null)
+                    {
+                        if (Event.current.rawType == EventType.MouseUp && Event.current.clickCount == 1)
+                        {
+                            //Debug.Log("Single click");
+                            EditorGUIUtility.PingObject(script); // 1 click, show the script in the Project folder
+                            Event.current.Use();
+                        }
+                        else if (Event.current.rawType == EventType.MouseDown && Event.current.clickCount > 1)
+                        {
+                            //Debug.Log("Double+ click");
+                            AssetDatabase.OpenAsset(script, lineNumber); // 2+ clicks, open the script
+                            GUIUtility.ExitGUI();
+                            Event.current.Use();
+                        }
+                    }
                 }
                 if (showSettings)
                 {
@@ -1049,7 +1061,7 @@ namespace UnityTest
                 // we need to add them back in to the Rects here.
                 float indent = itemRect.width - indentedRect.width;
                 foldoutRect.x += indent;
-                scriptRect.x += indent;
+                //scriptRect.x += indent;
                 toggleRect.x += indent;
 
                 // Process right-mouse clicks on the foldout button for our left-handed friends
@@ -1067,23 +1079,7 @@ namespace UnityTest
                     }
                 }
 
-                // Process clicks on the script
-                if (Utilities.IsMouseButtonReleased())
-                {
-                    if (Utilities.IsMouseOverRect(scriptRect) && GUI.enabled)
-                    {
-                        if (Event.current.clickCount == 1)
-                        {
-                            EditorGUIUtility.PingObject(script);
-                            Event.current.Use();
-                        }
-                        else if (Event.current.clickCount == 2)
-                        {
-                            AssetDatabase.OpenAsset(script, lineNumber);
-                            GUIUtility.ExitGUI();
-                        }
-                    }
-                }
+                
 
                 
 
