@@ -1,6 +1,5 @@
 using UnityEditor;
 using UnityEngine;
-using System.Collections.Generic;
 
 namespace UnityTest
 {
@@ -65,16 +64,57 @@ namespace UnityTest
                 // "Queue" space
                 using (new EditorGUILayout.HorizontalScope(GUILayout.ExpandHeight(true), GUILayout.ExpandWidth(true)))
                 {
-                    //Rect left = new Rect(rect.x, rect.y, 0.5f * rect.width, rect.height);
-                    //Rect right = new Rect(rect.x + 0.5f * rect.width, rect.y, 0.5f * rect.width, rect.height);
-                    queueScrollPosition = DrawQueue("Selected", ui.manager.queue, null, queueScrollPosition, 
-                        showResult: false
+                    ReorderableTestQueue.QueueFieldResult result = ReorderableTestQueue.QueueField(
+                        new GUIContent("Selected"),
+                        ui.manager.queue,
+                        queueScrollPosition,
+                        (Rect rect, Test test) =>
+                        {
+                            bool dummy = false;
+                            //Utilities.DrawDebugOutline(ui.itemRect, Color.red);
+                            ui.DrawListItem(rect, test, ref dummy, ref dummy, ref dummy,
+                                showFoldout: false,
+                                showScript: true,
+                                showLock: false,
+                                showToggle: false,
+                                showResultBackground: false,
+                                showClearResult: false,
+                                showResult: false,
+                                showSettings: true,
+                                name: test.attribute.GetPath()
+                            );
+                        },
+                        reversed: false,
+                        deselectOnClear: true
                     );
-                    finishedScrollPosition = DrawQueue("Finished", ui.manager.finishedTests, ui.manager.finishedResults, finishedScrollPosition, 
-                        showResult: true,
-                        showSettings : false,
-                        reversed: true
+                    ui.manager.queue = result.queue;
+                    queueScrollPosition = result.scrollPosition;
+
+                    result = ReorderableTestQueue.QueueField(
+                        new GUIContent("Finished"),
+                        ui.manager.finishedTests,
+                        finishedScrollPosition,
+                        (Rect rect, Test test) =>
+                        {
+                            bool dummy = false;
+                            //Utilities.DrawDebugOutline(ui.itemRect, Color.red);
+                            ui.DrawListItem(rect, test, ref dummy, ref dummy, ref dummy,
+                                showFoldout: false,
+                                showScript: true,
+                                showLock: false,
+                                showToggle: false,
+                                showResultBackground: true,
+                                showClearResult: false,
+                                showResult: true,
+                                showSettings: false,
+                                name: test.attribute.GetPath()
+                            );
+                        },
+                        reversed: true,
+                        deselectOnClear: false
                     );
+                    ui.manager.finishedTests = result.queue;
+                    finishedScrollPosition = result.scrollPosition;
                 }
             }
 
@@ -83,110 +123,15 @@ namespace UnityTest
             ProcessEvents();
         }
 
-        private Vector2 DrawQueue(string title, List<Test> queue, List<Test.Result> results, Vector2 scrollPosition, 
-            bool showResult = false,
-            bool showSettings = true,
-            bool reversed = false
-        )
-        {
-            using (new EditorGUILayout.VerticalScope(GUILayout.ExpandWidth(true)))
-            {
-                // header labels for the queue
-                using (new EditorGUILayout.HorizontalScope(GUILayout.ExpandWidth(true)))
-                {
-                    GUIStyle style = Style.Get("GUIQueue/Queue/Title");
-                    Rect r = EditorGUILayout.GetControlRect(false);
-                    r.width = Style.GetWidth(style, title);
-                    GUI.Label(r, title, style);
-
-                    GUILayout.FlexibleSpace();
-
-                    bool disabled = false;
-                    if (queue != null) disabled = queue.Count == 0;
-
-                    using (new EditorGUI.DisabledScope(disabled))
-                    {
-                        if (GUILayout.Button("Clear") && !disabled)
-                        {
-                            if (queue == ui.manager.queue)
-                                foreach (Test test in queue)
-                                    test.selected = false;
-                            queue.Clear();
-                        }
-                    }
-                }
-
-
-
-                // Queue area
-                GUIStyle queueStyle = Style.Get("GUIQueue/Queue");
-                EditorGUILayout.VerticalScope s = new EditorGUILayout.VerticalScope(queueStyle, GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true));
-                Rect queueRect = s.rect;
-                using (s)
-                {
-                    // Respect proper padding
-                    queueRect.x += queueStyle.padding.left;
-                    queueRect.y += queueStyle.padding.top;
-                    queueRect.width -= queueStyle.padding.horizontal;
-                    queueRect.height -= queueStyle.padding.vertical;
-                    
-                    Rect viewRect = new Rect(queueRect);
-
-                    List<Test> tests = new List<Test>();
-
-                    if (queue != null)
-                    {
-                        tests = new List<Test>(queue);
-                        if (reversed) tests.Reverse();
-
-                        ui.indentLevel = 0;
-                        ui.itemRect = queueRect;
-                        ui.itemRect.height = EditorGUIUtility.singleLineHeight;
-                        viewRect.height = EditorGUIUtility.singleLineHeight * tests.Count;
-                    }
-                    
-                    scrollPosition = GUI.BeginScrollView(
-                        queueRect,
-                        scrollPosition,
-                        viewRect,
-                        false,
-                        false,
-                        GUIStyle.none,
-                        GUI.skin.verticalScrollbar
-                    );
-                    {
-                        foreach (Test test in tests)
-                        {
-                            DrawQueueTest(test, queue, 
-                                showResult: showResult,
-                                showSettings: showSettings
-                            );
-                        }
-                    }
-                    GUI.EndScrollView();
-                }
-
-                GUILayout.Space(Style.Get("GUIQueue/Queue").margin.bottom);
-            }
-
-            return scrollPosition;
-        }
-
         private void DrawQueueRunning()
         {
             using (new GUILayout.VerticalScope())
             {
                 using (new GUILayout.HorizontalScope())
                 {
-                    float previousLabelWidth = EditorGUIUtility.labelWidth;
-                    //EditorGUIUtility.labelWidth = 0f;
                     GUILayout.Label("Running", Style.Get("GUIQueue/Queue/Title"), GUILayout.Width(Style.GetWidth("GUIQueue/Queue/Title", "Running")));
-
                     GUILayout.FlexibleSpace();
-
                     GUILayout.Label("frame " + string.Format("{0,8}", ui.manager.nframes) + "    " + ui.manager.timer.ToString("0.0000 s"));
-
-                    EditorGUIUtility.labelWidth = previousLabelWidth;
                 }
 
                 GUIStyle box = Style.Get("GUIQueue/Queue");
@@ -197,47 +142,8 @@ namespace UnityTest
                 rect.width -= box.padding.horizontal;
                 rect.y += box.padding.top;
                 rect.height -= box.padding.vertical;
-                if (Test.current != null) DrawQueueTest(rect, Test.current);
+                if (Test.current != null) GUI.Label(rect, Test.current.attribute.GetPath(), Style.Get("GUIQueue/Test"));
             }
-        }
-
-        private void DrawQueueTest(Test test, List<Test> queue,
-            bool showResult = false,
-            bool showSettings = true
-        )
-        {
-            GUIStyle clearStyle = Style.Get("ClearResult");
-            GUIContent clearIcon = Style.GetIcon("ClearResult", "Remove test from queue");
-
-            Rect last = new Rect(ui.itemRect);
-            last.width = Style.GetWidth(clearStyle, clearIcon);
-            float previousItemRectX = ui.itemRect.x;
-            ui.itemRect.x += last.width;
-            ui.itemRect.width -= last.width;
-
-            if (GUI.Button(last, clearIcon, clearStyle)) queue.Remove(test);
-
-            bool dummy = false;
-            //Utilities.DrawDebugOutline(ui.itemRect, Color.red);
-            ui.DrawListItem(test, ref dummy, ref dummy, ref dummy, 
-                    showFoldout: false,
-                    showScript: true,
-                    showLock: false,
-                    showToggle: false,
-                    showResultBackground: showResult,
-                    showClearResult: false,
-                    showResult: showResult,
-                    showSettings: showSettings,
-                    name: test.attribute.GetPath()
-                );
-            ui.itemRect.x = previousItemRectX;
-            ui.itemRect.width += last.width;
-        }
-
-
-        private void DrawQueueTest(Rect rect, Test test)
-        {
-            GUI.Label(rect, test.attribute.GetPath(), Style.Get("GUIQueue/Test"));
         }
 
 

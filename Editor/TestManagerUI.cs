@@ -31,8 +31,8 @@ namespace UnityTest
 
         public Foldout rootFoldout => manager.rootFoldout;
         public List<Foldout> foldouts => manager.foldouts;
-        public GUIQueue guiQueue => manager.guiQueue;
 
+        // Defer these parameters so that they are saved in the TestManager object (EditorWindows can't be saved as ScriptableObjects :( )
         public Vector2 scrollPosition { get => manager.scrollPosition; set => manager.scrollPosition = value; }
         public bool showWelcome { get => manager.showWelcome; set => manager.showWelcome = value; }
         public bool loadingWheelVisible { get => manager.loadingWheelVisible; set => manager.loadingWheelVisible = value; }
@@ -359,7 +359,7 @@ namespace UnityTest
                     }
                 }
 
-                guiQueue.Draw();
+                manager.guiQueue.Draw();
             }
 
             if (loadingWheelVisible) DrawLoadingWheel(mainScope.rect);
@@ -368,22 +368,18 @@ namespace UnityTest
             {
                 // Doing things this way avoids annoying GUI errors complaining about groups not being ended properly.
                 if (refresh) Refresh();
-                //else if (selectAll) rootFoldout.Select(manager); // Simulate a press
-                //else if (deselectAll) rootFoldout.Deselect(manager); // Simulate a press
             }
         }
 
         private void DrawWelcome()
         {
             // Setup styles and content
-            //GUIContent content = Style.GetIcon("TestManagerUI/Welcome");
             GUIContent icon = Style.GetIcon("TestManagerUI/Welcome");
             GUIContent title = new GUIContent(Style.welcomeTitle, icon.image);
             GUIContent message = new GUIContent(Style.welcomeMessage);
             GUIContent donate = Style.GetIcon("TestManagerUI/Donate");
             GUIContent doc = Style.GetIcon("TestManagerUI/Documentation");
 
-            //GUIStyle mainStyle = Style.Get("TestManagerUI/TestView");
             GUIStyle welcomeStyle = Style.Get("TestManagerUI/Welcome");
             GUIStyle titleStyle = Style.Get("TestManagerUI/Welcome/Title");
             GUIStyle messageStyle = Style.Get("TestManagerUI/Welcome/Message");
@@ -535,7 +531,7 @@ namespace UnityTest
                 }
                 final += path[(matches[matches.Count - 1].Index + matches[matches.Count - 1].Length)..];
 
-                DrawListItem(match, ref match.expanded, ref match.locked, ref match.selected,
+                DrawListItem(itemRect, match, ref match.expanded, ref match.locked, ref match.selected,
                     showFoldout: false,
                     showScript: true,
                     showLock: true,
@@ -547,6 +543,7 @@ namespace UnityTest
                     showSettings: false,
                     name: final
                 );
+                itemRect.y += itemRect.height;
             }
         }
 
@@ -804,6 +801,7 @@ namespace UnityTest
         /// object reference, the "clear results" button, and the test results. It does not draw the contents of the foldout for a Test object.
         /// </summary>
         public void DrawListItem(
+            Rect itemRect,
             Object item,
             ref bool expanded, ref bool locked, ref bool selected,
             bool showFoldout = true,
@@ -1101,11 +1099,9 @@ namespace UnityTest
                     //new System.Tuple < Rect, Color >(settingsRect,     Color.red),
                 }) Utilities.DrawDebugOutline(kvp.Item1, kvp.Item2);
             }
-
-            itemRect.y += itemRect.height;
         }
 
-
+        /*
         [CustomPropertyDrawer(typeof(Test.TestPrefab))]
         public class TestPrefabPropertyDrawer : PropertyDrawer
         {
@@ -1179,6 +1175,7 @@ namespace UnityTest
                 EditorGUI.ObjectField(rect2, _gameObject, GUIContent.none);
             }
         }
+        */
         #endregion Tests
 
         #endregion UI

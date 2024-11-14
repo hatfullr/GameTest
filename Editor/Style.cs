@@ -47,7 +47,7 @@ namespace UnityTest
         }
         public static class GUIQueue
         {
-            public const float minHeight = 200f;
+            public const float minHeight = 150f;
             //public const float minWidth = 300f;
         }
 

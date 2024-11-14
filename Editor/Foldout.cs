@@ -67,7 +67,7 @@ namespace UnityTest
                 selected |= IsAllSelected(ui.manager); // Set to the proper state ahead of time if needed
                 if (!IsAnySelected(ui.manager)) selected = false;
 
-                ui.DrawListItem(this, ref expanded, ref locked, ref selected,
+                ui.DrawListItem(ui.itemRect, this, ref expanded, ref locked, ref selected,
                     showFoldout: true,
                     showScript: false,
                     showLock: true,
@@ -78,6 +78,7 @@ namespace UnityTest
                     showSettings: false,
                     changeItemRectWidthOnTextOverflow: true
                 );
+                ui.itemRect.y += ui.itemRect.height;
 
                 if (expanded)
                 {
@@ -93,7 +94,7 @@ namespace UnityTest
                     {
                         foreach (Test test in tests.OrderBy(x => x.attribute.name))
                         {
-                            ui.DrawListItem(test, ref test.expanded, ref test.locked, ref test.selected,
+                            ui.DrawListItem(ui.itemRect, test, ref test.expanded, ref test.locked, ref test.selected,
                                 showFoldout: false,
                                 showScript: true,
                                 showLock: true,
@@ -103,6 +104,7 @@ namespace UnityTest
                                 showResult: true,
                                 changeItemRectWidthOnTextOverflow: true
                             );
+                            ui.itemRect.y += ui.itemRect.height;
                         }
                         ui.itemRect.y += Style.TestManagerUI.foldoutMargin;
                     }
