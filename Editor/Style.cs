@@ -49,6 +49,8 @@ namespace UnityTest
         {
             public const float minHeight = 150f;
             //public const float minWidth = 300f;
+            public static Color dragFromColor = new Color(1f, 1f, 1f, 0.1f);
+            public static Color dragToColor = new Color(0.5f, 0.5f, 1f, 0.1f);
         }
 
         public static class Tooltips
@@ -413,7 +415,6 @@ namespace UnityTest
                 case "GUIQueue/Test":
                     s = new GUIStyle(EditorStyles.label);
                     s.alignment = TextAnchor.MiddleLeft;
-                    //s.padding = new RectOffset(0, 0, 0, 0);
                     s.clipping = TextClipping.Clip;
                     break;
                 case "GUIQueue/Toolbar/BoldLabel":
@@ -424,12 +425,18 @@ namespace UnityTest
                     break;
                 case "GUIQueue/Queue":
                     s = new GUIStyle(EditorStyles.helpBox);
+                    s.margin.top = 1;
                     break;
                 case "GUIQueue/Queue/Title":
                     s = new GUIStyle(EditorStyles.boldLabel);
+                    s.alignment = TextAnchor.LowerLeft;
                     break;
                 case "GUIQueue/Queue/Clear":
                     s = new GUIStyle(GUI.skin.button);
+                    break;
+                case "GUIQueue/FrameCounter":
+                    s = new GUIStyle(EditorStyles.label);
+                    s.alignment = TextAnchor.LowerRight;
                     break;
                 #endregion GUIQueue
 

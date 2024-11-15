@@ -814,6 +814,7 @@ namespace UnityTest
             bool showGoTo = false,
             bool showSettings = true,
             bool changeItemRectWidthOnTextOverflow = false,
+            bool showTooltips = true,
             string name = null
         )
         {
@@ -878,8 +879,11 @@ namespace UnityTest
 
                 GUIContent resultIcon = Style.GetIcon("Result/" + result.ToString());
                 GUIContent toggleContent = new GUIContent(name);
-                if (result == Test.Result.Fail) toggleContent.tooltip = Style.Tooltips.testFailed;
-                else if (result == Test.Result.Pass) toggleContent.tooltip = Style.Tooltips.testPassed;
+                if (showTooltips)
+                {
+                    if (result == Test.Result.Fail) toggleContent.tooltip = Style.Tooltips.testFailed;
+                    else if (result == Test.Result.Pass) toggleContent.tooltip = Style.Tooltips.testPassed;
+                }
 
 
                 float clearWidth = Style.GetWidth(clearStyle, clearIcon);
