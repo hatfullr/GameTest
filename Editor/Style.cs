@@ -15,10 +15,9 @@ namespace UnityTest
         public const string donationLink = "https://ko-fi.com/rogerhatfull";
         public const string documentationLink = "https://github.com/hatfullr/UnityTest";
         public static string welcomeMessage = string.Join('\n',
-            "<b>1.</b> Create a method in a MonoBehaviour with a [UnityTest.Test] attribute and UnityTest.Assert statements.",
-            "<b>2.</b> Recompile.",
-            "<b>3.</b> Select your test below to add it to the queue.",
-            "<b>4.</b> Click the Play button in the toolbar. A test fails if it throws an AssertionException, " +
+            "<b>1.</b> Create a method in a MonoBehaviour with a [UnityTest.Test] attribute and UnityTest.Assert statements, then recompile.",
+            "<b>2.</b> Select your test below to add it to the queue.",
+            "<b>3.</b> Click the Play button in the toolbar. A test fails if it throws an AssertionException, " +
             "and passes otherwise. Check the Console for detailed results.",
             "Click the GitHub button or see README.md for additional information. <b>If this tool has helped you, please consider donating " +
             "to help me create more cool stuff.</b> Thank you for using UnityTest.",
@@ -48,9 +47,37 @@ namespace UnityTest
         public static class GUIQueue
         {
             public const float minHeight = 150f;
-            //public const float minWidth = 300f;
-            public static Color dragFromColor = new Color(1f, 1f, 1f, 0.1f);
-            public static Color dragToColor = new Color(0.5f, 0.5f, 1f, 0.1f);
+            public static Color dragFromColor
+            {
+                get
+                {
+                    Color ret = Color.black;
+                    if (Utilities.isDarkTheme) ret = Color.white;
+                    ret.a = 0.25f;
+                    return ret;
+                }
+            }
+            public static Color dragToColor
+            {
+                get
+                {
+                    Color ret = Color.cyan;
+                    if (Utilities.isDarkTheme) ret.r = 0.5f;
+                    else ret *= 0.5f;
+                    ret.a = 0.5f;
+                    return ret;
+                }
+            }
+            public static Color dragHoverColor
+            {
+                get
+                {
+                    Color ret = dragFromColor;
+                    ret.a *= 0.5f;
+                    return ret;
+                }
+            }
+            public const float dragBarHeight = 1f;
         }
 
         public static class Tooltips
@@ -286,7 +313,7 @@ namespace UnityTest
                     s.imagePosition = ImagePosition.ImageLeft;
                     s.fontSize = 18;
                     s.fontStyle = FontStyle.Bold;
-                    s.alignment = TextAnchor.LowerLeft;
+                    s.alignment = TextAnchor.MiddleLeft;
 
                     s.padding.left = 0;
                     s.padding.right = 0;
@@ -365,8 +392,6 @@ namespace UnityTest
                     s.padding = new RectOffset(0, 0, 0, 0);
                     break;
                 case "Lock":
-                    //s = new GUIStyle("IN LockButton");
-                    //s.fixedHeight = Get("Toggle").fixedHeight; // fill to the same height as the toggle
                     s = new GUIStyle(EditorStyles.iconButton);
                     s.fixedHeight = Get("Toggle").fixedHeight; // fill to the same height as the toggle
                     s.alignment = TextAnchor.MiddleCenter;
@@ -643,7 +668,7 @@ namespace UnityTest
 
                 #region GUIQueue
                 case "GUIQueue/Toolbar/Options":
-                    c = new GUIContent(EditorGUIUtility.IconContent("pane options"));
+                    c = new GUIContent(EditorGUIUtility.IconContent("_Menu"));// pane options"));
                     break;
                 #endregion
                 

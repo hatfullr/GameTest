@@ -66,7 +66,8 @@ namespace UnityTest
                         showClearResult: false,
                         showResult: false,
                         showSettings: true,
-                        showTooltips: false,
+                        showTooltips: true,
+                        tooltipOverride: "Click+drag to reorder",
                         name: test.attribute.GetPath()
                     );
                 },
@@ -96,7 +97,8 @@ namespace UnityTest
                 },
                 onDrag: ui.Repaint,
                 reversed: true,
-                deselectOnClear: false
+                deselectOnClear: false,
+                allowReorder: false
             );
 
             DrawSplitter();

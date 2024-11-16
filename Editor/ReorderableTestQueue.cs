@@ -1,9 +1,7 @@
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor;
 using UnityTest;
-using static UnityTest.TestManager;
 
 /// <summary>
 /// I didn't like Unity's implementation of ReorderableList / it was too confusing to implement. This is my own
@@ -17,20 +15,24 @@ public class ReorderableTestQueue
     public System.Action onDrag;
     public bool reversed;
     public bool deselectOnClear;
+    public bool allowReorder;
 
     public Vector2 scrollPosition;
 
     private Test dragging;
-    private Rect dragStartRect;
+    private Rect dragStartRect, mouseOverRect;
     private Test mouseOver;
-    private Rect mouseOverRect;
 
-    private int dragOffset = 0;
+    private DragOffset dragOffset;
 
-    public struct QueueFieldResult
+    private Rect dragBar;
+
+    private enum DragOffset
     {
-        public List<Test> queue;
-        public Vector2 scrollPosition;
+        Lower,
+        Upper,
+        TopMost,
+        BottomMost,
     }
 
     public ReorderableTestQueue(
@@ -39,7 +41,8 @@ public class ReorderableTestQueue
         System.Action<Rect, Test> testDrawer = null,
         System.Action onDrag = null,
         bool reversed = false,
-        bool deselectOnClear = false
+        bool deselectOnClear = false,
+        bool allowReorder = true
     )
     {
         this.queue = queue;
@@ -48,9 +51,17 @@ public class ReorderableTestQueue
         this.onDrag = onDrag;
         this.reversed = reversed;
         this.deselectOnClear = deselectOnClear;
+        this.allowReorder = allowReorder;
     }
 
-    private bool IsDragging() => dragging != null;
+    private bool IsDragging() => dragging != null && allowReorder;
+
+    private List<Test> GetTests()
+    {
+        List<Test> tests = new List<Test>(queue);
+        if (reversed) tests.Reverse();
+        return tests;
+    }
 
     public float GetQueueHeight()
     {
@@ -137,8 +148,19 @@ public class ReorderableTestQueue
         );
         using (scrollViewScope)
         {
-            List<Test> tests = new List<Test>(queue);
-            if (reversed) tests.Reverse();
+            Rect above = new Rect(itemRect.x, viewRect.y, itemRect.width, itemRect.y - viewRect.y);
+
+            List<Test> tests = GetTests();
+
+            if (IsDragging() && Utilities.IsMouseOverRect(above))
+            {
+                mouseOver = tests[0];
+                mouseOverRect = itemRect;
+                dragBar = new Rect(itemRect);
+                dragBar.height = Style.GUIQueue.dragBarHeight;
+                dragBar.y -= 0.5f * dragBar.height;
+                dragOffset = DragOffset.TopMost;
+            }
 
             foreach (Test test in tests)
             {
@@ -149,12 +171,52 @@ public class ReorderableTestQueue
                 {
                     mouseOver = test;
                     mouseOverRect = itemRect;
+
+                    if (IsDragging())
+                    {
+                        Rect upper = new Rect(itemRect.x, itemRect.y, itemRect.width, 0.5f * itemRect.height);
+                        Rect lower = new Rect(itemRect.x, itemRect.y + upper.height, itemRect.width, upper.height);
+
+                        dragBar = new Rect(itemRect);
+                        dragBar.height = Style.GUIQueue.dragBarHeight;
+
+                        dragOffset = DragOffset.Upper;
+
+                        if (Utilities.IsMouseOverRect(lower))
+                        {
+                            dragOffset = DragOffset.Lower;
+                            dragBar.y = itemRect.yMax;
+                        }
+                        if (test == tests[tests.Count - 1])
+                        {
+                            Rect below = new Rect(lower);
+                            below.height = Screen.height;
+                            if (Utilities.IsMouseOverRect(below))
+                            {
+                                dragOffset = DragOffset.BottomMost;
+                                dragBar.y = itemRect.yMax;
+                            }
+                        }
+
+                        dragBar.y -= 0.5f * dragBar.height;
+                    }
+                    else if (allowReorder) EditorGUI.DrawRect(itemRect, Style.GUIQueue.dragHoverColor);
                 }
-
-                if (IsDragging()) OnDrag();
-
                 itemRect.y += itemRect.height;
             }
+            if (tests.Count > 0) itemRect.y -= itemRect.height;
+
+
+            if (IsDragging()) OnDrag();
+
+            // DEBUGGING
+            foreach (System.Tuple<Rect, Color> kvp in new System.Tuple<Rect, Color>[]
+            {
+                //new System.Tuple<Rect, Color>(above, isMouseAboveTests ? Color.green : Color.red),
+                //new System.Tuple<Rect, Color>(below, isMouseBelowTests ? Color.green : Color.red),
+                //new System.Tuple<Rect, Color>(queueRect, isMouseInQueue ? Color.green : Color.red),
+            }) Utilities.DrawDebugOutline(kvp.Item1, kvp.Item2);
+
             scrollPosition = scrollViewScope.scrollPosition;
         }
     }
@@ -170,16 +232,8 @@ public class ReorderableTestQueue
 
     private void ProcessDragDrop()
     {
-        if (!mouseOver)
-        {
-            if (Event.current.rawType == EventType.MouseUp && IsDragging()) OnDragCancelled();
-            return;
-        }
-
         if (Event.current.rawType == EventType.MouseDrag && !IsDragging()) OnDragStarted();
-        else if (Event.current.rawType == EventType.MouseUp) OnDragCompleted();
-
-        //Debug.Log(dragging);
+        else if (Event.current.rawType == EventType.MouseUp && IsDragging()) OnDragCompleted();
     }
 
     /// <summary>
@@ -188,87 +242,51 @@ public class ReorderableTestQueue
     private void OnDrag()
     {
         EditorGUI.DrawRect(dragStartRect, Style.GUIQueue.dragFromColor);
-
-        Rect upper = new Rect(mouseOverRect);
-        Rect lower = new Rect(mouseOverRect);
-        upper.height *= 0.5f;
-        lower.height *= 0.5f;
-        lower.y += upper.height;
-
-        Rect dragTo = new Rect(mouseOverRect.x, 0f, mouseOverRect.width, 2f);
-
-        if (Utilities.IsMouseOverRect(upper))
-        {
-            dragTo.y = upper.y - 0.5f * dragTo.height;
-            if (reversed) dragOffset = 1;
-            else dragOffset = -1;
-        }
-        else if (Utilities.IsMouseOverRect(lower))
-        {
-            dragTo.y = lower.yMax - 0.5f * dragTo.height;
-            if (reversed) dragOffset = -1;
-            else dragOffset = 1;
-        }
-        else
-        {
-            dragOffset = 0;
-            return;
-        }
-
-        EditorGUI.DrawRect(dragTo, Style.GUIQueue.dragToColor);
-
+        EditorGUI.DrawRect(dragBar, Style.GUIQueue.dragToColor);
         onDrag.Invoke();
-
-        //Utilities.DrawDebugOutline(upper, Color.red);
-        //Utilities.DrawDebugOutline(lower, Color.green);
     }
 
     private void OnDragStarted()
     {
-        //Debug.Log("Drag started");
         dragging = mouseOver;
         dragStartRect = mouseOverRect;
     }
 
     private void OnDragCompleted()
     {
-        //Debug.Log("Drag completed");
+        List<Test> tests = GetTests();
 
-        // Put the dragged Test between the neighbor and the current mouseOver Test
-        int oldIndex = queue.IndexOf(dragging);
-        int newIndex = queue.IndexOf(mouseOver) + dragOffset;
 
-        if (oldIndex != newIndex)
+        if (dragOffset == DragOffset.TopMost)
         {
-            queue.RemoveAt(oldIndex);
+            queue.Remove(dragging);
+            if (reversed) queue.Add(dragging);
+            else queue.Insert(0, dragging);
+        }
+        else if (dragOffset == DragOffset.BottomMost)
+        {
+            queue.Remove(dragging);
+            if (reversed) queue.Insert(0, dragging);
+            else queue.Add(dragging);
+        }
+        else
+        {
+            // Put the dragged Test between the neighbor and the current mouseOver Test
+            int newIndex = tests.IndexOf(mouseOver);
+            if (dragOffset == DragOffset.Lower) newIndex += 1;
 
-            /*
-            if (reversed)
-            {
-                if (newIndex < oldIndex) newIndex++; // the actual index could have shifted due to the removal
-            }
-            else
-            {
-                if (newIndex > oldIndex) newIndex--; // the actual index could have shifted due to the removal
-            }
-            */
+            newIndex = Mathf.Clamp(newIndex, 0, tests.Count - 1);
 
-            if (newIndex > oldIndex) newIndex--; // the actual index could have shifted due to the removal
+            // index might change after we have removed the Test
+            if (tests.IndexOf(dragging) < newIndex) newIndex--;
 
-            newIndex = Mathf.Clamp(newIndex, 0, queue.Count - 1);
+            if (reversed) newIndex = tests.Count - newIndex;
 
+            queue.Remove(dragging);
             queue.Insert(newIndex, dragging);
         }
 
         dragging = null;
-        dragOffset = 0;
-    }
-
-    private void OnDragCancelled()
-    {
-        //Debug.Log("Drag cancelled");
-        dragging = null;
-        dragOffset = 0;
     }
 
     public void Draw(Rect rect)

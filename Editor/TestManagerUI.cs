@@ -2,9 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor;
 using UnityEditor.SceneManagement;
-using System.Linq;
 using System.Text.RegularExpressions;
-using UnityEngine.EventSystems;
 
 namespace UnityTest
 {
@@ -427,9 +425,7 @@ namespace UnityTest
                 padding: padding
             );
 
-            Color bg;
-            if (Utilities.isDarkTheme) bg = new Color(0f, 0f, 0f, 0.2f);
-            else bg = new Color(1f, 1f, 1f, 0.2f);
+            Color bg = Color.black * 0.2f;
 
             // Drawing
             GUI.Box(bgRect, GUIContent.none, welcomeStyle);
@@ -438,16 +434,13 @@ namespace UnityTest
 
             using (new EditorGUIUtility.IconSizeScope(new Vector2(titleRect.height - welcomeStyle.padding.vertical, titleRect.height - welcomeStyle.padding.vertical)))
             {
-                EditorGUI.DropShadowLabel(Utilities.GetPaddedRect(titleRect, titleStyle.padding), title, titleStyle);
+                EditorGUI.LabelField(Utilities.GetPaddedRect(titleRect, titleStyle.padding), title, titleStyle);
             }
-            //GUI.Box(header, title, titleStyle);
 
             for (int i = 0; i < nLinks; i++)
             {
                 if (EditorGUI.LinkButton(Utilities.GetPaddedRect(linkRects[i], EditorStyles.linkLabel.padding), linkContent[i])) Application.OpenURL(links[i]);
             }
-
-            //EditorGUI.LabelField(titleRect, title, titleStyle);
 
             EditorGUI.LabelField(Utilities.GetPaddedRect(body, messageStyle.padding), message, messageStyle);
 
@@ -815,6 +808,7 @@ namespace UnityTest
             bool showSettings = true,
             bool changeItemRectWidthOnTextOverflow = false,
             bool showTooltips = true,
+            string tooltipOverride = null,
             string name = null
         )
         {
@@ -881,7 +875,8 @@ namespace UnityTest
                 GUIContent toggleContent = new GUIContent(name);
                 if (showTooltips)
                 {
-                    if (result == Test.Result.Fail) toggleContent.tooltip = Style.Tooltips.testFailed;
+                    if (tooltipOverride != null) toggleContent.tooltip = tooltipOverride;
+                    else if (result == Test.Result.Fail) toggleContent.tooltip = Style.Tooltips.testFailed;
                     else if (result == Test.Result.Pass) toggleContent.tooltip = Style.Tooltips.testPassed;
                 }
 
@@ -1029,7 +1024,11 @@ namespace UnityTest
                 }
                 if (showLock)
                 {
+                    // Desperately trying to save my light skin users
+                    Color contentColor = GUI.contentColor;
+                    if (!Utilities.isDarkTheme) GUI.contentColor = Color.black * 0.5f;
                     if (GUI.Button(lockedRect, lockIcon, lockedStyle)) locked = !locked;
+                    GUI.contentColor = contentColor;
                 }
                 if (showToggle)
                 {
