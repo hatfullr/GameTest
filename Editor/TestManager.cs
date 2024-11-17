@@ -37,6 +37,8 @@ namespace UnityTest
         public string loadingWheelText = null;
         public List<Test> searchMatches = new List<Test>();
 
+        public Utilities.DebugMode debug;
+
         public GUIQueue guiQueue
         {
             get
@@ -58,11 +60,6 @@ namespace UnityTest
         public float timer;
         public uint nframes;
 
-        /// <summary>
-        /// When true, debug messages are printed to Console.
-        /// </summary>
-        public DebugMode debug = DebugMode.Log | DebugMode.LogWarning | DebugMode.LogError;
-
         public bool paused = false;
         public bool running = false;
 
@@ -76,20 +73,6 @@ namespace UnityTest
         private List<AttributeAndMethod> attributesAndMethods = new List<AttributeAndMethod>();
 
         private System.Threading.Tasks.Task task;
-
-        [System.Flags]
-        public enum DebugMode
-        {
-            Log = 1 << 0,
-            LogWarning = 1 << 1,
-            LogError = 1 << 2,
-        }
-
-        public static DebugMode GetDebugMode()
-        {
-            TestManagerUI window = EditorWindow.GetWindow<TestManagerUI>();
-            return window.manager.debug;
-        }
 
         /// <summary>
         /// Save the TestManager asset as well as all assets linked to it.
@@ -129,7 +112,7 @@ namespace UnityTest
             {
                 timer = 0f;
                 nframes = 0;
-                Test.current = null;
+                SkipRemainingTests();
             }
             if (change == PlayModeStateChange.EnteredEditMode) running = false;
         }
@@ -227,7 +210,7 @@ namespace UnityTest
             search = default;
             searchMatches = new List<Test>();
 
-            debug = DebugMode.Log | DebugMode.LogWarning | DebugMode.LogError;
+            Utilities.debug = Utilities.DebugMode.Log | Utilities.DebugMode.LogWarning | Utilities.DebugMode.LogError;
             previousFrameNumber = 0;
             timer = 0f;
             nframes = 0;
@@ -254,8 +237,28 @@ namespace UnityTest
             }
             else
             {
-                if (debug.HasFlag(DebugMode.Log)) Utilities.Log("Starting");
+                Utilities.Log("Starting");
             }
+        }
+
+        private void SkipRemainingTests()
+        {
+            // Mark any remaining tests as skipped
+            if (Test.current != null)
+            {
+                Test.current.result = Test.Result.Skipped;
+                Test.current.CancelCoroutines();
+                AddToFinishedQueue(Test.current);
+                Test.current.PrintResult();
+                Test.current = null;
+            }
+            foreach (Test test in queue)
+            {
+                test.result = Test.Result.Skipped;
+                AddToFinishedQueue(test);
+                test.PrintResult();
+            }
+            queue.Clear();
         }
 
         /// <summary>
@@ -263,13 +266,12 @@ namespace UnityTest
         /// </summary>
         public void Stop()
         {
-            if (debug.HasFlag(DebugMode.Log)) Utilities.Log("Finished", null, null);
-            queue.Clear();
+            SkipRemainingTests();
             paused = false;
             running = false;
             if (EditorApplication.isPlaying) EditorApplication.ExitPlaymode();
-            Test.current = null;
             onStop();
+            Utilities.Log("Finished", null, null);
         }
         #endregion
 
@@ -489,7 +491,7 @@ namespace UnityTest
         public void UpdateTests(System.Action onFinished = null)
         {
             UpdateTestsAsync(GetAssemblies(), onFinished);
-            if (debug.HasFlag(DebugMode.Log)) Utilities.Log("Tests updated");
+            Utilities.Log("Tests updated");
         }
 
         #endregion

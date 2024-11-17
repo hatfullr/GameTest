@@ -3,6 +3,8 @@ using UnityEngine;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using System.Text.RegularExpressions;
+using Codice.CM.Common.Tree;
+using UnityEditor.VersionControl;
 
 namespace UnityTest
 {
@@ -83,6 +85,8 @@ namespace UnityTest
         /// </summary>
         void OnEnable()
         {
+            Utilities.debug = manager.debug;
+
             searchField = new UnityEditor.IMGUI.Controls.SearchField(); // Unity demands we do this in OnEnable and nowhere else
 
             // Clear these events out if they are already added
@@ -325,9 +329,9 @@ namespace UnityTest
                             viewRect.width = Mathf.Max(minWidth, scrollScope.rect.width);
                             viewRect.height = GetListHeight();
 
-                            //Utilities.DrawDebugOutline(new Rect(scrollRect.x + viewRect.x, scrollRect.y + viewRect.y, viewRect.width, viewRect.height), Color.red);
+                            if (showWelcome) viewRect.height += GetWelcomeHeight();
 
-                            scrollPosition = GUI.BeginScrollView(
+                            GUI.ScrollViewScope scrollViewScope = new GUI.ScrollViewScope(
                                 scrollScope.rect,
                                 scrollPosition,
                                 viewRect,
@@ -336,10 +340,18 @@ namespace UnityTest
                                 GUI.skin.horizontalScrollbar,
                                 GUI.skin.verticalScrollbar
                             );
+                            using (scrollViewScope)
                             {
-                                if (showWelcome) DrawWelcome(); // Welcome message
+                                scrollPosition = scrollViewScope.scrollPosition;
 
                                 itemRect = new Rect(viewRect.x, viewRect.y, viewRect.width, Style.lineHeight);
+
+                                if (showWelcome)
+                                {
+                                    Rect welcomeRect = DrawWelcome(); // Welcome message
+                                    itemRect.y = welcomeRect.yMax;
+                                }
+
                                 // Apply padding
                                 itemRect.x += style.padding.left;
                                 itemRect.y += style.padding.top;
@@ -347,8 +359,9 @@ namespace UnityTest
 
                                 if (string.IsNullOrEmpty(search)) DrawNormalMode();
                                 else DrawSearchMode();
+
+                                //Utilities.DrawDebugOutline(viewRect, Color.red);
                             }
-                            GUI.EndScrollView();
                         }
                     }
 
@@ -374,7 +387,39 @@ namespace UnityTest
             }
         }
 
-        private void DrawWelcome()
+        private float GetWelcomeHeight()
+        {
+            GUIStyle messageStyle = Style.Get("TestManagerUI/Welcome/Message");
+            GUIContent message = new GUIContent(Style.welcomeMessage);
+            GUIStyle donateStyle = Style.Get("TestManagerUI/Donate");
+            GUIStyle docStyle = Style.Get("TestManagerUI/Documentation");
+            GUIContent donate = Style.GetIcon("TestManagerUI/Donate");
+            GUIContent doc = Style.GetIcon("TestManagerUI/Documentation");
+
+            const int nLinks = 2;
+            string[] links = new string[nLinks] { Style.donationLink, Style.documentationLink };
+
+            GUIStyle[] linkStyles = new GUIStyle[nLinks] { donateStyle, docStyle };
+            GUIContent[] linkContent = new GUIContent[nLinks] { donate, doc };
+
+            Rect[] linkRects = new Rect[nLinks];
+            for (int i = 0; i < nLinks; i++) linkRects[i] = new Rect(Vector2.zero, linkStyles[i].CalcSize(linkContent[i]));
+
+            Rect titleRect = new Rect(viewRect.x, viewRect.y, viewRect.width, 0f);
+            titleRect.height = 0;
+            for (int i = 0; i < nLinks; i++) titleRect.height = Mathf.Max(titleRect.height, linkRects[i].height);
+
+            Rect body = new Rect(
+                viewRect.x,
+            titleRect.yMax,
+            viewRect.width,
+                messageStyle.CalcHeight(message, titleRect.width) + messageStyle.padding.vertical
+            );
+
+            return titleRect.height + body.height;
+        }
+
+        private Rect DrawWelcome()
         {
             // Setup styles and content
             GUIContent icon = Style.GetIcon("TestManagerUI/Welcome");
@@ -449,8 +494,10 @@ namespace UnityTest
 
             EditorGUI.LabelField(Utilities.GetPaddedRect(body, messageStyle.padding), message, messageStyle);
 
-            viewRect.y = bgRect.yMax;
-            viewRect.height -= bgRect.height;
+            Rect ret = new Rect(bgRect);
+
+            //viewRect.y = bgRect.yMax;
+            //viewRect.height -= bgRect.height;
 
             // DEBUGGING
             foreach (System.Tuple<Rect, Color> kvp in new System.Tuple<Rect, Color>[]
@@ -459,7 +506,10 @@ namespace UnityTest
                 //new System.Tuple<Rect,Color>(titleRect, Color.red),
                 //new System.Tuple<Rect,Color>(body,      Color.red)
                 //new System.Tuple<Rect,Color>(viewRect,      Color.red)
+                //new System.Tuple<Rect,Color>(ret,      Color.red)
             }) Utilities.DrawDebugOutline(kvp.Item1, kvp.Item2);
+
+            return ret;
         }
 
         private Mode GetMode()
@@ -701,13 +751,13 @@ namespace UnityTest
 
         private void DrawDebugButton()
         {
-            System.Array values = System.Enum.GetValues(typeof(TestManager.DebugMode));
+            System.Array values = System.Enum.GetValues(typeof(Utilities.DebugMode));
 
             bool hasNothing = true;
             bool hasEverything = true;
             bool hasAnything = false;
             
-            foreach (TestManager.DebugMode mode in values)
+            foreach (Utilities.DebugMode mode in values)
             {
                 if (manager.debug.HasFlag(mode))
                 {
@@ -722,11 +772,11 @@ namespace UnityTest
 
             void ClearFlags()
             {
-                foreach (TestManager.DebugMode mode in values) manager.debug &= ~mode;
+                foreach (Utilities.DebugMode mode in values) manager.debug &= ~mode;
             }
             void SetAllFlags()
             {
-                foreach (TestManager.DebugMode mode in values) manager.debug |= mode;
+                foreach (Utilities.DebugMode mode in values) manager.debug |= mode;
             }
 
             Rect rect = Style.GetRect("TestManagerUI/Toolbar/Debug", debugContent);
@@ -740,7 +790,7 @@ namespace UnityTest
                 if (hasEverything) toolsMenu.AddDisabledItem(new GUIContent("Everything"), true);
                 else toolsMenu.AddItem(new GUIContent("Everything"), hasEverything, SetAllFlags);
 
-                foreach (TestManager.DebugMode mode in System.Enum.GetValues(typeof(TestManager.DebugMode)))
+                foreach (Utilities.DebugMode mode in System.Enum.GetValues(typeof(Utilities.DebugMode)))
                 {
                     toolsMenu.AddItem(new GUIContent(mode.ToString()), manager.debug.HasFlag(mode), () =>
                     {

@@ -93,7 +93,7 @@ namespace UnityTest
                     )) return;
                     test.DestroyDefaultPrefab();
                     Init(test);
-                    if (TestManager.GetDebugMode().HasFlag(TestManager.DebugMode.Log)) Utilities.Log("Reset " + test.attribute.GetPath());
+                    if (Utilities.debug.HasFlag(Utilities.DebugMode.Log)) Utilities.Log("Reset " + test.attribute.GetPath());
                     GUIUtility.ExitGUI();
                 }
             }

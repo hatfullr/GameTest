@@ -9,6 +9,19 @@ namespace UnityTest
 {
     public static class Utilities
     {
+        /// <summary>
+        /// When true, debug messages are printed to Console.
+        /// </summary>
+        public static DebugMode debug = DebugMode.Log | DebugMode.LogWarning | DebugMode.LogError;
+
+        [System.Flags]
+        public enum DebugMode
+        {
+            Log = 1 << 0,
+            LogWarning = 1 << 1,
+            LogError = 1 << 2,
+        }
+
         public static string debugTag { get => "[" + GetPackageInfo().displayName + "]"; }
         public const BindingFlags bindingFlags = BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly | BindingFlags.Static;
 
@@ -474,7 +487,7 @@ namespace UnityTest
         /// <summary>
         /// Print a log message to the console, intended for debug messages.
         /// </summary>
-        [HideInCallstack] public static void Log(string message, Object context, string color, bool hideMessage = true) => Debug.LogFormat(LogType.Log, LogOption.NoStacktrace, context, "{0}", GetLogString(message, color, hideMessage));
+        [HideInCallstack] public static void Log(string message, Object context, string color, bool hideMessage = true) { if (debug.HasFlag(DebugMode.Log)) Debug.LogFormat(LogType.Log, LogOption.NoStacktrace, context, "{0}", GetLogString(message, color, hideMessage)); }
         [HideInCallstack] public static void Log(string message, Object context) => Log(message, context, null);
         [HideInCallstack] public static void Log(string message, string color) => Log(message, null, color);
         [HideInCallstack] public static void Log(string message) => Log(message, null, null);
@@ -482,7 +495,7 @@ namespace UnityTest
         /// <summary>
         /// Print a warning message to the console.
         /// </summary>
-        [HideInCallstack] public static void LogWarning(string message, Object context, string color, bool hideMessage = true) => Debug.LogWarning(GetLogString(message, color, hideMessage), context);
+        [HideInCallstack] public static void LogWarning(string message, Object context, string color, bool hideMessage = true) { if (debug.HasFlag(DebugMode.LogWarning)) Debug.LogWarning(GetLogString(message, color, hideMessage), context); }
         [HideInCallstack] public static void LogWarning(string message, Object context) => LogWarning(message, context, null);
         [HideInCallstack] public static void LogWarning(string message, string color) => LogWarning(message, null, color);
         [HideInCallstack] public static void LogWarning(string message) => LogWarning(message, null, null);
@@ -491,7 +504,7 @@ namespace UnityTest
         /// <summary>
         /// Print a warning message to the console.
         /// </summary>
-        [HideInCallstack] public static void LogError(string message, Object context, string color, bool hideMessage = true) => Debug.LogError(GetLogString(message, color, hideMessage), context);
+        [HideInCallstack] public static void LogError(string message, Object context, string color, bool hideMessage = true) { if (debug.HasFlag(DebugMode.LogError)) Debug.LogError(GetLogString(message, color, hideMessage), context); }
         [HideInCallstack] public static void LogError(string message, Object context) => LogError(message, context, null);
         [HideInCallstack] public static void LogError(string message, string color) => LogError(message, null, color);
         [HideInCallstack] public static void LogError(string message) => LogError(message, null, null);
