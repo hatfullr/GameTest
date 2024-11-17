@@ -58,7 +58,7 @@ public class Example : MonoBehaviour
     [Test] // Create a unit test with the name "TestMethod"
     private void TestMethod(GameObject gameObject)
     {
-	    Example script = gameObject.GetComponent<Example>();
+        Example script = gameObject.GetComponent<Example>();
         int previous = script.number; // Store the previous value of "number"
         script.Method(); // Increment "number"
         Assert.AreEqual(previous + 1, script.number); // Check if the increment worked
