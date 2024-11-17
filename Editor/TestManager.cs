@@ -206,7 +206,7 @@ namespace UnityTest
                 RunNext();
                 return;
             }
-            Test.current.skipped = true;
+            Test.current.result = Test.Result.Skipped;
 
             Test.current.CancelCoroutines();
             Test.current.OnRunComplete();

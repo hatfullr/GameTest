@@ -971,6 +971,7 @@ namespace UnityTest
                     }
                     if (result == Test.Result.Fail) resultColor = Style.failColor; 
                     else if (result == Test.Result.Pass) resultColor = Style.passColor;
+                    else if (result == Test.Result.Skipped) resultColor = Style.skippedColor;
 
                     if (result != Test.Result.None) EditorGUI.DrawRect(resultBGRect, resultColor);
                 }

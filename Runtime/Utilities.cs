@@ -55,11 +55,15 @@ namespace UnityTest
         /// <summary>
         /// HTML color green. Adapts to DarkSkin and LightSkin.
         /// </summary>
-        public static string green { get { if (isDarkTheme) return "#50C878"; return "#164f00"; } }
+        public static string green { get { if (isDarkTheme) return "#50C878"; return "#00802b"; } }
         /// <summary>
         /// HTML color red. Adapts to DarkSkin and LightSkin.
         /// </summary>
         public static string red { get { if (isDarkTheme) return "red"; return "red"; } }
+        /// <summary>
+        /// HTML color yellow. Adapts to DarkSkin and LightSkin.
+        /// </summary>
+        public static string yellow { get { if (isDarkTheme) return "yellow"; return "#806600"; } }
 
         public static float searchBarMinWidth = 80f;
         public static float searchBarMaxWidth = 300f;

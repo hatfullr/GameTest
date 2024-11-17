@@ -22,9 +22,9 @@ namespace UnityTest
             "Click the GitHub button or see README.md for additional information. <b>If this tool has helped you, please consider donating " +
             "to help me create more cool stuff.</b> Thank you for using UnityTest.",
             "",
-            "• Click on script icons to open your code",
-            "• Check for tooltips in this window, also Edit > Preferences > Enable PlayMode Tooltips",
-            "• Hide UnityTest from stack traces by enabling \"Strip logging callstack\" in the triple-dot menu at the top right of the Console",
+            "• Click script icons to open test code",
+            "• Check tooltips, and Edit > Preferences > Enable PlayMode Tooltips",
+            "• Hide UnityTest from stack trace with \"Strip logging callstack\" in the triple-dot menu (top right of Console window)",
             "",
             "<i><size=10>To hide this message, press the speech bubble in the toolbar.</size></i>"
         );
@@ -96,6 +96,7 @@ namespace UnityTest
             public const string welcome = "Show/hide the welcome message";
             public const string testPassed = "Passed";
             public const string testFailed = "Failed";
+            public const string testSkipped = "Skipped";
             public const string clearTest = "Clear test result";
             public const string goToSearch = "Go to foldout";
             public const string lockButton = "Keep item selected/deselected";
@@ -110,6 +111,7 @@ namespace UnityTest
 
         public static Color failColor = new Color(1f, 0f, 0f, 0.1f);
         public static Color passColor = new Color(0, 1f, 0f, 0.1f);
+        public static Color skippedColor = new Color(1f, 1f, 0f, 0.1f);
 
         public static GUIStyle Get(string style)
         {
@@ -404,7 +406,7 @@ namespace UnityTest
                     s.stretchHeight = false;
                     s.padding = new RectOffset(0, 0, 0, 0);
                     s.margin = new RectOffset(0, 3, 0, 0);
-                    //s.contentOffset = new Vector2(-1f, 0f);
+                    s.contentOffset = new Vector2(0f, -1f);
                     s.alignment = TextAnchor.MiddleCenter;
                     break;
                 case "ClearResult":
@@ -655,6 +657,10 @@ namespace UnityTest
                 case "Result/Fail":
                     c = new GUIContent(EditorGUIUtility.IconContent("TestFailed"));
                     c.tooltip = Tooltips.testFailed;
+                    break;
+                case "Result/Skipped":
+                    c = new GUIContent(EditorGUIUtility.IconContent("TestInconclusive"));
+                    c.tooltip = Tooltips.testSkipped;
                     break;
                 case "ClearResult":
                     c = new GUIContent(EditorGUIUtility.IconContent("clear"));

@@ -26,7 +26,6 @@ namespace UnityTest
         /// The attribute on the method to be executed.
         /// </summary>
         public TestAttribute attribute;
-        public bool skipped;
         public bool selected, locked, expanded, isInSuite;
         public static Test current;
         public System.Action onFinished, onSelected, onDeselected;
@@ -67,6 +66,7 @@ namespace UnityTest
             None,
             Pass,
             Fail,
+            Skipped,
         }
 
         private class CoroutineMonoBehaviour : MonoBehaviour { }
@@ -251,7 +251,7 @@ namespace UnityTest
         public void OnRunComplete()
         {
             TearDown();
-            if (result == Result.None && !skipped) result = Result.Pass;
+            if (result == Result.None && result != Result.Skipped) result = Result.Pass;
 
             Application.logMessageReceived -= HandleLog;
 
@@ -272,11 +272,8 @@ namespace UnityTest
             string message = attribute.GetPath();
             if (result == Result.Pass) message = string.Join(' ', Utilities.ColorString("(Passed)", Utilities.green), message);
             else if (result == Result.Fail) message = string.Join(' ', Utilities.ColorString("(Failed)", Utilities.red), message);
-            else if (result == Result.None)
-            {
-                if (skipped) message = string.Join(' ', "(Skipped)", message);
-                else message = string.Join(' ', "(Finished)", message);
-            }
+            else if (result == Result.Skipped) message = string.Join(' ', Utilities.ColorString("(Skipped)", Utilities.yellow), message);
+            else if (result == Result.None) message = string.Join(' ', "(Finished)", message);
             else throw new System.NotImplementedException(result.ToString());
             
             Utilities.Log(message, GetScript());
