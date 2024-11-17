@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
+using UnityEditor;
 using UnityEngine;
 
 
@@ -8,8 +9,20 @@ namespace UnityTest
 {
     public static class Utilities
     {
+        /// <summary>
+        /// When true, debug messages are printed to Console.
+        /// </summary>
+        public static DebugMode debug = DebugMode.Log | DebugMode.LogWarning | DebugMode.LogError;
+
+        [System.Flags]
+        public enum DebugMode
+        {
+            Log = 1 << 0,
+            LogWarning = 1 << 1,
+            LogError = 1 << 2,
+        }
+
         public static string debugTag { get => "[" + GetPackageInfo().displayName + "]"; }
-        public static string editorPrefs { get => GetPackageInfo().displayName; }
         public const BindingFlags bindingFlags = BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly | BindingFlags.Static;
 
         /// <summary>
@@ -28,9 +41,24 @@ namespace UnityTest
         public static string packagesPath { get; } = Path.Join(projectPath, "Packages");
 
         /// <summary>
-        /// Location of the "Packages/UnityTest/Runtime/Data" folder.
+        /// Location where data assets are stored.
         /// </summary>
         public static string dataPath { get => EnsureDirectoryExists(Path.Join(assetsPath, "UnityTest", "Data")); }
+
+        /// <summary>
+        /// Location where Foldout assets are stored.
+        /// </summary>
+        public static string foldoutDataPath { get => EnsureDirectoryExists(Path.Join(dataPath, "Foldouts")); }
+
+        /// <summary>
+        /// Location where Test assets are stored.
+        /// </summary>
+        public static string testDataPath { get => EnsureDirectoryExists(Path.Join(dataPath, "Tests")); }
+
+        /// <summary>
+        /// Location where Test defaultPrefab are stored.
+        /// </summary>
+        public static string testPrefabPath { get => EnsureDirectoryExists(Path.Join(testDataPath, "Default Prefabs")); }
 
         /// <summary>
         /// True if the editor is using the theme called "DarkSkin". Otherwise, false.
@@ -40,11 +68,15 @@ namespace UnityTest
         /// <summary>
         /// HTML color green. Adapts to DarkSkin and LightSkin.
         /// </summary>
-        public static string green { get { if (isDarkTheme) return "#50C878"; return "#164f00"; } }
+        public static string green { get { if (isDarkTheme) return "#50C878"; return "#00802b"; } }
         /// <summary>
         /// HTML color red. Adapts to DarkSkin and LightSkin.
         /// </summary>
         public static string red { get { if (isDarkTheme) return "red"; return "red"; } }
+        /// <summary>
+        /// HTML color yellow. Adapts to DarkSkin and LightSkin.
+        /// </summary>
+        public static string yellow { get { if (isDarkTheme) return "yellow"; return "#806600"; } }
 
         public static float searchBarMinWidth = 80f;
         public static float searchBarMaxWidth = 300f;
@@ -53,6 +85,121 @@ namespace UnityTest
         /// Query the package.json file to determine exactly what the current name of this package is.
         /// </summary>
         public static UnityEditor.PackageManager.PackageInfo GetPackageInfo() => UnityEditor.PackageManager.PackageInfo.FindForAssembly(typeof(Utilities).Assembly);
+
+        private static HashSet<string> loggedExceptions = new HashSet<string>();
+
+        public enum  RectAlignment
+        {
+            LowerLeft,
+            MiddleLeft,
+            UpperLeft,
+            UpperCenter,
+            UpperRight,
+            MiddleRight,
+            LowerRight,
+            LowerCenter,
+            MiddleCenter,
+        }
+
+        /// <summary>
+        /// Returns a new Rect the same size as toAlign, positioned relative to relativeTo according to alignment.
+        /// </summary>
+        public static Rect AlignRect(Rect toAlign, Rect relativeTo, RectAlignment alignment, RectOffset padding = null)
+        {
+            Rect rect = new Rect(toAlign);
+            if (padding == null) padding = new RectOffset(0, 0, 0, 0);
+
+            if (alignment == RectAlignment.LowerLeft || alignment == RectAlignment.MiddleLeft || alignment == RectAlignment.UpperLeft)
+            {
+                rect.x = relativeTo.x + padding.left;
+            }
+            else if (alignment == RectAlignment.LowerCenter || alignment == RectAlignment.MiddleCenter || alignment == RectAlignment.UpperCenter)
+            {
+                rect.x = relativeTo.center.x - 0.5f * rect.width;
+            }
+            else if (alignment == RectAlignment.LowerRight || alignment == RectAlignment.MiddleRight || alignment == RectAlignment.UpperRight)
+            {
+                rect.x = relativeTo.xMax - rect.width - padding.right;
+            }
+
+
+            if (alignment == RectAlignment.LowerLeft || alignment == RectAlignment.LowerCenter || alignment == RectAlignment.LowerRight)
+            {
+                rect.y = relativeTo.yMax - rect.height - padding.bottom;
+            }
+            else if (alignment == RectAlignment.MiddleLeft || alignment == RectAlignment.MiddleCenter || alignment == RectAlignment.MiddleRight)
+            {
+                rect.y = relativeTo.center.y - 0.5f * rect.height;
+            }
+            else if (alignment == RectAlignment.UpperLeft || alignment == RectAlignment.UpperCenter || alignment == RectAlignment.UpperRight)
+            {
+                rect.y = relativeTo.y + padding.top;
+            }
+
+            return rect;
+        }
+
+        /// <summary>
+        /// Align many Rects. Each given Rect is "stacked" such that its edge or corner touches the next Rect in the array at the given stacking order.
+        /// If a padding is given, each Rect will be positioned in a way that respects the padding.
+        /// </summary>
+        public static Rect[] AlignRects(
+            Rect[] toAlign, Rect relativeTo, RectAlignment alignment, RectAlignment stacking,
+            RectOffset[] padding = null
+        )
+        {
+            Rect[] ret = new Rect[toAlign.Length];
+            Rect rel = new Rect(relativeTo);
+            if (padding == null)
+            {
+                padding = new RectOffset[toAlign.Length];
+                for (int i = 0; i < toAlign.Length; i++) padding[i] = null;
+            }
+
+            for (int i = 0; i < ret.Length; i++)
+            {
+                ret[i] = AlignRect(toAlign[i], rel, alignment, padding[i]);
+                if (stacking == RectAlignment.LowerLeft || stacking == RectAlignment.MiddleLeft || stacking == RectAlignment.UpperLeft)
+                {
+                    rel.x -= ret[i].width;
+                }
+                else if (stacking == RectAlignment.LowerRight || stacking == RectAlignment.MiddleRight || stacking == RectAlignment.UpperRight)
+                {
+                    rel.x += ret[i].width;
+                }
+                if (stacking == RectAlignment.LowerLeft || stacking == RectAlignment.LowerCenter || stacking == RectAlignment.LowerRight)
+                {
+                    rel.y -= ret[i].height;
+                }
+                else if (stacking == RectAlignment.UpperLeft || stacking == RectAlignment.UpperCenter || stacking == RectAlignment.UpperRight)
+                {
+                    rel.y += ret[i].height;
+                }
+            }
+            return ret;
+        }
+
+        public static Rect GetPaddedRect(Rect rect, RectOffset padding)
+        {
+            return new Rect(
+                rect.x + padding.left,
+                rect.y + padding.top,
+                rect.width - padding.horizontal,
+                rect.height - padding.vertical
+            );
+        }
+
+        public static void DrawDebugOutline(Rect rect, Color color)
+        {
+            Rect left = new Rect(rect.xMin, rect.y, 1f, rect.height);
+            Rect right = new Rect(rect.xMax, rect.y, 1f, rect.height);
+            Rect top = new Rect(rect.x, rect.yMin, rect.width, 1f);
+            Rect bottom = new Rect(rect.x, rect.yMax, rect.width, 1f);
+            foreach (Rect r in new Rect[] { left, right, top, bottom })
+            {
+                EditorGUI.DrawRect(r, color);
+            }
+        }
 
         /// <summary>
         /// Given the path to a file, returns true if the path is located in the Samples folder, and false otherwise.
@@ -73,20 +220,135 @@ namespace UnityTest
         }
 
         /// <summary>
+        /// Get the file path to Assets/UnityPath/Data/[name].asset.
+        /// </summary>
+        public static string GetAssetPath(string name, string directory)
+        {
+            if (directory == null) directory = dataPath;
+            string path = Path.Join(directory, name);
+            if (Path.GetExtension(path) != ".asset") path = Path.ChangeExtension(path, ".asset");
+            return GetUnityPath(path);
+        }
+
+        public static string GetAssetPath(Object asset) => GetUnityPath(AssetDatabase.GetAssetPath(asset));
+
+        /// <summary>
+        /// Check Assets/UnityTest/Data/[name].asset to see if it exists.
+        /// </summary>
+        public static bool AssetExists(string name, string directory) => File.Exists(GetAssetPath(name, directory));
+
+        /// <summary>
+        /// Loop through all *.asset files in Assets/UnityTest/Data to find the first asset that meets the given criteria function. The
+        /// input parameter to the criteria function is any Object. The result of the criteria function must be a bool.
+        /// </summary>
+        public static T SearchForAsset<T>(System.Func<T, bool> criteria, string searchDirectory, bool errorOnMissing = true)
+        {
+            foreach (string path in Directory.GetFiles(searchDirectory, "*", SearchOption.TopDirectoryOnly))
+            {
+                T asset = LoadAssetAtPath<T>(GetUnityPath(path));
+                if (asset == null) continue; // No asset of the given type exists at the given path
+                if (criteria(asset)) return asset;
+            }
+            if (errorOnMissing) throw new AssetNotFound("type = '" + typeof(T) + "', criteria = '" + criteria + "'");
+            return (T)(object)null;
+        }
+
+        /// <summary>
+        /// Loop through all *.asset files in Assets/UnityTest/Data to find the first asset that meets the given criteria function. The
+        /// input parameter to the criteria function is any Object. The result of the criteria function must be a bool.
+        /// </summary>
+        public static T LoadAssetAtPath<T>(string assetPath) => (T)(object)AssetDatabase.LoadAssetAtPath(GetUnityPath(assetPath), typeof(T));
+
+        /// <summary>
+        /// Create a new asset file at Assets/UnityTest/Data/[name].asset. If overwrite is true then if an asset with the same name already
+        /// exists, it is destroyed and a new one is created in its place. Otherwise, if overwrite is false, the asset is loaded and returned.
+        /// The type must inherit from ScriptableObject.
+        /// </summary>
+        public static T CreateAsset<T>(string name, string directory, System.Action<T> initializer = null, bool overwrite = false)
+        {
+            if (directory == null) directory = dataPath;
+
+            // First check if this asset already exists
+            string path = GetUnityPath(GetAssetPath(name, directory));
+            if (AssetExists(name, directory))
+            {
+                if (overwrite)
+                {
+                    if (!AssetDatabase.DeleteAsset(path)) throw new System.Exception("Failed to overwrite asset at path '" + path + "'");
+                }
+                else return (T)(object)AssetDatabase.LoadAssetAtPath(path, typeof(T));
+            }
+
+            ScriptableObject result = ScriptableObject.CreateInstance(typeof(T));
+            if (initializer != null) initializer((T)(object)result);
+            AssetDatabase.CreateAsset(result, path);
+            return (T)(object)result;
+        }
+
+        public static void SaveAssets(IEnumerable<Object> assets)
+        {
+            MarkAssetsForSave(assets);
+            SaveDirtyAssets(assets);
+        }
+        public static void SaveAsset(Object asset) => SaveAssets(new List<Object> { asset });
+
+        public static void SaveDirtyAsset(Object asset) => AssetDatabase.SaveAssetIfDirty(asset);
+        public static void SaveDirtyAssets(IEnumerable<Object> assets)
+        {
+            foreach (Object asset in assets)
+            {
+                if (asset == null) continue;
+                SaveDirtyAsset(asset);
+            }
+        }
+
+        public static void MarkAssetForSave(Object asset) => EditorUtility.SetDirty(asset);
+        public static void MarkAssetsForSave(IEnumerable<Object> assets)
+        {
+            foreach (Object asset in assets)
+            {
+                if (asset == null) continue;
+                MarkAssetForSave(asset);
+            }
+        }
+
+        public static bool DeleteAsset(string name, string directory) => AssetDatabase.DeleteAsset(GetAssetPath(name, directory));
+        public static bool DeleteAsset(Object asset)
+        {
+            string path = GetAssetPath(asset);
+            return DeleteAsset(Path.GetFileName(path), GetUnityPath(Path.GetDirectoryName(path)));
+        }
+
+        public static void DeleteFolder(string path) => AssetDatabase.DeleteAsset(GetUnityPath(path));
+
+        /// <summary>
         /// Create directories so that the given directory path exists. Returns the given directory path.
         /// </summary>
         public static string EnsureDirectoryExists(string directory)
         {
-            if (Directory.Exists(directory)) return directory;
+            directory = GetUnityPath(directory);
 
-            if (IsPathChild(assetsPath, directory) || IsPathChild(packagesPath, directory))
+            string parent, newFolderName;
+
+            // reverse order begins with top-most directory
+            foreach (string dir in IterateDirectories(directory, true))
             {
-                directory = GetUnityPath(directory);
-                UnityEditor.AssetDatabase.CreateFolder(Path.GetDirectoryName(directory), Path.GetFileName(directory));
-                return directory;
+                parent = Path.GetDirectoryName(dir);
+                newFolderName = Path.GetFileName(dir);
+                if (!AssetDatabase.IsValidFolder(dir))
+                {
+                    AssetDatabase.CreateFolder(parent, newFolderName);
+                }
             }
 
-            Directory.CreateDirectory(directory);
+            // Create the final directory at the destination path
+            parent = Path.GetDirectoryName(directory);
+            newFolderName = Path.GetFileName(directory);
+            if (!AssetDatabase.IsValidFolder(directory))
+            {
+                AssetDatabase.CreateFolder(parent, newFolderName);
+            }
+
             return directory;
         }
 
@@ -134,6 +396,9 @@ namespace UnityTest
         /// </summary>
         public static string GetUnityPath(string path)
         {
+            // If the path begins with either "Assets" or "Packages", then it's already a Unity path.
+            if (path.StartsWith("Assets") || path.StartsWith("Packages")) return path;
+
             path = Path.GetFullPath(path); // normalize the path
 
             if (IsPathChild(assetsPath, path)) // it's in the "Assets" folder
@@ -191,7 +456,7 @@ namespace UnityTest
         /// </summary>
         public static bool IsMouseOverRect(Rect rect)
         {
-            if (Event.current != null) return rect.Contains(Event.current.mousePosition) && GUI.enabled;
+            if (Event.current != null) return rect.Contains(Event.current.mousePosition);
             return false;
         }
 
@@ -211,18 +476,18 @@ namespace UnityTest
         }
 
         [HideInCallstack]
-        private static string GetLogString(string message, string color = null)
+        private static string GetLogString(string message, string color = null, bool hideMessage = true)
         {
             string tag = "<size=10>" + debugTag + "</size>";
             if (!string.IsNullOrEmpty(color)) tag = ColorString(tag, color);
-            return string.Join(' ', tag, message);
+            return string.Join(' ', tag, message) + "\n<size=10>(Disable these messages with the debug toolbar button)</size>";
         }
 
 
         /// <summary>
         /// Print a log message to the console, intended for debug messages.
         /// </summary>
-        [HideInCallstack] public static void Log(string message, Object context, string color) => Debug.LogFormat(LogType.Log, LogOption.NoStacktrace, context, "{0}", GetLogString(message, color));
+        [HideInCallstack] public static void Log(string message, Object context, string color, bool hideMessage = true) { if (debug.HasFlag(DebugMode.Log)) Debug.LogFormat(LogType.Log, LogOption.NoStacktrace, context, "{0}", GetLogString(message, color, hideMessage)); }
         [HideInCallstack] public static void Log(string message, Object context) => Log(message, context, null);
         [HideInCallstack] public static void Log(string message, string color) => Log(message, null, color);
         [HideInCallstack] public static void Log(string message) => Log(message, null, null);
@@ -230,7 +495,7 @@ namespace UnityTest
         /// <summary>
         /// Print a warning message to the console.
         /// </summary>
-        [HideInCallstack] public static void LogWarning(string message, Object context, string color) => Debug.LogWarning(GetLogString(message, color), context);
+        [HideInCallstack] public static void LogWarning(string message, Object context, string color, bool hideMessage = true) { if (debug.HasFlag(DebugMode.LogWarning)) Debug.LogWarning(GetLogString(message, color, hideMessage), context); }
         [HideInCallstack] public static void LogWarning(string message, Object context) => LogWarning(message, context, null);
         [HideInCallstack] public static void LogWarning(string message, string color) => LogWarning(message, null, color);
         [HideInCallstack] public static void LogWarning(string message) => LogWarning(message, null, null);
@@ -239,18 +504,27 @@ namespace UnityTest
         /// <summary>
         /// Print a warning message to the console.
         /// </summary>
-        [HideInCallstack] public static void LogError(string message, Object context, string color) => Debug.LogError(GetLogString(message, color), context);
+        [HideInCallstack] public static void LogError(string message, Object context, string color, bool hideMessage = true) { if (debug.HasFlag(DebugMode.LogError)) Debug.LogError(GetLogString(message, color, hideMessage), context); }
         [HideInCallstack] public static void LogError(string message, Object context) => LogError(message, context, null);
         [HideInCallstack] public static void LogError(string message, string color) => LogError(message, null, color);
         [HideInCallstack] public static void LogError(string message) => LogError(message, null, null);
 
         /// <summary>
-        /// Print an exception to the console. The color cannot be changed.
+        /// Print an exception to the console. The color cannot be changed. To ensure that an exception is logged only a single time
+        /// per assembly reload, set "once" to true. Only the exception's message is checked when "once" is true.
         /// </summary>
-        [HideInCallstack] public static void LogException(System.Exception exception, Object context) => Debug.LogException(exception, context);
-        [HideInCallstack] public static void LogException(System.Exception exception) => Debug.LogException(exception);
-        
-
+        [HideInCallstack] public static void LogException(System.Exception exception, Object context, bool once = false)
+        {
+            if (once && loggedExceptions.Contains(exception.Message)) return;
+            Debug.LogException(exception, context);
+            loggedExceptions.Add(exception.Message);
+        }
+        [HideInCallstack] public static void LogException(System.Exception exception, bool once = false)
+        {
+            if (once && loggedExceptions.Contains(exception.Message)) return;
+            Debug.LogException(exception);
+            loggedExceptions.Add(exception.Message);
+        }
 
         /// <summary>
         /// Signifies that a path is not located in either the "Assets" or "Packages" folder of a project.
@@ -260,6 +534,16 @@ namespace UnityTest
             public InvalidUnityPath() { }
             public InvalidUnityPath(string message) : base(message) { }
             public InvalidUnityPath(string message, System.Exception inner) : base(message, inner) { }
+        }
+
+        /// <summary>
+        /// Raised when SearchForAsset fails to locate an asset given its criteria function.
+        /// </summary>
+        public class AssetNotFound : System.Exception
+        {
+            public AssetNotFound() { }
+            public AssetNotFound(string message) : base(message) { }
+            public AssetNotFound(string message, System.Exception inner) : base(message, inner) { }
         }
     }
 }

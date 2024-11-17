@@ -1,3 +1,5 @@
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/K3K415S8MR)
+
 # UnityTest
 A testing framework for the Unity editor that helps you maintain and debug your code without requiring "assembly definition" (`*.asmdef`) files, unlike the [Unity Test Framework](https://docs.unity3d.com/Packages/com.unity.test-framework@1.4/manual/index.html) (UTF). However, `UnityTest` also still works with `*.asmdef` files.
 
@@ -56,7 +58,7 @@ public class Example : MonoBehaviour
     [Test] // Create a unit test with the name "TestMethod"
     private void TestMethod(GameObject gameObject)
     {
-        Example script = gameObject.GetComponent<Example>(); // Get the Example component
+	    Example script = gameObject.GetComponent<Example>();
         int previous = script.number; // Store the previous value of "number"
         script.Method(); // Increment "number"
         Assert.AreEqual(previous + 1, script.number); // Check if the increment worked

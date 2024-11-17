@@ -10,7 +10,7 @@ namespace UnityTest
     /// If SetUp is present, it is called before each method is executed. If TearDown is present (must have SetUp present), it
     /// is called after each method is executed.
     /// </summary>
-    [System.AttributeUsage(System.AttributeTargets.Class), System.Serializable]
+    [System.AttributeUsage(System.AttributeTargets.Class), System.Serializable, System.Obsolete("Testing suites are not yet supported")]
     public class SuiteAttribute : System.Attribute, System.IComparable<SuiteAttribute>
     {
         /// <summary>
@@ -55,16 +55,18 @@ namespace UnityTest
         }
 
         #region Operators
+        public int CompareTo(SuiteAttribute other) => GetPath().CompareTo(other.GetPath());
+
         public override bool Equals(object other)
         {
+            if (other is null) return false;
             if (GetType() != other.GetType()) return false;
             return this == (other as SuiteAttribute);
         }
         public override int GetHashCode() => (sourceFile + name + pauseOnFail).GetHashCode();
-        public static bool operator ==(SuiteAttribute left, SuiteAttribute right) => left.GetPath() == right.GetPath() && left.pauseOnFail == right.pauseOnFail;
-        public static bool operator !=(SuiteAttribute left, SuiteAttribute right) => !(left == right);
-        public int CompareTo(SuiteAttribute other) => GetPath().CompareTo(other.GetPath());
 
+        public static bool operator ==(SuiteAttribute left, SuiteAttribute right) => left.sourceFile == right.sourceFile && left.name == right.name && left.pauseOnFail == right.pauseOnFail;
+        public static bool operator !=(SuiteAttribute left, SuiteAttribute right) => !(left == right);
         #endregion
     }
 }

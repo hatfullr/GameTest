@@ -1,5 +1,3 @@
-// TODO: Move into the Editor/ folder
-
 using System.Reflection;
 using UnityEngine;
 using System.IO;
@@ -14,6 +12,11 @@ namespace UnityTest
     /// </summary>
     public class Test : ScriptableObject
     {
+        /// <summary>
+        /// The user-set prefab that is instantiated when running this test. If null, then "defaultPrefab" is used instead.
+        /// </summary>
+        public GameObject prefab;
+
         public Result result;
         /// <summary>
         /// The test method to be executed.
@@ -23,28 +26,39 @@ namespace UnityTest
         /// The attribute on the method to be executed.
         /// </summary>
         public TestAttribute attribute;
-
-        [HideInInspector] public bool skipped;
-        
-        public GameObject defaultGameObject;
-
-        public bool selected, locked, expanded;
+        public bool selected, locked, expanded, isInSuite;
+        public static Test current;
+        public System.Action onFinished, onSelected, onDeselected;
 
         private GameObject gameObject;
         private Object script = null;
-
-
 
         private GameObject instantiatedDefaultGO = null;
 
         private static GameObject coroutineGO = null;
         private static List<System.Collections.IEnumerator> coroutines = new List<System.Collections.IEnumerator>();
         private static List<Coroutine> cos = new List<Coroutine>();
-        public static Test current;
 
         private static bool sceneWarningPrinted = false;
 
-        public System.Action onFinished;
+        [SerializeField] private GameObject _defaultPrefab;
+        public GameObject defaultPrefab
+        {
+            get
+            {
+                if (_defaultPrefab == null) _defaultPrefab = Utilities.SearchForAsset<GameObject>((GameObject g) => g.name == name, Utilities.testPrefabPath, false);
+                if (_defaultPrefab == null)
+                {
+                    string path = Utilities.GetUnityPath(Utilities.GetAssetPath(name, Utilities.testPrefabPath));
+                    path = Path.ChangeExtension(path, ".prefab");
+                    GameObject gameObject = new GameObject(name, method.DeclaringType);
+                    _defaultPrefab = PrefabUtility.SaveAsPrefabAsset(gameObject, path, out bool success);
+                    DestroyImmediate(gameObject);
+                    if (!success) throw new System.Exception("Failed to create prefab: " + gameObject.name);
+                }
+                return _defaultPrefab;
+            }
+        }
 
         [System.Serializable]
         public enum Result
@@ -52,22 +66,31 @@ namespace UnityTest
             None,
             Pass,
             Fail,
+            Skipped,
         }
 
         private class CoroutineMonoBehaviour : MonoBehaviour { }
 
         public override string ToString() => "Test(" + attribute.GetPath() + ")";
 
-        public bool IsInSuite() => method.DeclaringType.GetCustomAttribute(typeof(SuiteAttribute)) != null;
-
         public bool IsExample() => Utilities.IsSample(attribute.sourceFile);
+
+        /// <summary>
+        /// Destroy the default prefab, which is stored in this project.
+        /// </summary>
+        public bool DestroyDefaultPrefab()
+        {
+            bool ret = AssetDatabase.DeleteAsset(PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(defaultPrefab));
+            _defaultPrefab = null;
+            return ret;
+        }
 
         public GameObject DefaultSetUp()
         {
-            if (defaultGameObject != null)
+            if (prefab != null)
             {
                 instantiatedDefaultGO = null;
-                instantiatedDefaultGO = Object.Instantiate(defaultGameObject);
+                instantiatedDefaultGO = Object.Instantiate(prefab);
                 return instantiatedDefaultGO;
             }
             // Checking if the method is a part of a Unit Test Suite
@@ -93,10 +116,8 @@ namespace UnityTest
                 // Custom method
                 MethodInfo setUp = method.DeclaringType.GetMethod(attribute.setUp, Utilities.bindingFlags);
                 object result = setUp.Invoke(method.DeclaringType, null);
-                //object result = setUp.Invoke(null, null);
 
-
-                if (IsInSuite())
+                if (isInSuite)
                 {
                     if (result != null) throw new System.Exception("Return type of SetUp in Suite must be void: " + method.DeclaringType);
                 }
@@ -126,7 +147,7 @@ namespace UnityTest
             if (!string.IsNullOrEmpty(attribute.tearDown))
             {
                 MethodInfo tearDown = method.DeclaringType.GetMethod(attribute.tearDown, Utilities.bindingFlags);
-                if (IsInSuite()) tearDown.Invoke(null, null);
+                if (isInSuite) tearDown.Invoke(null, null);
                 else tearDown.Invoke(gameObject.GetComponent(method.DeclaringType), new object[] { gameObject });
             }
             else DefaultTearDown();
@@ -163,7 +184,7 @@ namespace UnityTest
                 }
                 if (!ignore)
                 {
-                    Utilities.LogWarning("You are not in an empty scene. Unit Test results might be misleading. Perhaps your previous TearDown function " +
+                    Utilities.LogWarning("You are not in an empty scene. Test results might be misleading. Perhaps your previous TearDown function " +
                         "didn't correctly remove all the GameObjects, or you used Destroy instead of DestroyImmediate. Otherwise this might be intended behavior for " +
                         "the custom tests you wrote, in which case you can ignore this error.");
                     sceneWarningPrinted = true;
@@ -173,13 +194,13 @@ namespace UnityTest
             result = Result.None;
             SetUp();
 
-            // If not a Suite, check the game object
-            if (!IsInSuite())
-            {
-                if (gameObject == null) throw new System.NullReferenceException("GameObject == null. Check your SetUp method for " + attribute.GetPath());
-                if (gameObject.GetComponent(method.DeclaringType) == null && instantiatedDefaultGO == null)
-                    throw new System.NullReferenceException("Component of type " + method.DeclaringType + " not found in the GameObject returned by the SetUp method.");
-            }
+            // check the game object
+            if (gameObject == null) throw new System.NullReferenceException("GameObject == null. Check your SetUp method for " + attribute.name + " in " + Utilities.GetUnityPath(attribute.sourceFile));
+
+            Component component = gameObject.GetComponent(method.DeclaringType);
+
+            if (component == null && instantiatedDefaultGO == null)
+                throw new System.NullReferenceException("Component of type " + method.DeclaringType + " not found in the GameObject returned by the SetUp method.");
 
             // invoke the method
             if (method.ReturnType == typeof(System.Collections.IEnumerator))
@@ -187,29 +208,15 @@ namespace UnityTest
                 if (coroutineGO != null) Object.DestroyImmediate(coroutineGO);
                 coroutineGO = new GameObject("Coroutine helper", typeof(CoroutineMonoBehaviour));
                 coroutineGO.hideFlags = HideFlags.HideAndDontSave;
-                if (IsInSuite())
-                {
-                    Suite suite = Suite.Get(method.DeclaringType);
-                    StartCoroutine(method.Invoke(suite, null) as System.Collections.IEnumerator);
-                }
-                else
-                {
-                    try { StartCoroutine(method.Invoke(gameObject.GetComponent(method.DeclaringType), new object[] { gameObject }) as System.Collections.IEnumerator); }
-                    catch (TargetException) { Utilities.LogError("TargetException was thrown (1). Please submit a bug report."); }
-                }
+                
+                try { StartCoroutine(method.Invoke(component, new object[] { gameObject }) as System.Collections.IEnumerator); }
+                catch (TargetException) { Utilities.LogError("TargetException was thrown (1). Please submit a bug report."); }
             }
             else
             {
-                if (IsInSuite())
-                {
-                    Suite suite = Suite.Get(method.DeclaringType);
-                    method.Invoke(suite, null); // probably of type void
-                }
-                else
-                {
-                    try { method.Invoke(gameObject.GetComponent(method.DeclaringType), new object[] { gameObject }); } // probably of type void
-                    catch (TargetException) { Utilities.LogError("TargetException was thrown (2). Please submit a bug report."); }
-                }
+                try { method.Invoke(component, new object[] { gameObject }); } // probably of type void
+                catch (TargetException) { Utilities.LogError("TargetException was thrown (2). Please submit a bug report."); }
+                
                 OnRunComplete();
             }
         }
@@ -244,7 +251,7 @@ namespace UnityTest
         public void OnRunComplete()
         {
             TearDown();
-            if (result == Result.None && !skipped) result = Result.Pass;
+            if (result == Result.None && result != Result.Skipped) result = Result.Pass;
 
             Application.logMessageReceived -= HandleLog;
 
@@ -265,6 +272,7 @@ namespace UnityTest
             string message = attribute.GetPath();
             if (result == Result.Pass) message = string.Join(' ', Utilities.ColorString("(Passed)", Utilities.green), message);
             else if (result == Result.Fail) message = string.Join(' ', Utilities.ColorString("(Failed)", Utilities.red), message);
+            else if (result == Result.Skipped) message = string.Join(' ', Utilities.ColorString("(Skipped)", Utilities.yellow), message);
             else if (result == Result.None) message = string.Join(' ', "(Finished)", message);
             else throw new System.NotImplementedException(result.ToString());
             
@@ -310,20 +318,11 @@ namespace UnityTest
         public Object GetScript()
         {
             if (script != null) return script;
-            // Intercept trying to load the ExampleTests.cs script from the package folder
-            string pathToSearch;
-            //if (IsExample())
-            //{
-            //    // Get the internal directory in the style that Unity wants it in (starts with "Packages")
-            //    pathToSearch = Path.GetRelativePath(Path.GetDirectoryName(Utilities.packagesPath), Utilities.runtimePath);
-            //}
-            //else
-            //{
-                pathToSearch = Path.GetDirectoryName(Path.Join(
-                    Path.GetFileName(Application.dataPath),     // Usually it's "Assets", unless Unity ever changes that
-                    Path.GetRelativePath(Application.dataPath, attribute.sourceFile))
-                );
-            //}
+
+            string pathToSearch = Path.GetDirectoryName(Path.Join(
+                Path.GetFileName(Application.dataPath),     // Usually it's "Assets", unless Unity ever changes that
+                Path.GetRelativePath(Application.dataPath, attribute.sourceFile))
+            );
 
             string basename = Path.GetFileName(attribute.sourceFile);
 
