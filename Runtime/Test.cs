@@ -94,10 +94,9 @@ namespace UnityTest
                 return instantiatedDefaultGO;
             }
             // Checking if the method is a part of a Unit Test Suite
-            if (method.DeclaringType.GetCustomAttribute(typeof(SuiteAttribute), false) != null)
-            {
-                return null;
-            }
+#pragma warning disable CS0618 // "obsolete" markers
+            if (method.DeclaringType.GetCustomAttribute(typeof(SuiteAttribute), false) != null) return null;
+#pragma warning restore CS0618 // "obsolete" markers
             return new GameObject(attribute.name + " (" + method.DeclaringType + ")", method.DeclaringType);
         }
 

@@ -354,7 +354,9 @@ namespace UnityTest
                 test = Utilities.CreateAsset<Test>(name, Utilities.testDataPath, (Test t) =>
                 {
                     t.method = method;
+#pragma warning disable CS0618 // "obsolete" markers
                     t.isInSuite = method.DeclaringType.GetCustomAttribute(typeof(SuiteAttribute)) != null;
+#pragma warning restore CS0618
                     t.attribute = attribute;
                 });
                  
@@ -364,7 +366,9 @@ namespace UnityTest
             else
             {
                 test.method = method;
+#pragma warning disable CS0618 // "obsolete" markers
                 test.isInSuite = method.DeclaringType.GetCustomAttribute(typeof(SuiteAttribute)) != null;
+#pragma warning restore CS0618
             }
 
             return test;
@@ -380,14 +384,18 @@ namespace UnityTest
                 {
                     if (!type.IsClass) continue; // only work with classes
 
+#pragma warning disable CS0618 // "obsolete" markers
                     classAttributes = type.GetCustomAttributes(typeof(SuiteAttribute), false);
+#pragma warning restore CS0618
                     if (classAttributes.Length > 0)
                     {
                         // Locate the SuiteAttribute if there is one. It has to be done this way for some reason I can't understand.
                         foreach (object attr in classAttributes)
                         {
+#pragma warning disable CS0618 // "obsolete" markers
                             if (attr.GetType() != typeof(SuiteAttribute)) continue;
                             SuiteAttribute suiteAttribute = attr as SuiteAttribute;
+#pragma warning restore CS0618
 
                             // Get the Suite's SetUp and TearDown methods. These are null if it doesn't have them
                             MethodInfo[] methods = type.GetMethods(Utilities.bindingFlags);
@@ -491,7 +499,7 @@ namespace UnityTest
         public void UpdateTests(System.Action onFinished = null)
         {
             UpdateTestsAsync(GetAssemblies(), onFinished);
-            Utilities.Log("Tests updated");
+            //Utilities.Log("Tests updated");
         }
 
         #endregion
