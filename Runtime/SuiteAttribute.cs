@@ -10,7 +10,7 @@ namespace UnityTest
     /// If SetUp is present, it is called before each method is executed. If TearDown is present (must have SetUp present), it
     /// is called after each method is executed.
     /// </summary>
-    [System.AttributeUsage(System.AttributeTargets.Class), System.Serializable]
+    [System.AttributeUsage(System.AttributeTargets.Class), System.Serializable, System.Obsolete("Testing suites are not yet supported")]
     public class SuiteAttribute : System.Attribute, System.IComparable<SuiteAttribute>
     {
         /// <summary>
