@@ -355,9 +355,9 @@ namespace UnityTest
                     t.isInSuite = method.DeclaringType.GetCustomAttribute(typeof(SuiteAttribute)) != null;
                     t.attribute = attribute;
                 });
-
+                 
                 // Each Test needs a "Default GameObject" that is stored in the UnityTest Data folder.
-                test.CreateDefaultPrefab();
+                //test.CreateDefaultPrefab();
             }
             else
             {

@@ -61,6 +61,11 @@ namespace UnityTest
             TestManagerUI window = GetWindow<TestManagerUI>(Style.TestManagerUI.windowTitle);
             window.minSize = new Vector2(Style.TestManagerUI.minWidth, Style.TestManagerUI.minHeight);
         }
+
+        void OnInspectorUpdate()
+        {
+            if (settingsWindow != null) settingsWindow.Repaint();
+        }
         #endregion Unity UI
 
 
@@ -238,11 +243,11 @@ namespace UnityTest
                 StopLoadingWheel();
                 Repaint();
 
-                if (settingsWindow != null)
-                {
-                    if (newSettingsTest == null) settingsWindow.Close();
-                    else settingsWindow.SetTest(newSettingsTest);
-                }
+                //if (settingsWindow != null)
+                //{
+                //    if (newSettingsTest == null) settingsWindow.Close();
+                //    else settingsWindow.SetTest(newSettingsTest);
+                //}
 
                 if (onFinished != null) onFinished();
             });
@@ -1017,9 +1022,9 @@ namespace UnityTest
                 {
                     if (GUI.Button(settingsRect, settingsIcon, settingsStyle))
                     {
-                        if (settingsWindow == null) settingsWindow = SettingsWindow.Init();
-                        settingsWindow.SetTest(item as Test);
-                        settingsWindow.SetVisible(true);
+                        if (settingsWindow == null) settingsWindow = EditorWindow.GetWindow<SettingsWindow>(true);
+                        settingsWindow.Init(item as Test);
+                        settingsWindow.ShowUtility();
                     }
                 }
                 if (showLock)

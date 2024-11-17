@@ -42,7 +42,24 @@ namespace UnityTest
 
         private static bool sceneWarningPrinted = false;
 
-        private GameObject defaultPrefab;
+        [SerializeField] private GameObject _defaultPrefab;
+        public GameObject defaultPrefab
+        {
+            get
+            {
+                if (_defaultPrefab == null) _defaultPrefab = Utilities.SearchForAsset<GameObject>((GameObject g) => g.name == name, Utilities.testPrefabPath, false);
+                if (_defaultPrefab == null)
+                {
+                    string path = Utilities.GetUnityPath(Utilities.GetAssetPath(name, Utilities.testPrefabPath));
+                    path = Path.ChangeExtension(path, ".prefab");
+                    GameObject gameObject = new GameObject(name, method.DeclaringType);
+                    _defaultPrefab = PrefabUtility.SaveAsPrefabAsset(gameObject, path, out bool success);
+                    DestroyImmediate(gameObject);
+                    if (!success) throw new System.Exception("Failed to create prefab: " + gameObject.name);
+                }
+                return _defaultPrefab;
+            }
+        }
 
         [System.Serializable]
         public enum Result
@@ -59,37 +76,13 @@ namespace UnityTest
         public bool IsExample() => Utilities.IsSample(attribute.sourceFile);
 
         /// <summary>
-        /// Get the prefab that is saved in the project and is used when "prefab" is null. This is set immediately after a Test is created.
-        /// </summary>
-        public GameObject GetDefaultPrefab()
-        {
-            // The default prefab should be linked up already, but in case it isn't, we make sure
-            if (defaultPrefab == null) defaultPrefab = Utilities.SearchForAsset<GameObject>((GameObject g) => g.name == name, Utilities.testPrefabPath);
-            return defaultPrefab;
-        }
-
-        /// <summary>
-        /// Create the default prefab, which is stored in this project.
-        /// </summary>
-        public void CreateDefaultPrefab()
-        {
-            GameObject gameObject = new GameObject(name, method.DeclaringType);
-            string path = Utilities.GetUnityPath(Utilities.GetAssetPath(gameObject.name, Utilities.testPrefabPath));
-            path = Path.ChangeExtension(path, ".prefab");
-
-            bool success;
-            defaultPrefab = PrefabUtility.SaveAsPrefabAsset(gameObject, path, out success);
-            DestroyImmediate(gameObject);
-            if (!success) throw new System.Exception("Failed to create prefab: " + gameObject.name);
-        }
-
-        /// <summary>
         /// Destroy the default prefab, which is stored in this project.
         /// </summary>
         public bool DestroyDefaultPrefab()
         {
-            if (defaultPrefab == null) return false;
-            return AssetDatabase.DeleteAsset(PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(defaultPrefab));
+            bool ret = AssetDatabase.DeleteAsset(PrefabUtility.GetPrefabAssetPathOfNearestInstanceRoot(defaultPrefab));
+            _defaultPrefab = null;
+            return ret;
         }
 
         public GameObject DefaultSetUp()
@@ -123,7 +116,6 @@ namespace UnityTest
                 // Custom method
                 MethodInfo setUp = method.DeclaringType.GetMethod(attribute.setUp, Utilities.bindingFlags);
                 object result = setUp.Invoke(method.DeclaringType, null);
-                //object result = setUp.Invoke(null, null);
 
                 if (isInSuite)
                 {
