@@ -633,44 +633,6 @@ namespace UnityTest
             GUI.Label(rect, content, Style.Get("TestManagerUI/LoadingWheel"));
         }
 
-        private bool[] DrawUniversalToggle(State state)
-        {
-            // This is all just to draw the toggle button in the toolbar
-            GUIContent toggle = Style.GetIcon("TestManagerUI/Toolbar/Toggle/On"); // guess at initial value
-            GUIStyle toggleStyle = Style.Get("TestManagerUI/Toolbar/Toggle/On");
-
-            Rect rect = GUILayoutUtility.GetRect(toggle, toggleStyle);
-
-            bool hover = Utilities.IsMouseOverRect(rect) && GUI.enabled;
-
-            // Change the style of the toggle button according to the current state
-            if (state.anySelected && !state.allSelected)
-            {
-                if (hover) toggle = Style.GetIcon("TestManagerUI/Toolbar/Toggle/Mixed/Hover");
-                else toggle = Style.GetIcon("TestManagerUI/Toolbar/Toggle/Mixed");
-            }
-            else
-            {
-                if (state.allSelected)
-                {
-                    if (hover) toggle = Style.GetIcon("TestManagerUI/Toolbar/Toggle/On/Hover");
-                }
-                else if (!state.anySelected)
-                {
-                    if (hover) toggle = Style.GetIcon("TestManagerUI/Toolbar/Toggle/Off/Hover");
-                    else toggle = Style.GetIcon("TestManagerUI/Toolbar/Toggle/Off");
-                }
-            }
-
-            bool wasMixed = EditorGUI.showMixedValue;
-            EditorGUI.showMixedValue = state.anySelected && !state.allSelected;
-            bool choice = GUI.Button(rect, toggle, toggleStyle);
-            EditorGUI.showMixedValue = wasMixed;
-
-            if (choice) return new bool[2] { !state.allSelected, state.anySelected };
-            return new bool[2] { false, false };
-        }
-
         private void DrawClearButton(State state)
         {
             using (new EditorGUI.DisabledScope(!state.selectedHaveResults))
@@ -871,8 +833,6 @@ namespace UnityTest
             using (new EditorGUI.IndentLevelScope(indentLevel))
             {
                 // Save initial state information
-                float previousLabelWidth = EditorGUIUtility.labelWidth;
-                bool wasMixed = EditorGUI.showMixedValue;
                 Color previousBackgroundColor = GUI.backgroundColor;
 
                 // Setup styles
@@ -932,20 +892,15 @@ namespace UnityTest
                 if (showTooltips)
                 {
                     if (tooltipOverride != null) toggleContent.tooltip = tooltipOverride;
-                    else if (result == Test.Result.Fail) toggleContent.tooltip = Style.Tooltips.testFailed;
-                    else if (result == Test.Result.Pass) toggleContent.tooltip = Style.Tooltips.testPassed;
+                    else
+                    {
+                        if (result == Test.Result.Fail) toggleContent.tooltip = Style.Tooltips.testFailed;
+                        else if (result == Test.Result.Pass) toggleContent.tooltip = Style.Tooltips.testPassed;
+                        else if (result == Test.Result.Skipped) toggleContent.tooltip = Style.Tooltips.testSkipped;
+                        else if (result == Test.Result.None) { }
+                        else throw new System.NotImplementedException("Unrecognized result " + result);
+                    }
                 }
-
-
-                float clearWidth = Style.GetWidth(clearStyle, clearIcon);
-                float resultWidth = Style.GetWidth(resultStyle, resultIcon);
-                float settingsWidth = Style.GetWidth(settingsStyle, settingsIcon);
-                
-                if (!showClearResult) clearWidth = 0f;
-                if (!showResult) resultWidth = 0f;
-                if (!showSettings) settingsWidth = 0f;
-
-
 
                 // Setup Rects for drawing
                 Rect indentedRect = EditorGUI.IndentedRect(itemRect);
@@ -976,20 +931,20 @@ namespace UnityTest
 
                 float rightOffset = 0f;
                 Rect resultRect = new Rect(itemRect);
-                resultRect.x = resultRect.xMax - resultWidth - (itemRect.width - indentedRect.width) - resultStyle.margin.right;
-                resultRect.width = resultWidth;
+                resultRect.width = showResult ? Style.GetWidth(resultStyle, resultIcon) : 0f;
+                resultRect.x = itemRect.xMax - resultRect.width - (itemRect.width - indentedRect.width) - resultStyle.margin.right;
                 rightOffset += resultRect.width;
                 if (showResult) rightOffset += resultStyle.margin.left;
 
                 Rect clearRect = new Rect(itemRect);
-                clearRect.x = clearRect.xMax - (rightOffset + clearWidth) - clearStyle.margin.right;
-                clearRect.width = clearWidth;
+                clearRect.width = showClearResult ? Style.GetWidth(clearStyle, clearIcon) : 0f;
+                clearRect.x = itemRect.xMax - (rightOffset + clearRect.width) - clearStyle.margin.right;
                 rightOffset += clearRect.width;
                 if (showClearResult) rightOffset += clearStyle.margin.left;
 
                 Rect settingsRect = new Rect(itemRect);
-                settingsRect.x = settingsRect.xMax - (rightOffset + settingsWidth) - settingsStyle.margin.right;
-                settingsRect.width = settingsWidth;
+                settingsRect.width = showSettings ? Style.GetWidth(settingsStyle, settingsIcon) : 0f;
+                settingsRect.x = itemRect.xMax - (rightOffset + settingsRect.width) - settingsStyle.margin.right;
                 rightOffset += settingsRect.width;
                 if (showSettings) rightOffset += settingsStyle.margin.left;
 
@@ -1009,6 +964,8 @@ namespace UnityTest
                 }
 
                 toggleStyle = new GUIStyle(Style.GetTextOverflowAlignmentStyle(textRect, toggleStyle, toggleContent.text, TextAnchor.MiddleRight));
+
+
 
                 // Drawing
                 Color resultColor = Color.clear;
@@ -1089,6 +1046,7 @@ namespace UnityTest
                 }
                 if (showToggle)
                 {
+                    bool wasMixed = EditorGUI.showMixedValue;
                     EditorGUI.showMixedValue = isMixed;
                     using (new EditorGUI.DisabledScope(locked)) selected = EditorGUI.ToggleLeft(toggleRect, toggleContent, selected, toggleStyle);
                     EditorGUI.showMixedValue = wasMixed;
@@ -1109,7 +1067,6 @@ namespace UnityTest
                 if (showResult) EditorGUI.LabelField(resultRect, resultIcon, resultStyle);
 
                 // Reset GUI to previous state
-                EditorGUIUtility.labelWidth = previousLabelWidth;
                 GUI.backgroundColor = previousBackgroundColor;
 
 
@@ -1125,7 +1082,6 @@ namespace UnityTest
                 // Process right-mouse clicks on the foldout button for our left-handed friends
                 if (Utilities.IsMouseOverRect(foldoutRect))
                 {
-
                     if (Event.current != null)
                     {
                         if (Event.current.button == 1 && Event.current.type == EventType.MouseUp)
@@ -1160,82 +1116,6 @@ namespace UnityTest
                 }) Utilities.DrawDebugOutline(kvp.Item1, kvp.Item2);
             }
         }
-
-        /*
-        [CustomPropertyDrawer(typeof(Test.TestPrefab))]
-        public class TestPrefabPropertyDrawer : PropertyDrawer
-        {
-            private const float xpadding = 2f;
-            private float lineHeight = EditorGUIUtility.singleLineHeight;
-
-            private GUIContent[] methodNames;
-
-            private void Initialize(SerializedProperty property)
-            {
-                System.Type type = property.serializedObject.targetObject.GetType();
-                string[] names = type.GetMethods(Utilities.bindingFlags)
-                              .Where(m => m.GetCustomAttributes(typeof(TestAttribute), true).Length > 0)
-                              .Select(m => m.Name).ToArray();
-                methodNames = new GUIContent[names.Length];
-                for (int i = 0; i < names.Length; i++)
-                    methodNames[i] = new GUIContent(names[i]);
-            }
-
-            public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
-            {
-                return lineHeight;
-            }
-
-            public override void OnGUI(Rect position, SerializedProperty property, GUIContent label)
-            {
-                if (methodNames == null) Initialize(property);
-
-                SerializedProperty _gameObject = property.FindPropertyRelative(nameof(_gameObject));
-                SerializedProperty _methodName = property.FindPropertyRelative(nameof(_methodName));
-
-                int index = 0;
-                bool labelInOptions = false;
-                for (int i = 0; i < methodNames.Length; i++)
-                {
-                    if (methodNames[i].text == _methodName.stringValue)
-                    {
-                        index = i;
-                    }
-                    if (methodNames[i].text == label.text) labelInOptions = true;
-                }
-
-                // Create the rects to draw as though we had no prefix label (as inside ReorderableLists)
-                Rect rect1 = new Rect(position);
-                rect1.width = EditorGUIUtility.labelWidth - xpadding;
-
-                Rect rect2 = new Rect(position);
-                rect2.xMin = rect1.xMax + xpadding;
-                rect2.width = position.xMax - rect1.xMax;
-
-                if (labelInOptions && property.displayName == label.text)
-                { // If we are in a ReorderableList, then don't draw the prefix label.
-                    label = GUIContent.none;
-                    // For some reason the height is not right if we don't do this...
-                    rect2.height = lineHeight;
-                }
-                else
-                { // Otherwise, draw a prefix label
-                    Rect rect = new Rect(position);
-                    rect.width = EditorGUIUtility.labelWidth - xpadding;
-                    rect1.xMin = rect.xMax + xpadding;
-                    rect1.width = (position.xMax - rect.xMax) * 0.5f - 2 * xpadding;
-                    rect2.xMin = rect1.xMax + xpadding;
-                    rect2.width = position.xMax - rect2.xMin;
-
-                    EditorGUI.LabelField(rect, label);
-                    label = GUIContent.none;
-                }
-                int result = EditorGUI.Popup(rect1, label, index, methodNames);
-                if (result < methodNames.Length) _methodName.stringValue = methodNames[result].text;
-                EditorGUI.ObjectField(rect2, _gameObject, GUIContent.none);
-            }
-        }
-        */
         #endregion Tests
 
         #endregion UI
