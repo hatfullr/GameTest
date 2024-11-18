@@ -331,6 +331,11 @@ namespace UnityTest
 
                             if (showWelcome) viewRect.height += GetWelcomeHeight();
 
+                            if (viewRect.height > scrollScope.rect.height) // This means the vertical scrollbar is visible
+                            {
+                                viewRect.width -= GUI.skin.verticalScrollbar.CalcSize(GUIContent.none).x;
+                            }
+
                             GUI.ScrollViewScope scrollViewScope = new GUI.ScrollViewScope(
                                 scrollScope.rect,
                                 scrollPosition,
@@ -356,6 +361,8 @@ namespace UnityTest
                                 itemRect.x += style.padding.left;
                                 itemRect.y += style.padding.top;
                                 itemRect.width -= style.padding.horizontal;
+
+                                
 
                                 if (string.IsNullOrEmpty(search)) DrawNormalMode();
                                 else DrawSearchMode();
