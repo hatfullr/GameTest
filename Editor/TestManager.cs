@@ -21,7 +21,7 @@ namespace UnityTest
         /// <summary>
         /// The Test objects associated with the methods that have a TestAttribute attached to them.
         /// </summary>
-        public Tests tests;
+        public List<Test> tests = new List<Test>();
 
         public List<Test> queue = new List<Test>();
         public List<Test> finishedTests = new List<Test>();
@@ -70,7 +70,7 @@ namespace UnityTest
         /// </summary>
         public System.Action onStop;
 
-        private List<AttributeAndMethod> attributesAndMethods = new List<AttributeAndMethod>();
+        private List<System.Tuple<TestAttribute, MethodInfo>> attributesAndMethods = new List<System.Tuple<TestAttribute, MethodInfo>>();
 
         private System.Threading.Tasks.Task task;
 
@@ -210,7 +210,8 @@ namespace UnityTest
             search = default;
             searchMatches = new List<Test>();
 
-            Utilities.debug = Utilities.DebugMode.Log | Utilities.DebugMode.LogWarning | Utilities.DebugMode.LogError;
+            debug = Utilities.DebugMode.Log | Utilities.DebugMode.LogWarning | Utilities.DebugMode.LogError;
+            Utilities.debug = debug;
             previousFrameNumber = 0;
             timer = 0f;
             nframes = 0;
@@ -341,7 +342,7 @@ namespace UnityTest
 
         
 
-        private Test CreateTest(TestAttribute attribute, MethodInfo method)
+        private void CreateTest(TestAttribute attribute, MethodInfo method)
         {
             // Try to locate an existing Test asset that matches the given TestAttribute.
             // If none are found, create a new Test object and saves the asset to disk.
@@ -371,12 +372,36 @@ namespace UnityTest
 #pragma warning restore CS0618
             }
 
-            return test;
+            tests.Add(test);
         }
-        
+
+        /// <summary>
+        /// Remove the Test from the list of tests, delete the Test asset, and remove the Test from all Foldouts.
+        /// </summary>
+        public void DestroyTest(Test test)
+        {
+            tests.Remove(test);
+            Utilities.DeleteAsset(test);
+
+            foreach (Foldout foldout in foldouts)
+            {
+                if (foldout.tests.Contains(test)) foldout.tests.Remove(test);
+            }
+        }
+
+        /// <summary>
+        /// Return the first Test that has the same TestAttribute, or null if one isn't found.
+        /// </summary>
+        public Test FindTest(TestAttribute attribute)
+        {
+            foreach (Test test in tests)
+                if (test.attribute == attribute) return test;
+            return null;
+        }
+
         private void UpdateTestAttributesAndMethods(HashSet<System.Reflection.Assembly> assemblies)
         {
-            List<AttributeAndMethod> result = new List<AttributeAndMethod>();
+            List<System.Tuple<TestAttribute, MethodInfo>> result = new List<System.Tuple<TestAttribute, MethodInfo>>();
             object[] classAttributes, methodAttributes;
             foreach (System.Reflection.Assembly assembly in assemblies)
             {
@@ -434,7 +459,7 @@ namespace UnityTest
                                 else
                                     testAttribute = new TestAttribute(suiteAttribute.pauseOnFail, method.Name, suiteAttribute.sourceFile);
 
-                                result.Add(new AttributeAndMethod(testAttribute, method));
+                                result.Add(new System.Tuple<TestAttribute, MethodInfo>(testAttribute, method));
                             }
                             break;
                         }
@@ -453,7 +478,7 @@ namespace UnityTest
                         foreach (object attribute in methodAttributes)
                         {
                             if (attribute.GetType() != typeof(TestAttribute)) continue;
-                            result.Add(new AttributeAndMethod(attribute as TestAttribute, method));
+                            result.Add(new System.Tuple<TestAttribute, MethodInfo>(attribute as TestAttribute, method));
                             break;
                         }
                     }
@@ -473,17 +498,21 @@ namespace UnityTest
             task = null;
 
             List<TestAttribute> foundAttributes = new List<TestAttribute>();
-            foreach (AttributeAndMethod obj in attributesAndMethods)
+            foreach (System.Tuple<TestAttribute, MethodInfo> obj in attributesAndMethods)
             {
-                foundAttributes.Add(obj.attribute);
-                if (tests.ContainsAttribute(obj.attribute)) tests.UpdateMethod(obj.attribute, obj.method);
-                else tests.Add(CreateTest(obj.attribute, obj.method)); // Also creates a Test asset in the database
+                TestAttribute attribute = obj.Item1;
+                MethodInfo method = obj.Item2;
+
+                foundAttributes.Add(attribute);
+                Test foundTest = FindTest(attribute);
+                if (foundTest == null) CreateTest(attribute, method);
+                else foundTest.method = method;
             }
 
             // Ensure that "tests" no longer contains any old Test objects that weren't found during this update
-            foreach (TestAttribute attribute in tests.GetAttributes())
+            foreach (Test test in new List<Test>(tests))
             {
-                if (!foundAttributes.Contains(attribute)) tests.RemoveAtAttribute(attribute); // Also deletes the Test asset from the database
+                if (!foundAttributes.Contains(test.attribute)) DestroyTest(test);
             }
 
             // DEBUGGING: Pretend that the task took a long time
@@ -501,66 +530,6 @@ namespace UnityTest
             UpdateTestsAsync(GetAssemblies(), onFinished);
             //Utilities.Log("Tests updated");
         }
-
         #endregion
-
-
-        [System.Serializable]
-        public class Tests : List<Test>
-        {
-            /// <summary>
-            /// Remove the Test from this list and also delete its asset in the asset database
-            /// </summary>
-            public new void Remove(Test test)
-            {
-                Utilities.DeleteAsset(test);
-                base.Remove(test);
-            }
-            public void RemoveAtAttribute(TestAttribute attribute)
-            {
-                foreach (Test test in new List<Test>(this))
-                {
-                    if (test.attribute == attribute)
-                    {
-                        Remove(test);
-                        return;
-                    }
-                }
-            }
-            public bool ContainsAttribute(TestAttribute attribute)
-            {
-                foreach (TestAttribute a in GetAttributes())
-                    if (a == attribute) return true;
-                return false;
-            }
-            public void UpdateMethod(TestAttribute attribute, MethodInfo method)
-            {
-                foreach (Test test in this)
-                {
-                    if (test.attribute == attribute)
-                    {
-                        test.method = method;
-                        return;
-                    }
-                }
-            }
-            public IEnumerable<TestAttribute> GetAttributes()
-            {
-                foreach (Test test in new List<Test>(this))
-                    yield return test.attribute;
-            }
-        }
-
-        private struct AttributeAndMethod
-        {
-            public TestAttribute attribute;
-            public MethodInfo method;
-
-            public AttributeAndMethod(TestAttribute attribute, MethodInfo method)
-            {
-                this.attribute = attribute;
-                this.method = method;
-            }
-        }
     }
 }
