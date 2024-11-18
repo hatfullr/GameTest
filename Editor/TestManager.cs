@@ -37,6 +37,11 @@ namespace UnityTest
         public string loadingWheelText = null;
         public List<Test> searchMatches = new List<Test>();
 
+        /// <summary>
+        /// Set and used by TestManagerUI
+        /// </summary>
+        public bool anyTestsSelected;
+
         public Utilities.DebugMode debug;
 
         public GUIQueue guiQueue
@@ -383,9 +388,17 @@ namespace UnityTest
             tests.Remove(test);
             Utilities.DeleteAsset(test);
 
-            foreach (Foldout foldout in foldouts)
+            foreach (Foldout foldout in new List<Foldout>(foldouts))
             {
-                if (foldout.tests.Contains(test)) foldout.tests.Remove(test);
+                if (foldout.tests.Contains(test))
+                {
+                    foldout.tests.Remove(test);
+                    if (foldout.tests.Count == 0)
+                    {
+                        foldouts.Remove(foldout);
+                        Utilities.DeleteAsset(foldout);
+                    }
+                }
             }
         }
 

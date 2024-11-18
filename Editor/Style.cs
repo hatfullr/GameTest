@@ -399,14 +399,14 @@ namespace UnityTest
                     s.alignment = TextAnchor.MiddleCenter;
                     break;
                 case "Result":
-                    s = new GUIStyle(EditorStyles.iconButton);
+                    s = new GUIStyle(EditorStyles.label);
                     s.imagePosition = ImagePosition.ImageOnly;
                     s.fixedHeight = Get("Toggle").fixedHeight;
                     s.fixedWidth = Get("ClearResult").fixedWidth;
                     s.stretchHeight = false;
                     s.padding = new RectOffset(0, 0, 0, 0);
-                    s.margin = new RectOffset(0, 3, 0, 0);
-                    s.contentOffset = new Vector2(0f, -1f);
+                    s.margin = new RectOffset(0, 2, 0, 0);
+                    s.contentOffset = new Vector2(-1f, -1f);
                     s.alignment = TextAnchor.MiddleCenter;
                     break;
                 case "ClearResult":
