@@ -192,7 +192,7 @@ namespace UnityTest
             Refresh(() => 
             {
                 Utilities.Log("Reset");
-            });
+            }, message: "Resetting");
         }
 
         private void Refresh(System.Action onFinished = null, string message = "Refreshing")
@@ -246,12 +246,6 @@ namespace UnityTest
 
                 StopLoadingWheel();
                 Repaint();
-
-                //if (settingsWindow != null)
-                //{
-                //    if (newSettingsTest == null) settingsWindow.Close();
-                //    else settingsWindow.SetTest(newSettingsTest);
-                //}
 
                 if (onFinished != null) onFinished();
             });
