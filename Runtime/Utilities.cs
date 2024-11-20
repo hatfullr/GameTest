@@ -43,22 +43,7 @@ namespace UnityTest
         /// <summary>
         /// Location where data assets are stored.
         /// </summary>
-        public static string dataPath { get => EnsureDirectoryExists(Path.Join(assetsPath, "UnityTest", "Data")); }
-
-        /// <summary>
-        /// Location where Foldout assets are stored.
-        /// </summary>
-        public static string foldoutDataPath { get => EnsureDirectoryExists(Path.Join(dataPath, "Foldouts")); }
-
-        /// <summary>
-        /// Location where Test assets are stored.
-        /// </summary>
-        public static string testDataPath { get => EnsureDirectoryExists(Path.Join(dataPath, "Tests")); }
-
-        /// <summary>
-        /// Location where Test defaultPrefab are stored.
-        /// </summary>
-        public static string testPrefabPath { get => EnsureDirectoryExists(Path.Join(testDataPath, "Default Prefabs")); }
+        public static string dataPath { get => EnsureDirectoryExists(Path.Join(assetsPath, "UnityTest")); }
 
         /// <summary>
         /// True if the editor is using the theme called "DarkSkin". Otherwise, false.
@@ -230,6 +215,7 @@ namespace UnityTest
             return GetUnityPath(path);
         }
 
+        
         public static string GetAssetPath(Object asset) => GetUnityPath(AssetDatabase.GetAssetPath(asset));
 
         /// <summary>
@@ -285,6 +271,7 @@ namespace UnityTest
             return (T)(object)result;
         }
 
+        
         public static void SaveAssets(IEnumerable<Object> assets)
         {
             MarkAssetsForSave(assets);
@@ -311,6 +298,7 @@ namespace UnityTest
                 MarkAssetForSave(asset);
             }
         }
+        
 
         public static bool DeleteAsset(string name, string directory) => AssetDatabase.DeleteAsset(GetAssetPath(name, directory));
         public static bool DeleteAsset(Object asset)
@@ -320,6 +308,7 @@ namespace UnityTest
         }
 
         public static void DeleteFolder(string path) => AssetDatabase.DeleteAsset(GetUnityPath(path));
+        
 
         /// <summary>
         /// Create directories so that the given directory path exists. Returns the given directory path.

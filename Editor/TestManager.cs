@@ -16,57 +16,28 @@ namespace UnityTest
     [System.Serializable]
     public class TestManager : ScriptableObject
     {
-        public const string fileName = nameof(TestManager);
+        public bool showWelcome = true;
+        public Utilities.DebugMode debug;
+        public string search = null;
+        public bool paused = false;
+        public bool running = false;
 
-        /// <summary>
-        /// The Test objects associated with the methods that have a TestAttribute attached to them.
-        /// </summary>
-        public List<Test> tests = new List<Test>();
+        public Vector2 scrollPosition;
+
+        public List<Foldout> foldouts = new List<Foldout>();
 
         public List<Test> queue = new List<Test>();
         public List<Test> finishedTests = new List<Test>();
-        public List<Test.Result> finishedResults = new List<Test.Result>();
 
-        [SerializeField] private GUIQueue _guiQueue;
-        [SerializeField] private Foldout _rootFoldout;
-        public List<Foldout> foldouts = new List<Foldout>();
-        public Vector2 scrollPosition;
-        public bool showWelcome = true;
+        public GUIQueue guiQueue;
+        
         public bool loadingWheelVisible = false;
-        public string search = null;
         public string loadingWheelText = null;
+
         public List<Test> searchMatches = new List<Test>();
 
-        /// <summary>
-        /// Set and used by TestManagerUI
-        /// </summary>
-        public bool anyTestsSelected;
-
-        public Utilities.DebugMode debug;
-
-        public GUIQueue guiQueue
-        {
-            get
-            {
-                if (_guiQueue == null) _guiQueue = Utilities.CreateAsset<GUIQueue>(GUIQueue.fileName, Utilities.dataPath);
-                return _guiQueue;
-            }
-        }
-
-        public Foldout rootFoldout
-        {
-            get
-            {
-                if (_rootFoldout == null) _rootFoldout = Utilities.CreateAsset<Foldout>("rootFoldout", Utilities.foldoutDataPath);
-                return _rootFoldout;
-            }
-        }
-
-        public float timer;
-        public uint nframes;
-
-        public bool paused = false;
-        public bool running = false;
+        
+        
 
         private uint previousFrameNumber = 0;
 
@@ -84,42 +55,19 @@ namespace UnityTest
         /// </summary>
         public void Save()
         {
-            List<Object> assets = new List<Object>()
-            {
-                this,
-                guiQueue,
-                rootFoldout,
-            };
-            assets.AddRange(foldouts);
-            assets.AddRange(tests);
-
-            for (int i = 0; i < assets.Count; i++)
-            {
-                string message = AssetDatabase.GetAssetPath(assets[i]);
-                if (assets[i].GetType() == typeof(Test)) message = "test " + (assets[i] as Test).attribute.GetPath();
-                else if (assets[i].GetType() == typeof(Foldout)) message = "foldout " + (assets[i] as Foldout).path;
-
-                if (EditorUtility.DisplayCancelableProgressBar("UnityTest", "Saving " + message, (float)(i + 1) / assets.Count))
-                    break;
-
-                Utilities.SaveAsset(assets[i]);
-
-                //System.Threading.Thread.Sleep(2 * (int)1e3); // for testing the cancelable functionality
-            }
-            EditorUtility.ClearProgressBar();
+            EditorUtility.SetDirty(this);
+            AssetDatabase.SaveAssetIfDirty(this);
         }
-
-        
 
         public void OnPlayStateChanged(PlayModeStateChange change)
         {
             if (change == PlayModeStateChange.ExitingPlayMode)
             {
-                timer = 0f;
-                nframes = 0;
                 SkipRemainingTests();
             }
             if (change == PlayModeStateChange.EnteredEditMode) running = false;
+
+            guiQueue.OnPlayStateChanged(change);
         }
 
         [HideInCallstack]
@@ -148,8 +96,7 @@ namespace UnityTest
                 }
                 else
                 {
-                    timer += Time.deltaTime;
-                    nframes++;
+                    guiQueue.IncrementTimer(Time.deltaTime);
                 }
             }
         }
@@ -157,8 +104,8 @@ namespace UnityTest
         [HideInCallstack]
         private void RunNext()
         {
-            timer = 0f;
-            nframes = 0;
+            guiQueue.ResetTimer();
+
             Test test = PopFromQueue();
 
             [HideInCallstack]
@@ -207,22 +154,19 @@ namespace UnityTest
         /// </summary>
         public void Reset()
         {
-            foldouts = new List<Foldout>();
+            foldouts.Clear();
             scrollPosition = default;
             showWelcome = true;
             loadingWheelVisible = false;
             loadingWheelText = null;
             search = default;
-            searchMatches = new List<Test>();
+            searchMatches.Clear();
 
             debug = Utilities.DebugMode.Log | Utilities.DebugMode.LogWarning | Utilities.DebugMode.LogError;
             Utilities.debug = debug;
             previousFrameNumber = 0;
-            timer = 0f;
-            nframes = 0;
-            queue = new List<Test>();
-            finishedTests = new List<Test>();
-            finishedResults = new List<Test.Result>();
+
+            guiQueue.Reset();
         }
 
 
@@ -233,7 +177,6 @@ namespace UnityTest
         public void Start()
         {
             finishedTests.Clear();
-            finishedResults.Clear();
 
             running = true;
 
@@ -285,6 +228,17 @@ namespace UnityTest
 
 
         #region Assembly and Test Management
+        public IEnumerable<Test> GetTests()
+        {
+            foreach (Foldout foldout in foldouts)
+            {
+                foreach (Test test in foldout.tests)
+                {
+                    yield return test;
+                }
+            }
+        }
+
         public void UpdateSearchMatches(TestManagerUI ui, string newSearch)
         {
             searchMatches.Clear();
@@ -294,7 +248,7 @@ namespace UnityTest
 
             string path;
             MatchCollection matches;
-            foreach (Test test in rootFoldout.GetTests(this).OrderBy(x => x.attribute.GetPath()))
+            foreach (Test test in GetTests().OrderBy(x => x.attribute.GetPath()))
             {
                 path = test.attribute.GetPath();
                 matches = re.Matches(path);
@@ -305,12 +259,19 @@ namespace UnityTest
         }
         public void AddToQueue(Test test)
         {
+            foreach (Test t in queue.ToArray())
+            {
+                if (t.attribute.GetPath() == test.attribute.GetPath())
+                {
+                    queue.Remove(t);
+                    break;
+                }
+            }
             queue.Insert(0, test);
         }
         private void AddToFinishedQueue(Test test)
         {
-            finishedTests.Insert(0, test);
-            finishedResults.Insert(0, test.result);
+            finishedTests.Insert(0, new Test(test));
         }
         private Test PopFromQueue()
         {
@@ -319,10 +280,7 @@ namespace UnityTest
             return test;
         }
 
-        private T GetAttribute<T>(MethodInfo method) => (T)(object)method.GetCustomAttribute(typeof(T), false);
-        private T GetAttribute<T>(System.Type cls) => (T)(object)cls.GetCustomAttribute(typeof(T), false);
-
-        public bool IsMethodIgnored(MethodInfo method) => GetAttribute<IgnoreAttribute>(method) != null;
+        public bool IsMethodIgnored(MethodInfo method) => method.GetCustomAttribute<IgnoreAttribute>(false) != null;
 
         /// <summary>
         /// Collect all the assemblies that Unity has compiled.
@@ -346,70 +304,66 @@ namespace UnityTest
         }
 
         
-
+        /// <summary>
+        /// Create a new Test with the given attribute and method. If a Foldout does not exist yet for the new Test,
+        /// Foldouts are created for the entire path of the new Test.
+        /// </summary>
         private void CreateTest(TestAttribute attribute, MethodInfo method)
         {
-            // Try to locate an existing Test asset that matches the given TestAttribute.
-            // If none are found, create a new Test object and saves the asset to disk.
-
-            // It isn't efficient, but let's try just searching through all the existing Test objects for one that has a matching TestAttribute
-            Test test = Utilities.SearchForAsset<Test>((Test t) => t.attribute == attribute, Utilities.testDataPath, false);
-            if (test == null) // Didn't find it
+            // Locate the Foldout that this new Test would be a member of
+            Foldout foundFoldout = null;
+            Test foundTest = null;
+            string parent = Path.GetDirectoryName(attribute.GetPath());
+            foreach (Foldout foldout in foldouts)
             {
-                string name = System.Guid.NewGuid().ToString();
-                test = Utilities.CreateAsset<Test>(name, Utilities.testDataPath, (Test t) =>
+                if (foldout.path == parent)
                 {
-                    t.method = method;
-#pragma warning disable CS0618 // "obsolete" markers
-                    t.isInSuite = method.DeclaringType.GetCustomAttribute(typeof(SuiteAttribute)) != null;
-#pragma warning restore CS0618
-                    t.attribute = attribute;
-                });
-                 
-                // Each Test needs a "Default GameObject" that is stored in the UnityTest Data folder.
-                //test.CreateDefaultPrefab();
-            }
-            else
-            {
-                test.method = method;
-#pragma warning disable CS0618 // "obsolete" markers
-                test.isInSuite = method.DeclaringType.GetCustomAttribute(typeof(SuiteAttribute)) != null;
-#pragma warning restore CS0618
-            }
-
-            tests.Add(test);
-        }
-
-        /// <summary>
-        /// Remove the Test from the list of tests, delete the Test asset, and remove the Test from all Foldouts.
-        /// </summary>
-        public void DestroyTest(Test test)
-        {
-            tests.Remove(test);
-            Utilities.DeleteAsset(test);
-
-            foreach (Foldout foldout in new List<Foldout>(foldouts))
-            {
-                if (foldout.tests.Contains(test))
-                {
-                    foldout.tests.Remove(test);
-                    if (foldout.tests.Count == 0)
+                    foundFoldout = foldout;
+                    foreach (Test test in foundFoldout.tests)
                     {
-                        foldouts.Remove(foldout);
-                        Utilities.DeleteAsset(foldout);
+                        if (test.attribute == attribute)
+                        {
+                            foundTest = test;
+                            break;
+                        }
                     }
+                    break;
                 }
             }
-        }
 
-        /// <summary>
-        /// Return the first Test that has the same TestAttribute, or null if one isn't found.
-        /// </summary>
-        public Test FindTest(TestAttribute attribute)
-        {
-            foreach (Test test in tests)
-                if (test.attribute == attribute) return test;
-            return null;
+            if (foundTest != null) // Found existing matching Test, so update its method
+            {
+                Debug.Log("Set Test method " + foundTest + " " + method);
+                foundTest.method = method;
+            }
+            else // Did not find any existing Test, so make a new one
+            {
+                if (foundFoldout == null) // No Foldout found for the Test, so we also need to make a new one
+                {
+                    // We might need to make several Foldouts so that there is a Foldout for each step on the path
+                    Foldout f;
+                    foreach (string path in Utilities.IterateDirectories(attribute.GetPath()))
+                    {
+                        f = null;
+                        foreach (Foldout foldout in foldouts)
+                        {
+                            if (foldout.path == path)
+                            {
+                                f = foldout;
+                                if (foundFoldout == null) foundFoldout = foldout;
+                                break;
+                            }
+                        }
+                        if (f == null)
+                        {
+                            foldouts.Add(new Foldout(path));
+                            if (foundFoldout == null) foundFoldout = foldouts[foldouts.Count - 1];
+                        }
+                    }
+                }
+
+                foundFoldout.tests.Add(new Test(attribute, method));
+            }
         }
 
         private void UpdateTestAttributesAndMethods(HashSet<System.Reflection.Assembly> assemblies)
@@ -504,8 +458,6 @@ namespace UnityTest
         {
             if (task != null) return; // the task is already running, so do nothing and wait for it to finish
 
-            //Debug.Log("Running");
-
             task = System.Threading.Tasks.Task.Run(() => UpdateTestAttributesAndMethods(assemblies));
             await task;
             task = null;
@@ -517,15 +469,22 @@ namespace UnityTest
                 MethodInfo method = obj.Item2;
 
                 foundAttributes.Add(attribute);
-                Test foundTest = FindTest(attribute);
-                if (foundTest == null) CreateTest(attribute, method);
-                else foundTest.method = method;
+                CreateTest(attribute, method);
             }
 
-            // Ensure that "tests" no longer contains any old Test objects that weren't found during this update
-            foreach (Test test in new List<Test>(tests))
+            // Remove any old Tests that have now been removed from the user's code
+            foreach (Foldout foldout in foldouts.ToArray())
             {
-                if (!foundAttributes.Contains(test.attribute)) DestroyTest(test);
+                foreach (Test test in foldout.tests.ToArray())
+                {
+                    if (foundAttributes.Contains(test.attribute)) continue;
+                    foldout.tests.Remove(test);
+                    if (foldout.tests.Count == 0)
+                    {
+                        foldouts.Remove(foldout);
+                        break;
+                    }
+                }
             }
 
             // DEBUGGING: Pretend that the task took a long time

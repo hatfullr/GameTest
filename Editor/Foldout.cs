@@ -7,7 +7,7 @@ using UnityEngine;
 namespace UnityTest
 {
     [System.Serializable]
-    public class Foldout : ScriptableObject
+    public class Foldout //: ScriptableObject
     {
         /// <summary>
         /// All Test objects in this Foldout will have paths that start with this path.
@@ -18,6 +18,14 @@ namespace UnityTest
         [SerializeField] private bool locked;
 
         public List<Test> tests = new List<Test>();
+
+        public Foldout(string path, bool selected = false, bool expanded = false, bool locked = false)
+        {
+            this.path = path;
+            this.selected = selected;
+            this.expanded = expanded;
+            this.locked = locked;
+        }
 
         /// <summary>
         /// Returns true if any tests in this Foldout come from a Suite, and false otherwise.
@@ -32,9 +40,6 @@ namespace UnityTest
         #region UI Methods
         public void Draw(TestManagerUI ui)
         {
-            // If this is the root foldout
-            if (string.IsNullOrEmpty(path)) throw new System.Exception("Cannot call Draw() on the rootFoldout. This should never happen.");
-
             bool wasExpanded = expanded;
             bool wasSelected = selected;
             bool wasMixed = IsMixed(ui.manager);
@@ -92,9 +97,10 @@ namespace UnityTest
                     }
                     else
                     {
+                        bool dummy = false;
                         foreach (Test test in tests.OrderBy(x => x.attribute.name))
                         {
-                            ui.DrawListItem(ui.itemRect, test, ref test.expanded, ref test.locked, ref test.selected,
+                            ui.DrawListItem(ui.itemRect, test, ref dummy, ref test.locked, ref test.selected,
                                 showFoldout: false,
                                 showScript: true,
                                 showLock: true,
@@ -185,7 +191,6 @@ namespace UnityTest
         public void ExpandAll(TestManager manager, bool value)
         {
             expanded = value;
-            foreach (Test test in GetTests(manager)) test.expanded = value;
             foreach (Foldout child in GetChildren(manager)) child.ExpandAll(manager, value);
         }
         #endregion
@@ -223,7 +228,7 @@ namespace UnityTest
         /// </summary>
         public static IEnumerable<Foldout> GetVisible(TestManagerUI ui)
         {
-            foreach (Foldout foldout in ui.foldouts)
+            foreach (Foldout foldout in ui.manager.foldouts)
             {
                 if (string.IsNullOrEmpty(foldout.path)) // This is the root foldout
                 {
@@ -239,7 +244,7 @@ namespace UnityTest
                     foreach (string parentPath in Utilities.IterateDirectories(foldout.path))
                     {
                         if (parentPath == foldout.path) continue;
-                        foreach (Foldout f in ui.foldouts)
+                        foreach (Foldout f in ui.manager.foldouts)
                         {
                             if (f.path != parentPath) continue;
                             if (!f.expanded) allParentsVisible = false;
@@ -297,6 +302,15 @@ namespace UnityTest
         /// Returns true if this Foldout contains the other Foldout in any subdirectory, and false otherwise.
         /// </summary>
         public bool IsParentOf(Foldout other) => other.IsChildOf(this);
+
+        /// <summary>
+        /// Return true if this Foldout does not have any parent.
+        /// </summary>
+        public bool IsRoot()
+        {
+            if (string.IsNullOrEmpty(path)) return true;
+            return string.IsNullOrEmpty(Path.GetDirectoryName(path));
+        }
 
         /// <summary>
         /// Returns true if more than one of this Foldout's tests is selected, but not all of them. The tests that are checked are

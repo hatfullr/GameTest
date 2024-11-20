@@ -10,7 +10,8 @@ namespace UnityTest
     /// <summary>
     /// A unit test that will appear in the UnityTest Manager as a toggleable test. Each Test has an executable method and an attribute.
     /// </summary>
-    public class Test : ScriptableObject
+    [System.Serializable]
+    public class Test
     {
         /// <summary>
         /// The user-set prefab that is instantiated when running this test. If null, then "defaultPrefab" is used instead.
@@ -26,19 +27,18 @@ namespace UnityTest
         /// The attribute on the method to be executed.
         /// </summary>
         public TestAttribute attribute;
-        public bool selected, locked, expanded, isInSuite;
-        public static Test current;
+        public bool selected, locked;
+        [HideInInspector] public bool isInSuite;
         public System.Action onFinished, onSelected, onDeselected;
 
         private GameObject gameObject;
-        private Object script = null;
+        private Object script;
+        private GameObject instantiatedDefaultGO;
 
-        private GameObject instantiatedDefaultGO = null;
-
-        private static GameObject coroutineGO = null;
+        public static Test current;
+        private static GameObject coroutineGO;
         private static List<System.Collections.IEnumerator> coroutines = new List<System.Collections.IEnumerator>();
         private static List<Coroutine> cos = new List<Coroutine>();
-
         private static bool sceneWarningPrinted = false;
 
         [SerializeField] private GameObject _defaultPrefab;
@@ -46,14 +46,15 @@ namespace UnityTest
         {
             get
             {
-                if (_defaultPrefab == null) _defaultPrefab = Utilities.SearchForAsset<GameObject>((GameObject g) => g.name == name, Utilities.testPrefabPath, false);
+                string name = attribute.GetPath();
+                if (_defaultPrefab == null) _defaultPrefab = Utilities.SearchForAsset((GameObject g) => g.name == name, Utilities.dataPath, false);
                 if (_defaultPrefab == null)
                 {
-                    string path = Utilities.GetUnityPath(Utilities.GetAssetPath(name, Utilities.testPrefabPath));
+                    string path = Utilities.GetUnityPath(Utilities.GetAssetPath(name, Utilities.dataPath));
                     path = Path.ChangeExtension(path, ".prefab");
                     GameObject gameObject = new GameObject(name, method.DeclaringType);
                     _defaultPrefab = PrefabUtility.SaveAsPrefabAsset(gameObject, path, out bool success);
-                    DestroyImmediate(gameObject);
+                    Object.DestroyImmediate(gameObject);
                     if (!success) throw new System.Exception("Failed to create prefab: " + gameObject.name);
                 }
                 return _defaultPrefab;
@@ -67,6 +68,28 @@ namespace UnityTest
             Pass,
             Fail,
             Skipped,
+        }
+
+        public Test(TestAttribute attribute, MethodInfo method)
+        {
+            this.attribute = attribute;
+            this.method = method;
+#pragma warning disable CS0618 // "obsolete" markers
+            isInSuite = method.DeclaringType.GetCustomAttribute(typeof(SuiteAttribute)) != null;
+#pragma warning restore CS0618
+        }
+        
+        public Test(Test original)
+        {
+            attribute = original.attribute;
+            method = original.method;
+            isInSuite = original.isInSuite;
+
+            selected = original.selected;
+            locked = original.locked;
+            result = original.result;
+            script = original.script;
+            prefab = original.prefab;
         }
 
         private class CoroutineMonoBehaviour : MonoBehaviour { }
@@ -161,6 +184,7 @@ namespace UnityTest
                 return;
             }
 
+            Application.logMessageReceived -= HandleLog; // In case it's already added, remove the event (works even if not added)
             Application.logMessageReceived += HandleLog;
 
             current = this;

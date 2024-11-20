@@ -3,8 +3,7 @@ using UnityEngine;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using System.Text.RegularExpressions;
-using Codice.CM.Common.Tree;
-using UnityEditor.VersionControl;
+using static UnityTest.Style;
 
 namespace UnityTest
 {
@@ -22,22 +21,24 @@ namespace UnityTest
         {
             get
             {
-                if (_manager == null) _manager = Utilities.CreateAsset<TestManager>(TestManager.fileName, Utilities.dataPath);
+                if (_manager == null)
+                {
+                    string[] guids = AssetDatabase.FindAssets("t:" + nameof(TestManager));
+                    if (guids.Length == 0) _manager = Utilities.CreateAsset<TestManager>("UnityTest", Utilities.dataPath);
+                    else if (guids.Length == 1) _manager = AssetDatabase.LoadAssetAtPath<TestManager>(AssetDatabase.GUIDToAssetPath(guids[0]));
+                    else if (guids.Length > 1) 
+                    {
+                        string[] paths = new string[guids.Length];
+                        for (int i = 0; i < guids.Length; i++) paths[i] = AssetDatabase.GUIDToAssetPath(guids[i]);
+                        Utilities.LogError("Multiple TestManager ScriptableObjects found in the project for UnityTest. Please " +
+                            "choose one to keep and delete the rest. They are located at: " + string.Join(" ", paths));
+                    }
+                }
                 return _manager;
             }
         }
 
         private SettingsWindow settingsWindow;
-
-        public Foldout rootFoldout => manager.rootFoldout;
-        public List<Foldout> foldouts => manager.foldouts;
-
-        // Defer these parameters so that they are saved in the TestManager object (EditorWindows can't be saved as ScriptableObjects :( )
-        public Vector2 scrollPosition { get => manager.scrollPosition; set => manager.scrollPosition = value; }
-        public bool showWelcome { get => manager.showWelcome; set => manager.showWelcome = value; }
-        public bool loadingWheelVisible { get => manager.loadingWheelVisible; set => manager.loadingWheelVisible = value; }
-        public string search { get => manager.search; set => manager.search = value; }
-        public string loadingWheelText { get => manager.loadingWheelText; set => manager.loadingWheelText = value; }
 
         public Rect viewRect = new Rect(0f, 0f, -1f, -1f);
         public Rect itemRect;
@@ -146,7 +147,7 @@ namespace UnityTest
         /// </summary>
         private void OnTestManagerFinished()
         {
-            foreach (Test test in manager.tests)
+            foreach (Test test in manager.GetTests())
             {
                 if (test.selected) manager.AddToQueue(test);
             }
@@ -165,7 +166,7 @@ namespace UnityTest
         [HideInCallstack]
         void Update()
         {
-            if (loadingWheelVisible)
+            if (manager.loadingWheelVisible)
             {
                 Repaint();
                 return;
@@ -180,19 +181,17 @@ namespace UnityTest
         #region Methods
         private void DoReset()
         {
-            // Delete all data associated with UnityTest
-            Utilities.DeleteFolder(Utilities.dataPath);
-
             manager.Reset();
 
             indentLevel = default;
             spinStartTime = default;
             spinIndex = default;
+            viewRect = new Rect();
+            itemRect = new Rect();
+            minWidth = default;
+            settingsWindow = null;
 
-            Refresh(() => 
-            {
-                Utilities.Log("Reset");
-            }, message: "Resetting");
+            Refresh(() => Utilities.Log("Reset"), message: "Resetting");
         }
 
         private void Refresh(System.Action onFinished = null, string message = "Refreshing")
@@ -205,45 +204,6 @@ namespace UnityTest
 
             manager.UpdateTests(() =>
             {
-                Test newSettingsTest = null;
-                foreach (Test test in manager.tests)
-                {
-                    if (previousSettingsTest != null)
-                    {
-                        if (test.attribute == previousSettingsTest.attribute) newSettingsTest = test;
-                    }
-                    
-                    Foldout final = null;
-                    foreach (string p in Utilities.IterateDirectories(test.attribute.GetPath(), true))
-                    {
-                        Foldout found = null;
-                        foreach (Foldout foldout in foldouts)
-                        {
-                            if (foldout.path == p)
-                            {
-                                found = foldout;
-                                break;
-                            }
-                        }
-
-                        if (found == null)
-                        {
-                            found = Utilities.SearchForAsset<Foldout>((Foldout f) => f.path == p, Utilities.foldoutDataPath, false);
-                            if (found == null) // Failed to find a matching asset, so create a new one now
-                            {
-                                found = Utilities.CreateAsset<Foldout>(System.Guid.NewGuid().ToString(), Utilities.foldoutDataPath, (Foldout newFoldout) =>
-                                {
-                                    newFoldout.path = p;
-                                });
-                            }
-                            foldouts.Add(found);
-                        }
-                        final = found;
-                    }
-                    if (final.tests.Contains(test)) continue;
-                    final.tests.Add(test);
-                }
-
                 StopLoadingWheel();
                 Repaint();
 
@@ -253,12 +213,12 @@ namespace UnityTest
 
         private void ResetSelected()
         {
-            foreach (Test test in rootFoldout.GetTests(manager))
+            foreach (Test test in manager.GetTests())
                 if (test.selected) test.Reset();
         }
         private void ResetAll()
         {
-            foreach (Test test in manager.tests) test.Reset();
+            foreach (Test test in manager.GetTests()) test.Reset();
         }
         #endregion Methods
 
@@ -271,7 +231,7 @@ namespace UnityTest
             EditorGUILayout.VerticalScope mainScope = new EditorGUILayout.VerticalScope(GUILayout.ExpandHeight(true), GUILayout.ExpandWidth(true));
             using (mainScope)
             {
-                using (new EditorGUI.DisabledScope(loadingWheelVisible))
+                using (new EditorGUI.DisabledScope(manager.loadingWheelVisible))
                 {
                     // The main window
                     using (new EditorGUILayout.VerticalScope(GUILayout.ExpandWidth(true), GUILayout.ExpandHeight(true)))
@@ -309,7 +269,7 @@ namespace UnityTest
                             viewRect.width = Mathf.Max(minWidth, scrollScope.rect.width);
                             viewRect.height = GetListHeight();
 
-                            if (showWelcome) viewRect.height += GetWelcomeHeight();
+                            if (manager.showWelcome) viewRect.height += GetWelcomeHeight();
 
                             if (viewRect.height > scrollScope.rect.height) // This means the vertical scrollbar is visible
                             {
@@ -318,7 +278,7 @@ namespace UnityTest
 
                             GUI.ScrollViewScope scrollViewScope = new GUI.ScrollViewScope(
                                 scrollScope.rect,
-                                scrollPosition,
+                                manager.scrollPosition,
                                 viewRect,
                                 false,
                                 false,
@@ -327,11 +287,11 @@ namespace UnityTest
                             );
                             using (scrollViewScope)
                             {
-                                scrollPosition = scrollViewScope.scrollPosition;
+                                manager.scrollPosition = scrollViewScope.scrollPosition;
 
                                 itemRect = new Rect(viewRect.x, viewRect.y, viewRect.width, Style.lineHeight);
 
-                                if (showWelcome)
+                                if (manager.showWelcome)
                                 {
                                     Rect welcomeRect = DrawWelcome(); // Welcome message
                                     itemRect.y = welcomeRect.yMax;
@@ -342,7 +302,7 @@ namespace UnityTest
                                 itemRect.y += style.padding.top;
                                 itemRect.width -= style.padding.horizontal;
 
-                                if (string.IsNullOrEmpty(search)) DrawNormalMode();
+                                if (string.IsNullOrEmpty(manager.search)) DrawNormalMode();
                                 else DrawSearchMode();
 
                                 //Utilities.DrawDebugOutline(viewRect, Color.red);
@@ -352,7 +312,7 @@ namespace UnityTest
 
                     if (!manager.running) // Otherwise stuff will keep being added into the queue during testing time
                     {
-                        foreach (Test test in manager.tests)
+                        foreach (Test test in manager.GetTests())
                         {
                             if (test.selected && !manager.queue.Contains(test)) manager.AddToQueue(test);
                             else if (manager.queue.Contains(test) && !test.selected) manager.queue.Remove(test);
@@ -362,7 +322,7 @@ namespace UnityTest
                     manager.guiQueue.Draw();
                 }
 
-                if (loadingWheelVisible) DrawLoadingWheel(mainScope.rect);
+                if (manager.loadingWheelVisible) DrawLoadingWheel(mainScope.rect);
             }
         }
 
@@ -486,7 +446,7 @@ namespace UnityTest
 
         private Mode GetMode()
         {
-            if (!string.IsNullOrEmpty(search)) return Mode.Search;
+            if (!string.IsNullOrEmpty(manager.search)) return Mode.Search;
             return Mode.Normal;
         }
 
@@ -524,7 +484,8 @@ namespace UnityTest
         /// </summary>
         private void DrawNormalMode()
         {
-            foreach (Foldout child in rootFoldout.GetChildren(manager, false)) child.Draw(this);
+            foreach (Foldout foldout in manager.foldouts)
+                if (foldout.IsRoot()) foldout.Draw(this);
         }
             
 
@@ -533,9 +494,10 @@ namespace UnityTest
         /// </summary>
         private void DrawSearchMode()
         {
-            Regex re = new Regex(search, RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.IgnorePatternWhitespace);
+            Regex re = new Regex(manager.search, RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.IgnorePatternWhitespace);
             MatchCollection matches;
             string path, final;
+            bool dummy = false;
             foreach (Test match in new List<Test>(manager.searchMatches))
             {
                 path = match.attribute.GetPath();
@@ -551,7 +513,7 @@ namespace UnityTest
                 }
                 final += path[(matches[matches.Count - 1].Index + matches[matches.Count - 1].Length)..];
 
-                DrawListItem(itemRect, match, ref match.expanded, ref match.locked, ref match.selected,
+                DrawListItem(itemRect, match, ref dummy, ref match.locked, ref match.selected,
                     showFoldout: false,
                     showScript: true,
                     showLock: true,
@@ -573,12 +535,12 @@ namespace UnityTest
         private void DrawSearchBar()
         {
             if (searchField == null) return;
-            string newSearch = searchField.OnToolbarGUI(search, GUILayout.MinWidth(Utilities.searchBarMinWidth), GUILayout.MaxWidth(Utilities.searchBarMaxWidth));
+            string newSearch = searchField.OnToolbarGUI(manager.search, GUILayout.MinWidth(Utilities.searchBarMinWidth), GUILayout.MaxWidth(Utilities.searchBarMaxWidth));
 
             Rect rect = GUILayoutUtility.GetLastRect();
             if (Utilities.IsMouseButtonReleased() && !(Utilities.IsMouseOverRect(rect) && GUI.enabled)) EditorGUI.FocusTextInControl(null);
 
-            if (search != newSearch) manager.UpdateSearchMatches(this, newSearch);
+            if (manager.search != newSearch) manager.UpdateSearchMatches(this, newSearch);
         }
 
         /// <summary>
@@ -600,7 +562,7 @@ namespace UnityTest
                 spinIndex = 0;
                 content = Style.GetIcon("TestManagerUI/LoadingWheel/" + spinIndex);
             }
-            content.text = loadingWheelText;
+            content.text = manager.loadingWheelText;
             GUI.Label(rect, content, Style.Get("TestManagerUI/LoadingWheel"));
         }
 
@@ -608,7 +570,7 @@ namespace UnityTest
         {
             bool selectedHaveResults = false;
             bool anyResults = false;
-            foreach (Test test in manager.tests)
+            foreach (Test test in manager.GetTests()) 
             {
                 if (test.result == Test.Result.None) continue;
                 anyResults = true;
@@ -757,7 +719,7 @@ namespace UnityTest
 
         private void DrawWelcomeButton()
         {
-            showWelcome = GUILayout.Toggle(showWelcome, Style.GetIcon("TestManagerUI/Toolbar/Welcome"), Style.Get("TestManagerUI/Toolbar/Welcome"));
+            manager.showWelcome = GUILayout.Toggle(manager.showWelcome, Style.GetIcon("TestManagerUI/Toolbar/Welcome"), Style.Get("TestManagerUI/Toolbar/Welcome"));
         }
 
         /// <summary>
@@ -775,15 +737,15 @@ namespace UnityTest
 
         private void StartLoadingWheel(string text = null)
         {
-            loadingWheelText = text;
+            manager.loadingWheelText = text;
             spinStartTime = Time.realtimeSinceStartup;
-            loadingWheelVisible = true;
+            manager.loadingWheelVisible = true;
         }
 
         private void StopLoadingWheel()
         {
-            loadingWheelVisible = false;
-            loadingWheelText = null;
+            manager.loadingWheelVisible = false;
+            manager.loadingWheelText = null;
         }
 
         #region Tests
@@ -794,7 +756,7 @@ namespace UnityTest
         /// </summary>
         public void DrawListItem(
             Rect itemRect,
-            Object item,
+            object item,
             ref bool expanded, ref bool locked, ref bool selected,
             bool showFoldout = true,
             bool showScript = false,
@@ -962,7 +924,7 @@ namespace UnityTest
                                 goToStyle
                             ))
                             {
-                                foreach (Foldout foldout in foldouts)
+                                foreach (Foldout foldout in manager.foldouts)
                                 {
                                     List<Test> tests = new List<Test>(foldout.GetTests(manager));
                                     if (tests.Contains((item as Test))) foldout.expanded = true;
@@ -1046,7 +1008,6 @@ namespace UnityTest
                                     selected,
                                     toggleStyle
                                 );
-                                if (selected) manager.anyTestsSelected = true;
                             }
                             EditorGUI.showMixedValue = wasMixed;
                         }
