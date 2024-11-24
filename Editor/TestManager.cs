@@ -27,7 +27,13 @@ namespace UnityTest
         public List<Foldout> foldouts = new List<Foldout>();
 
         public List<Test> queue = new List<Test>();
-        public List<Test> finishedTests = new List<Test>();
+        public List<Test> finished = new List<Test>();
+
+        /// <summary>
+        /// When the tests begin, the queue is saved into this variable so that the orders of the tests can be maintained.
+        /// When testing stops, the queue is repopulated with this list, and then this list is cleared. 
+        /// </summary>
+        [SerializeField] private List<Test> originalQueue = new List<Test>();
 
         public GUIQueue guiQueue;
         
@@ -59,21 +65,9 @@ namespace UnityTest
             AssetDatabase.SaveAssetIfDirty(this);
         }
 
-        public void OnPlayStateChanged(PlayModeStateChange change)
-        {
-            if (change == PlayModeStateChange.ExitingPlayMode)
-            {
-                SkipRemainingTests();
-            }
-            if (change == PlayModeStateChange.EnteredEditMode) running = false;
-
-            guiQueue.OnPlayStateChanged(change);
-        }
-
         [HideInCallstack]
         public void Update()
         {
-            //Debug.Log(Time.frameCount + " " + previousFrameNumber);
             if (Time.frameCount > previousFrameNumber) OnUpdate();
             previousFrameNumber = (uint)Time.frameCount;
         }
@@ -106,7 +100,8 @@ namespace UnityTest
         {
             guiQueue.ResetTimer();
 
-            Test test = PopFromQueue();
+            Test test = queue[0];
+            queue.RemoveAt(0);
 
             [HideInCallstack]
             void OnFinished()
@@ -125,7 +120,8 @@ namespace UnityTest
                     Stop();
                 }
             }
-            
+
+            test.onFinished -= OnFinished;
             test.onFinished += OnFinished;
             test.Run();
         }
@@ -161,6 +157,7 @@ namespace UnityTest
             loadingWheelText = null;
             search = default;
             searchMatches.Clear();
+            originalQueue.Clear();
 
             debug = Utilities.DebugMode.Log | Utilities.DebugMode.LogWarning | Utilities.DebugMode.LogError;
             Utilities.debug = debug;
@@ -176,7 +173,10 @@ namespace UnityTest
         /// </summary>
         public void Start()
         {
-            finishedTests.Clear();
+            finished.Clear();
+
+            originalQueue.Clear();
+            originalQueue.AddRange(queue); // Save a copy of the original queue to restore queue order in Stop()
 
             running = true;
 
@@ -201,13 +201,13 @@ namespace UnityTest
                 Test.current.PrintResult();
                 Test.current = null;
             }
-            foreach (Test test in queue)
+            foreach (Test test in queue.ToArray())
             {
                 test.result = Test.Result.Skipped;
                 AddToFinishedQueue(test);
+                RemoveFromQueue(test);
                 test.PrintResult();
             }
-            queue.Clear();
         }
 
         /// <summary>
@@ -216,6 +216,8 @@ namespace UnityTest
         public void Stop()
         {
             SkipRemainingTests();
+            queue.AddRange(originalQueue); // Restore test ordering
+            originalQueue.Clear();
             paused = false;
             running = false;
             if (EditorApplication.isPlaying) EditorApplication.ExitPlaymode();
@@ -257,7 +259,18 @@ namespace UnityTest
                 searchMatches.Add(test);
             }
         }
+        /// <summary>
+        /// Remove the Test from the queue if it is already there. Then insert the Test into the queue at the top.
+        /// </summary>
         public void AddToQueue(Test test)
+        {
+            RemoveFromQueue(test);
+            queue.Insert(0, test);
+        }
+        /// <summary>
+        /// If the Test is in the queue, remove it. Otherwise, do nothing.
+        /// </summary>
+        public void RemoveFromQueue(Test test)
         {
             foreach (Test t in queue.ToArray())
             {
@@ -267,17 +280,10 @@ namespace UnityTest
                     break;
                 }
             }
-            queue.Insert(0, test);
         }
         private void AddToFinishedQueue(Test test)
         {
-            finishedTests.Insert(0, new Test(test));
-        }
-        private Test PopFromQueue()
-        {
-            Test test = queue[0];
-            queue.RemoveAt(0);
-            return test;
+            finished.Add(test); // This makes a reverse order
         }
 
         public bool IsMethodIgnored(MethodInfo method) => method.GetCustomAttribute<IgnoreAttribute>(false) != null;
@@ -333,7 +339,6 @@ namespace UnityTest
 
             if (foundTest != null) // Found existing matching Test, so update its method
             {
-                Debug.Log("Set Test method " + foundTest + " " + method);
                 foundTest.method = method;
             }
             else // Did not find any existing Test, so make a new one
@@ -482,6 +487,20 @@ namespace UnityTest
                     if (foldout.tests.Count == 0)
                     {
                         foldouts.Remove(foldout);
+                        break;
+                    }
+                }
+            }
+
+            // Check the GUIQueue for any Tests whose methods need to be updated now
+            foreach (List<Test> q in new List<List<Test>> { queue, finished })
+            {
+                foreach (Test test in q)
+                {
+                    foreach (System.Tuple<TestAttribute, MethodInfo> obj in attributesAndMethods)
+                    {
+                        if (obj.Item1 != test.attribute) continue;
+                        test.method = obj.Item2;
                         break;
                     }
                 }

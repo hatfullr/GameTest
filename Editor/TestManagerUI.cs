@@ -3,7 +3,6 @@ using UnityEngine;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using System.Text.RegularExpressions;
-using static UnityTest.Style;
 
 namespace UnityTest
 {
@@ -133,7 +132,7 @@ namespace UnityTest
 
         private void OnPlayStateChanged(PlayModeStateChange change)
         {
-            manager.OnPlayStateChanged(change);
+            manager.guiQueue.ResetTimer();
 
             if (change == PlayModeStateChange.EnteredPlayMode && Utilities.IsSceneEmpty()) Focus();
 
@@ -147,10 +146,10 @@ namespace UnityTest
         /// </summary>
         private void OnTestManagerFinished()
         {
-            foreach (Test test in manager.GetTests())
-            {
-                if (test.selected) manager.AddToQueue(test);
-            }
+            //foreach (Test test in manager.GetTests())
+            //{
+            //    if (test.selected) manager.AddToQueue(test);
+            //}
         }
 
         void OnLostFocus()
@@ -302,13 +301,15 @@ namespace UnityTest
                                 itemRect.y += style.padding.top;
                                 itemRect.width -= style.padding.horizontal;
 
-                                if (string.IsNullOrEmpty(manager.search)) DrawNormalMode();
-                                else DrawSearchMode();
-
-                                //Utilities.DrawDebugOutline(viewRect, Color.red);
+                                using (new EditorGUI.DisabledGroupScope(manager.running))
+                                {
+                                    if (string.IsNullOrEmpty(manager.search)) DrawNormalMode();
+                                    else DrawSearchMode();
+                                }
                             }
                         }
                     }
+
 
                     if (!manager.running) // Otherwise stuff will keep being added into the queue during testing time
                     {
@@ -607,21 +608,15 @@ namespace UnityTest
             if (manager.running) content = Style.GetIcon("TestManagerUI/Toolbar/Play/On");
 
             bool current;
-            using (new EditorGUI.DisabledScope(manager.queue.Count == 0))
+            using (new EditorGUI.DisabledScope(manager.queue.Count == 0 && Test.current == null))
             {
                 current = GUILayout.Toggle(manager.running, content, Style.Get("TestManagerUI/Toolbar/Play"));
             }
 
             if (manager.running != current) // The user clicked on the button
             {
-                if (manager.running)
-                {
-                    manager.Stop();
-                }
-                else
-                {
-                    manager.Start();
-                }
+                if (manager.running) manager.Stop();
+                else manager.Start();
             }
         }
 
@@ -856,10 +851,11 @@ namespace UnityTest
 
                         if (result != Test.Result.None)
                         {
+                            float x = (showFoldout ? Style.GetWidth(foldoutStyle) : 0f) + (showGoTo ? Style.GetWidth(goToStyle) : 0f);
                             EditorGUI.DrawRect(
                                 new Rect(
-                                    (showFoldout ? Style.GetWidth(foldoutStyle) : 0f) + (showGoTo ? Style.GetWidth(goToStyle) : 0f), 0f,
-                                    indentedRect.width, indentedRect.height
+                                    x, 0f,
+                                    indentedRect.width - x, indentedRect.height
                                 ),
                                 resultColor
                             );

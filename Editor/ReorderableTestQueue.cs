@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor;
-using UnityEngine.Events;
 
 namespace UnityTest
 {
@@ -15,7 +14,6 @@ namespace UnityTest
         public GUIContent title;
         public System.Action<Rect, Test> testDrawer;
         public System.Action onDrag;
-        public bool reversed;
         public bool deselectOnClear;
         public bool allowReorder;
 
@@ -42,7 +40,6 @@ namespace UnityTest
             GUIContent title,
             System.Action<Rect, Test> testDrawer = null,
             System.Action onDrag = null,
-            bool reversed = false,
             bool deselectOnClear = false,
             bool allowReorder = true
         )
@@ -51,7 +48,6 @@ namespace UnityTest
             this.title = title;
             this.testDrawer = testDrawer;
             this.onDrag = onDrag;
-            this.reversed = reversed;
             this.deselectOnClear = deselectOnClear;
             this.allowReorder = allowReorder;
         }
@@ -61,13 +57,6 @@ namespace UnityTest
         public void Clear()
         {
             queue.Clear();
-        }
-
-        private List<Test> GetTests()
-        {
-            List<Test> tests = new List<Test>(queue);
-            if (reversed) tests.Reverse();
-            return tests;
         }
 
         public float GetQueueHeight()
@@ -158,11 +147,9 @@ namespace UnityTest
             {
                 Rect above = new Rect(itemRect.x, viewRect.y, itemRect.width, itemRect.y - viewRect.y);
 
-                List<Test> tests = GetTests();
-
                 if (IsDragging() && Utilities.IsMouseOverRect(above))
                 {
-                    mouseOver = tests[0];
+                    mouseOver = queue[0];
                     mouseOverRect = itemRect;
                     dragBar = new Rect(itemRect);
                     dragBar.height = Style.GUIQueue.dragBarHeight;
@@ -171,7 +158,7 @@ namespace UnityTest
                 }
 
                 Rect testRect;
-                foreach (Test test in tests)
+                foreach (Test test in queue)
                 {
                     if (allowReorder)
                     {
@@ -214,7 +201,7 @@ namespace UnityTest
                                 dragOffset = DragOffset.Lower;
                                 dragBar.y = itemRect.yMax;
                             }
-                            if (test == tests[tests.Count - 1])
+                            if (test == queue[queue.Count - 1])
                             {
                                 Rect below = new Rect(lower);
                                 below.height = Screen.height;
@@ -232,7 +219,7 @@ namespace UnityTest
 
                     itemRect.y += itemRect.height;
                 }
-                if (tests.Count > 0) itemRect.y -= itemRect.height;
+                if (queue.Count > 0) itemRect.y -= itemRect.height;
 
 
                 if (IsDragging()) OnDrag();
@@ -282,33 +269,26 @@ namespace UnityTest
 
         private void OnDragCompleted()
         {
-            List<Test> tests = GetTests();
-
-
             if (dragOffset == DragOffset.TopMost)
             {
                 queue.Remove(dragging);
-                if (reversed) queue.Add(dragging);
-                else queue.Insert(0, dragging);
+                queue.Insert(0, dragging);
             }
             else if (dragOffset == DragOffset.BottomMost)
             {
                 queue.Remove(dragging);
-                if (reversed) queue.Insert(0, dragging);
-                else queue.Add(dragging);
+                queue.Add(dragging);
             }
             else
             {
                 // Put the dragged Test between the neighbor and the current mouseOver Test
-                int newIndex = tests.IndexOf(mouseOver);
+                int newIndex = queue.IndexOf(mouseOver);
                 if (dragOffset == DragOffset.Lower) newIndex += 1;
 
-                newIndex = Mathf.Clamp(newIndex, 0, tests.Count - 1);
+                newIndex = Mathf.Clamp(newIndex, 0, queue.Count - 1);
 
                 // index might change after we have removed the Test
-                if (tests.IndexOf(dragging) < newIndex) newIndex--;
-
-                if (reversed) newIndex = tests.Count - newIndex;
+                if (queue.IndexOf(dragging) < newIndex) newIndex--;
 
                 queue.Remove(dragging);
                 queue.Insert(newIndex, dragging);

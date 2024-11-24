@@ -29,7 +29,7 @@ namespace UnityTest
         public TestAttribute attribute;
         public bool selected, locked;
         [HideInInspector] public bool isInSuite;
-        public System.Action onFinished, onSelected, onDeselected;
+        public System.Action onFinished;
 
         private GameObject gameObject;
         private Object script;

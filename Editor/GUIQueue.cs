@@ -15,7 +15,7 @@ namespace UnityTest
         public uint nframes;
 
         private ReorderableTestQueue queue;
-        private ReorderableTestQueue finishedQueue;
+        private ReorderableTestQueue finished;
 
         private Rect splitterRect, mainRect;
         private bool dragging;
@@ -38,12 +38,7 @@ namespace UnityTest
             height = Style.GUIQueue.minHeight;
             hideMain = false;
             queue.Clear();
-            finishedQueue.Clear();
-            ResetTimer();
-        }
-
-        public void OnPlayStateChanged(PlayModeStateChange change)
-        {
+            finished.Clear();
             ResetTimer();
         }
 
@@ -61,10 +56,7 @@ namespace UnityTest
 
         public void Draw()
         {
-            if (queue == null)
-            {
-                Debug.Log("Creating new queue");
-                queue = new ReorderableTestQueue(
+            if (queue == null) queue = new ReorderableTestQueue(
                 ref ui.manager.queue,
                 new GUIContent("Selected"),
                 testDrawer: (Rect rect, Test test) =>
@@ -85,12 +77,10 @@ namespace UnityTest
                     );
                 },
                 onDrag: ui.Repaint,
-                reversed: false,
                 deselectOnClear: true
             );
-            }
-            if (finishedQueue == null) finishedQueue = new ReorderableTestQueue(
-                ref ui.manager.finishedTests,
+            if (finished == null) finished = new ReorderableTestQueue(
+                ref ui.manager.finished,
                 new GUIContent("Finished"),
                 testDrawer: (Rect rect, Test test) =>
                 {
@@ -109,7 +99,6 @@ namespace UnityTest
                     );
                 },
                 onDrag: ui.Repaint,
-                reversed: true,
                 deselectOnClear: false,
                 allowReorder: false
             );
@@ -146,7 +135,7 @@ namespace UnityTest
                 right.width -= 0.5f * queueStyle.margin.left;
 
                 queue.Draw(left);
-                finishedQueue.Draw(right);
+                finished.Draw(right);
             }
 
             mainRect = scope.rect;
