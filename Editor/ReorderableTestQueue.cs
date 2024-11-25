@@ -16,6 +16,7 @@ namespace UnityTest
         public System.Action onDrag;
         public bool deselectOnClear;
         public bool allowReorder;
+        public bool canClear;
 
         public Vector2 scrollPosition;
 
@@ -41,7 +42,8 @@ namespace UnityTest
             System.Action<Rect, Test> testDrawer = null,
             System.Action onDrag = null,
             bool deselectOnClear = false,
-            bool allowReorder = true
+            bool allowReorder = true,
+            bool canClear = true
         )
         {
             this.queue = queue;
@@ -50,6 +52,7 @@ namespace UnityTest
             this.onDrag = onDrag;
             this.deselectOnClear = deselectOnClear;
             this.allowReorder = allowReorder;
+            this.canClear = canClear;
         }
 
         private bool IsDragging() => dragging != null && allowReorder;
@@ -67,37 +70,37 @@ namespace UnityTest
         private void DrawTitle(Rect rect)
         {
             GUIStyle labelStyle = Style.Get("GUIQueue/Queue/Title");
-            GUIStyle clearStyle = Style.Get("GUIQueue/Queue/Clear");
-
             GUIContent label = new GUIContent(title);
-            GUIContent clear = new GUIContent("Clear");
+            
 
             Rect labelRect = new Rect(rect);
-            Rect clearRect = new Rect(rect);
-
             labelRect.width = Style.GetWidth(labelStyle, label);
-            clearRect.width = Style.GetWidth(clearStyle, clear);
-
-            clearRect.x = rect.xMax - clearRect.width;
-
             GUI.Label(labelRect, label, labelStyle);
-
-            bool disabled = false;
-            if (queue != null) disabled = queue.Count == 0;
-
-            using (new EditorGUI.DisabledScope(disabled))
-            {
-                if (GUI.Button(clearRect, clear, clearStyle) && !disabled)
-                {
-                    if (deselectOnClear)
-                        foreach (Test test in queue)
-                            test.selected = false;
-                    queue.Clear();
-                }
-            }
-
             //Utilities.DrawDebugOutline(labelRect, Color.red);
-            //Utilities.DrawDebugOutline(clearRect, Color.red);
+
+            if (canClear)
+            {
+                GUIStyle clearStyle = Style.Get("GUIQueue/Queue/Clear");
+                GUIContent clear = new GUIContent("Clear");
+                Rect clearRect = new Rect(rect);
+                clearRect.width = Style.GetWidth(clearStyle, clear);
+                clearRect.x = rect.xMax - clearRect.width;
+
+                bool disabled = false;
+                if (queue != null) disabled = queue.Count == 0;
+
+                using (new EditorGUI.DisabledScope(disabled))
+                {
+                    if (GUI.Button(clearRect, clear, clearStyle) && !disabled)
+                    {
+                        if (deselectOnClear)
+                            foreach (Test test in queue)
+                                test.selected = false;
+                        queue.Clear();
+                    }
+                }
+                //Utilities.DrawDebugOutline(clearRect, Color.red);
+            }
         }
 
         private void DrawBody(Rect rect)

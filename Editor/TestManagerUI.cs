@@ -4,6 +4,11 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using System.Text.RegularExpressions;
 
+
+/// TODO ideas:
+///    1. Add a preferences window
+///        a. Let the user control the sorting order of the tests in the TestManager
+
 namespace UnityTest
 {
     public class TestManagerUI : EditorWindow, IHasCustomMenu
@@ -48,6 +53,12 @@ namespace UnityTest
         {
             Normal,
             Search,
+        }
+
+        public enum TestSortOrder
+        {
+            Name,
+            LineNumber,
         }
 
 
@@ -125,15 +136,14 @@ namespace UnityTest
 
         private void OnAfterAssemblyReload()
         {
-            Refresh();
-
-            if (manager.running && manager.queue.Count == 0) manager.Start();
+            Refresh(() =>
+            {
+                if (manager.running && !manager.paused) manager.RunNext();
+            });
         }
 
         private void OnPlayStateChanged(PlayModeStateChange change)
         {
-            manager.guiQueue.ResetTimer();
-
             if (change == PlayModeStateChange.EnteredPlayMode && Utilities.IsSceneEmpty()) Focus();
 
             // If we don't Repaint() here, then the toolbar buttons can appear incorrect.
@@ -311,12 +321,23 @@ namespace UnityTest
                     }
 
 
-                    if (!manager.running) // Otherwise stuff will keep being added into the queue during testing time
+                    if (!manager.running && !manager.stopping) // Otherwise stuff will keep being added into the queue during testing time
                     {
+                        bool hasTest = false;
                         foreach (Test test in manager.GetTests())
                         {
-                            if (test.selected && !manager.queue.Contains(test)) manager.AddToQueue(test);
-                            else if (manager.queue.Contains(test) && !test.selected) manager.queue.Remove(test);
+                            hasTest = false;
+                            foreach (Test t in manager.queue)
+                            {
+                                if (t.attribute == test.attribute)
+                                {
+                                    hasTest = true;
+                                    break;
+                                }
+                            }
+
+                            if (test.selected && !hasTest) manager.queue.Add(test); //manager.AddToQueue(test);
+                            else if (hasTest && !test.selected) manager.queue.Remove(test);
                         }
                     }
 
@@ -625,9 +646,11 @@ namespace UnityTest
             GUIContent content = Style.GetIcon("TestManagerUI/Toolbar/Pause/Off");
             if (manager.paused) content = Style.GetIcon("TestManagerUI/Toolbar/Pause/On");
 
-            using (new EditorGUI.DisabledScope(!manager.running))
+            bool wasPaused = manager.paused;
+            manager.paused = GUILayout.Toggle(manager.paused, content, Style.Get("TestManagerUI/Toolbar/Pause"));
+            if (wasPaused && !manager.paused && manager.running)
             {
-                manager.paused = GUILayout.Toggle(manager.paused, content, Style.Get("TestManagerUI/Toolbar/Pause"));
+                manager.RunNext();
             }
         }
 
@@ -848,18 +871,17 @@ namespace UnityTest
                         if (result == Test.Result.Fail) resultColor = Style.failColor;
                         else if (result == Test.Result.Pass) resultColor = Style.passColor;
                         else if (result == Test.Result.Skipped) resultColor = Style.skippedColor;
+                        else if (result == Test.Result.None) { }
+                        else throw new System.NotImplementedException("Unrecognized result " + result);
 
-                        if (result != Test.Result.None)
-                        {
-                            float x = (showFoldout ? Style.GetWidth(foldoutStyle) : 0f) + (showGoTo ? Style.GetWidth(goToStyle) : 0f);
-                            EditorGUI.DrawRect(
-                                new Rect(
-                                    x, 0f,
-                                    indentedRect.width - x, indentedRect.height
-                                ),
-                                resultColor
-                            );
-                        }
+                        float x = (showFoldout ? Style.GetWidth(foldoutStyle) : 0f) + (showGoTo ? Style.GetWidth(goToStyle) : 0f);
+                        EditorGUI.DrawRect(
+                            new Rect(
+                                x, 0f,
+                                indentedRect.width - x, indentedRect.height
+                            ),
+                            resultColor
+                        );
                     }
 
 

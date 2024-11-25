@@ -29,16 +29,16 @@ namespace UnityTest
         public TestAttribute attribute;
         public bool selected, locked;
         [HideInInspector] public bool isInSuite;
-        public System.Action onFinished;
+        public System.Action<Test> onFinished;
 
         private GameObject gameObject;
         private Object script;
         private GameObject instantiatedDefaultGO;
 
+        private Coroutine coroutine;
+
         public static Test current;
         private static GameObject coroutineGO;
-        private static List<System.Collections.IEnumerator> coroutines = new List<System.Collections.IEnumerator>();
-        private static List<Coroutine> cos = new List<Coroutine>();
         private static bool sceneWarningPrinted = false;
 
         [SerializeField] private GameObject _defaultPrefab;
@@ -178,9 +178,11 @@ namespace UnityTest
         [HideInCallstack]
         public void Run()
         {
+            if (method == null) throw new System.Exception("Missing method reference on Test " + attribute.GetPath());
+
             if (!EditorApplication.isPlaying)
             {
-                Utilities.LogWarning("Cannot run Unit Tests outside of Play mode!");
+                Utilities.LogError("Cannot run a Test while not in Play mode");
                 return;
             }
 
@@ -247,43 +249,39 @@ namespace UnityTest
         private void StartCoroutine(System.Collections.IEnumerator coroutineMethod)
         {
             CoroutineMonoBehaviour mono = coroutineGO.GetComponent<CoroutineMonoBehaviour>();
-            cos.Add(mono.StartCoroutine(DoCoroutine(coroutineMethod)));
+            coroutine = mono.StartCoroutine(DoCoroutine(coroutineMethod));
         }
 
         private System.Collections.IEnumerator DoCoroutine(System.Collections.IEnumerator coroutineMethod)
         {
-            coroutines.Add(coroutineMethod);
-
-            // Wait until it's our turn to run
-            while (coroutines[0] != coroutineMethod)
-                yield return null;
-
             // Run the coroutine
             yield return coroutineMethod;
 
             // Clean up
             OnRunComplete();
-
-            coroutines.Remove(coroutineMethod);
         }
 
         /// <summary>
-        /// Called when the test is finished, regardless of the results. Pauses the editor if the test specifies to do so.
+        /// Called when the test is finished, regardless of the results. Calls the TearDown function.
         /// </summary>
         [HideInCallstack]
         public void OnRunComplete()
         {
+            CancelCoroutine();
+            if (coroutineGO != null) Object.DestroyImmediate(coroutineGO);
+            coroutineGO = null;
+
             TearDown();
             if (result == Result.None && result != Result.Skipped) result = Result.Pass;
 
             Application.logMessageReceived -= HandleLog;
 
-            if (coroutineGO != null) Object.DestroyImmediate(coroutineGO);
-            coroutineGO = null;
+            PrintResult();
 
-            onFinished.Invoke();
+            if (attribute.pauseOnFail && result == Result.Fail) EditorApplication.isPaused = true;
 
             current = null;
+            if (onFinished != null) onFinished(this);
         }
 
         /// <summary>
@@ -302,27 +300,23 @@ namespace UnityTest
             Utilities.Log(message, GetScript());
         }
 
-        public void CancelCoroutines()
+        public void CancelCoroutine()
         {
             if (coroutineGO != null)
             {
                 CoroutineMonoBehaviour mono = coroutineGO.GetComponent<CoroutineMonoBehaviour>();
-                if (mono != null)
+                if (mono != null && coroutine != null)
                 {
-                    foreach (Coroutine coroutine in cos)
-                    {
-                        mono.StopCoroutine(coroutine);
-                    }
+                    mono.StopCoroutine(coroutine);
                 }
             }
-            coroutines.Clear();
         }
 
         private void HandleLog(string logString, string stackTrace, LogType type)
         {
             if (type == LogType.Exception || type == LogType.Assert)
             {
-                CancelCoroutines();
+                CancelCoroutine();
                 result = Result.Fail;
                 EditorApplication.isPaused = !EditorApplication.isPaused && // If false (already paused), stay paused
                     attribute.pauseOnFail; // If not paused (playing) and we should pause, then pause
@@ -331,7 +325,7 @@ namespace UnityTest
 
         public void Reset()
         {
-            CancelCoroutines();
+            CancelCoroutine();
             result = Result.None;
         }
 
@@ -372,18 +366,6 @@ namespace UnityTest
                 script = AssetDatabase.LoadAssetAtPath(AssetDatabase.GUIDToAssetPath(matched), typeof(MonoScript));
             }
             return script;
-        }
-
-        /// <summary>
-        /// This object can be used in the inspector to set a default prefab to be instantiated when running a Test instead
-        /// of the default, which is to instantiate a new GameObject with an attached Component.
-        /// </summary>
-        [System.Serializable]
-        public class TestPrefab
-        {
-            [SerializeField] private string _methodName;
-            [SerializeField] private GameObject _gameObject;
-            [HideInInspector] public GameObject gameObject { get => _gameObject; }
         }
     }
 }

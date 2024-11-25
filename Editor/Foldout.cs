@@ -97,8 +97,13 @@ namespace UnityTest
                     }
                     else
                     {
+                        IEnumerable<Test> order;
+                        if (ui.manager.testSortOrder == TestManagerUI.TestSortOrder.Name) order = tests.OrderBy(x => x.attribute.name);
+                        else if (ui.manager.testSortOrder == TestManagerUI.TestSortOrder.LineNumber) order = tests.OrderBy(x => x.attribute.lineNumber);
+                        else throw new System.NotImplementedException();
+
                         bool dummy = false;
-                        foreach (Test test in tests.OrderBy(x => x.attribute.name))
+                        foreach (Test test in order)
                         {
                             ui.DrawListItem(ui.itemRect, test, ref dummy, ref test.locked, ref test.selected,
                                 showFoldout: false,

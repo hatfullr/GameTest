@@ -58,7 +58,7 @@ namespace UnityTest
         {
             if (queue == null) queue = new ReorderableTestQueue(
                 ref ui.manager.queue,
-                new GUIContent("Selected"),
+                new GUIContent("Queued"),
                 testDrawer: (Rect rect, Test test) =>
                 {
                     bool dummy = false;
@@ -81,7 +81,7 @@ namespace UnityTest
             );
             if (finished == null) finished = new ReorderableTestQueue(
                 ref ui.manager.finished,
-                new GUIContent("Finished"),
+                new GUIContent("Results"),
                 testDrawer: (Rect rect, Test test) =>
                 {
                     bool dummy = false;
@@ -100,7 +100,8 @@ namespace UnityTest
                 },
                 onDrag: ui.Repaint,
                 deselectOnClear: false,
-                allowReorder: false
+                allowReorder: false,
+                canClear: false
             );
 
             DrawSplitter();

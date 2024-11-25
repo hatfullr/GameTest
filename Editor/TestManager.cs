@@ -21,6 +21,7 @@ namespace UnityTest
         public string search = null;
         public bool paused = false;
         public bool running = false;
+        public TestManagerUI.TestSortOrder testSortOrder = TestManagerUI.TestSortOrder.Name;
 
         public Vector2 scrollPosition;
 
@@ -42,10 +43,9 @@ namespace UnityTest
 
         public List<Test> searchMatches = new List<Test>();
 
-        
-        
-
         private uint previousFrameNumber = 0;
+
+        public bool stopping = false;
 
         /// <summary>
         /// Invoked when all Tests in the queue have been run and the editor has exited Play mode.
@@ -78,71 +78,69 @@ namespace UnityTest
         [HideInCallstack]
         private void OnUpdate()
         {
-            if (running)
-            {
-                if (Test.current == null) // No test is currently running
-                {
-                    if (queue.Count > 0) // Start the next test if there is one
-                    {
-                        if (!paused) RunNext();
-                        return;
-                    }
-                }
-                else
-                {
-                    guiQueue.IncrementTimer(Time.deltaTime);
-                }
-            }
+            if (Test.current != null) guiQueue.IncrementTimer(Time.deltaTime);
         }
 
         [HideInCallstack]
-        private void RunNext()
+        public void RunNext()
         {
             guiQueue.ResetTimer();
+
+            // This is a redundancy fallback
+            if (queue.Count == 0)
+            {
+                Stop();
+                return;
+            }
 
             Test test = queue[0];
             queue.RemoveAt(0);
 
-            [HideInCallstack]
-            void OnFinished()
+            if (test.result == Test.Result.Skipped)
             {
-                test.onFinished -= OnFinished;
-                test.PrintResult();
                 AddToFinishedQueue(test);
-                
-                if (test.attribute.pauseOnFail && test.result == Test.Result.Fail)
-                {
-                    EditorApplication.isPaused = true;
-                }
-
-                if (queue.Count == 0)
-                {
-                    Stop();
-                }
+                test.PrintResult();
+                return;
             }
 
-            test.onFinished -= OnFinished;
-            test.onFinished += OnFinished;
+            test.onFinished -= OnRunFinished;
+            test.onFinished += OnRunFinished;
+
             test.Run();
         }
 
+        private void OnRunFinished(Test test)
+        {
+            test.onFinished -= OnRunFinished;
+            AddToFinishedQueue(test);
+            guiQueue.ResetTimer();
+            if (running && !paused)
+            {
+                if (queue.Count > 0) RunNext();
+                else Stop();
+            }
+        }
+
         /// <summary>
-        /// Stop running the current test and move to the next.
+        /// Stop running the current test and start running the next in the queue.
         /// </summary>
         [HideInCallstack]
         public void Skip()
         {
-            if (Test.current == null)
+            if (Test.current != null)
             {
-                RunNext();
-                return;
+                Test.current.result = Test.Result.Skipped;
+                Test.current.OnRunComplete();
             }
-            Test.current.result = Test.Result.Skipped;
+        }
 
-            Test.current.CancelCoroutines();
-            Test.current.OnRunComplete();
+        private void SkipRemainingTests()
+        {
+            // Mark all remaining tests for skipping
+            foreach (Test test in queue) test.result = Test.Result.Skipped;
 
-            Test.current = null;
+            // If there is a Test running currently, skip it
+            Skip();
         }
 
         /// <summary>
@@ -180,34 +178,8 @@ namespace UnityTest
 
             running = true;
 
-            if (!EditorApplication.isPlaying)
-            {
-                EditorApplication.EnterPlaymode(); // can cause recompile
-            }
-            else
-            {
-                Utilities.Log("Starting");
-            }
-        }
-
-        private void SkipRemainingTests()
-        {
-            // Mark any remaining tests as skipped
-            if (Test.current != null)
-            {
-                Test.current.result = Test.Result.Skipped;
-                Test.current.CancelCoroutines();
-                AddToFinishedQueue(Test.current);
-                Test.current.PrintResult();
-                Test.current = null;
-            }
-            foreach (Test test in queue.ToArray())
-            {
-                test.result = Test.Result.Skipped;
-                AddToFinishedQueue(test);
-                RemoveFromQueue(test);
-                test.PrintResult();
-            }
+            if (!EditorApplication.isPlaying) EditorApplication.EnterPlaymode(); // can cause recompile
+            else Utilities.Log("Starting");
         }
 
         /// <summary>
@@ -215,14 +187,21 @@ namespace UnityTest
         /// </summary>
         public void Stop()
         {
+            if (stopping) return;
+
+            stopping = true;
             SkipRemainingTests();
+
             queue.AddRange(originalQueue); // Restore test ordering
             originalQueue.Clear();
-            paused = false;
+
             running = false;
+            paused = false;
+
             if (EditorApplication.isPlaying) EditorApplication.ExitPlaymode();
             onStop();
             Utilities.Log("Finished", null, null);
+            stopping = false;
         }
         #endregion
 
@@ -265,7 +244,7 @@ namespace UnityTest
         public void AddToQueue(Test test)
         {
             RemoveFromQueue(test);
-            queue.Insert(0, test);
+            queue.Add(test);
         }
         /// <summary>
         /// If the Test is in the queue, remove it. Otherwise, do nothing.
