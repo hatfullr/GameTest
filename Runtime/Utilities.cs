@@ -26,10 +26,12 @@ namespace UnityTest
         /// </summary>
         public static string packagesPath { get; } = Path.Join(projectPath, "Packages");
 
+#if UNITY_EDITOR
         /// <summary>
         /// Location where data assets are stored.
         /// </summary>
         public static string dataPath { get => EnsureDirectoryExists(Path.Join(assetsPath, "UnityTest")); }
+#endif
 
         /// <summary>
         /// True if the editor is using the theme called "DarkSkin". Otherwise, false.
@@ -52,12 +54,8 @@ namespace UnityTest
         public static float searchBarMinWidth = 80f;
         public static float searchBarMaxWidth = 300f;
 
-        /// <summary>
-        /// Query the package.json file to determine exactly what the current name of this package is.
-        /// </summary>
-        public static UnityEditor.PackageManager.PackageInfo GetPackageInfo() => UnityEditor.PackageManager.PackageInfo.FindForAssembly(typeof(Utilities).Assembly);
-
         #region UI Helpers
+#if UNITY_EDITOR
         public enum  RectAlignment
         {
             LowerLeft,
@@ -197,47 +195,11 @@ namespace UnityTest
         public static bool IsMouseButtonPressed() { if (Event.current == null) return false; return Event.current.rawType == EventType.MouseDown; }
         public static bool IsMouseButtonReleased() { if (Event.current == null) return false; return Event.current.rawType == EventType.MouseUp; }
         public static bool IsMouseDragging() { if (Event.current == null) return false; return Event.current.rawType == EventType.MouseDrag; }
-
+#endif
         #endregion
 
         #region Filesystem Helpers
-        /// <summary>
-        /// Given the path to a file, returns true if the path is located in the Samples folder, and false otherwise.
-        /// </summary>
-        public static bool IsSample(string path)
-        {
-            foreach (UnityEditor.PackageManager.UI.Sample sample in GetSamples())
-            {
-                if (sample.importPath == path) return true;
-            }
-            return false;
-        }
-
-        public static IEnumerable<UnityEditor.PackageManager.UI.Sample> GetSamples()
-        {
-            UnityEditor.PackageManager.PackageInfo info = GetPackageInfo();
-            return UnityEditor.PackageManager.UI.Sample.FindByPackage(info.name, info.version);
-        }
-
-        /// <summary>
-        /// Get the file path to Assets/UnityPath/Data/[name].asset.
-        /// </summary>
-        public static string GetAssetPath(string name, string directory)
-        {
-            if (directory == null) directory = dataPath;
-            string path = Path.Join(directory, name);
-            if (Path.GetExtension(path) != ".asset") path = Path.ChangeExtension(path, ".asset");
-            return GetUnityPath(path);
-        }
-
-        
-        public static string GetAssetPath(Object asset) => GetUnityPath(AssetDatabase.GetAssetPath(asset));
-
-        /// <summary>
-        /// Check Assets/UnityTest/Data/[name].asset to see if it exists.
-        /// </summary>
-        public static bool AssetExists(string name, string directory) => File.Exists(GetAssetPath(name, directory));
-
+#if UNITY_EDITOR
         /// <summary>
         /// Loop through all *.asset files in Assets/UnityTest/Data to find the first asset that meets the given criteria function. The
         /// input parameter to the criteria function is any Object. The result of the criteria function must be a bool.
@@ -259,44 +221,6 @@ namespace UnityTest
         /// input parameter to the criteria function is any Object. The result of the criteria function must be a bool.
         /// </summary>
         public static T LoadAssetAtPath<T>(string assetPath) => (T)(object)AssetDatabase.LoadAssetAtPath(GetUnityPath(assetPath), typeof(T));
-
-        
-        public static void SaveAssets(IEnumerable<Object> assets)
-        {
-            MarkAssetsForSave(assets);
-            SaveDirtyAssets(assets);
-        }
-        public static void SaveAsset(Object asset) => SaveAssets(new List<Object> { asset });
-
-        public static void SaveDirtyAsset(Object asset) => AssetDatabase.SaveAssetIfDirty(asset);
-        public static void SaveDirtyAssets(IEnumerable<Object> assets)
-        {
-            foreach (Object asset in assets)
-            {
-                if (asset == null) continue;
-                SaveDirtyAsset(asset);
-            }
-        }
-
-        public static void MarkAssetForSave(Object asset) => EditorUtility.SetDirty(asset);
-        public static void MarkAssetsForSave(IEnumerable<Object> assets)
-        {
-            foreach (Object asset in assets)
-            {
-                if (asset == null) continue;
-                MarkAssetForSave(asset);
-            }
-        }
-        
-
-        public static bool DeleteAsset(string name, string directory) => AssetDatabase.DeleteAsset(GetAssetPath(name, directory));
-        public static bool DeleteAsset(Object asset)
-        {
-            string path = GetAssetPath(asset);
-            return DeleteAsset(Path.GetFileName(path), GetUnityPath(Path.GetDirectoryName(path)));
-        }
-
-        public static void DeleteFolder(string path) => AssetDatabase.DeleteAsset(GetUnityPath(path));
         
 
         /// <summary>
@@ -313,22 +237,28 @@ namespace UnityTest
             {
                 parent = Path.GetDirectoryName(dir);
                 newFolderName = Path.GetFileName(dir);
-                if (!AssetDatabase.IsValidFolder(dir))
-                {
-                    AssetDatabase.CreateFolder(parent, newFolderName);
-                }
+                if (!AssetDatabase.IsValidFolder(dir)) AssetDatabase.CreateFolder(parent, newFolderName);
             }
 
             // Create the final directory at the destination path
             parent = Path.GetDirectoryName(directory);
             newFolderName = Path.GetFileName(directory);
-            if (!AssetDatabase.IsValidFolder(directory))
-            {
-                AssetDatabase.CreateFolder(parent, newFolderName);
-            }
+            if (!AssetDatabase.IsValidFolder(directory)) AssetDatabase.CreateFolder(parent, newFolderName);
 
             return directory;
         }
+
+        /// <summary>
+        /// Get the file path to Assets/UnityPath/Data/[name].asset.
+        /// </summary>
+        public static string GetAssetPath(string name, string directory)
+        {
+            if (directory == null) directory = dataPath;
+            string path = Path.Join(directory, name);
+            if (Path.GetExtension(path) != ".asset") path = Path.ChangeExtension(path, ".asset");
+            return GetUnityPath(path);
+        }
+#endif
 
         /// <summary>
         /// Return each successive directory, starting at the directory of the given path and moving outward toward the root path, 
@@ -419,7 +349,7 @@ namespace UnityTest
             }
             return false;
         }
-        #endregion
+#endregion
 
         #region Exceptions
         /// <summary>

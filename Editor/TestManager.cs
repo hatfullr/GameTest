@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor;
-using UnityEditor.Compilation;
 using System.Reflection;
 using System.IO;
 using System.Text.RegularExpressions;
@@ -307,9 +306,9 @@ namespace UnityTest
             List<string> added = new List<string>();
             HashSet<System.Reflection.Assembly> assemblies = new HashSet<System.Reflection.Assembly>();
             string path;
-            foreach (AssembliesType type in (AssembliesType[])System.Enum.GetValues(typeof(AssembliesType))) // Hit all assembly types
+            foreach (UnityEditor.Compilation.AssembliesType type in (UnityEditor.Compilation.AssembliesType[])System.Enum.GetValues(typeof(UnityEditor.Compilation.AssembliesType))) // Hit all assembly types
             {
-                foreach (UnityEditor.Compilation.Assembly assembly in CompilationPipeline.GetAssemblies(type))
+                foreach (UnityEditor.Compilation.Assembly assembly in UnityEditor.Compilation.CompilationPipeline.GetAssemblies(type))
                 {
                     path = Path.Join(Utilities.projectPath, assembly.outputPath);
                     if (added.Contains(path)) continue;

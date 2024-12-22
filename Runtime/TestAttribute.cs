@@ -104,6 +104,16 @@ namespace UnityTest
             this.lineNumber = lineNumber;
         }
 
+        public int CompareTo(TestAttribute other)
+        {
+#if UNITY_EDITOR
+            return GetPath().CompareTo(other.GetPath());
+#else
+            return 0;
+#endif
+        }
+
+#if UNITY_EDITOR
         /// <summary>
         /// Get the unique identifier for this test.
         /// </summary>
@@ -117,7 +127,6 @@ namespace UnityTest
 
         #region Operators
         public override string ToString() => "TestAttribute(" + GetPath() + ")";
-        public int CompareTo(TestAttribute other) => GetPath().CompareTo(other.GetPath());
 
         public override bool Equals(object other)
         {
@@ -130,6 +139,7 @@ namespace UnityTest
 
         public static bool operator ==(TestAttribute left, TestAttribute right) => left.sourceFile == right.sourceFile && left.name == right.name && left.setUp == right.setUp && left.tearDown == right.tearDown && left.pauseOnFail == right.pauseOnFail;
         public static bool operator !=(TestAttribute left, TestAttribute right) => !(left == right);
-        #endregion
-    }
+#endregion
+#endif
+        }
 }

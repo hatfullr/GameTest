@@ -44,6 +44,16 @@ namespace UnityTest
             this.sourceFile = sourceFile;
         }
 
+        public int CompareTo(SuiteAttribute other)
+        {
+#if UNITY_EDITOR
+            return GetPath().CompareTo(other.GetPath());
+#else
+            return 0;
+#endif
+        }
+
+#if UNITY_EDITOR
         /// <summary>
         /// Get the unique identifier for this test suite.
         /// </summary>
@@ -55,8 +65,6 @@ namespace UnityTest
         }
 
         #region Operators
-        public int CompareTo(SuiteAttribute other) => GetPath().CompareTo(other.GetPath());
-
         public override bool Equals(object other)
         {
             if (other is null) return false;
@@ -68,5 +76,6 @@ namespace UnityTest
         public static bool operator ==(SuiteAttribute left, SuiteAttribute right) => left.sourceFile == right.sourceFile && left.name == right.name && left.pauseOnFail == right.pauseOnFail;
         public static bool operator !=(SuiteAttribute left, SuiteAttribute right) => !(left == right);
         #endregion
+#endif
     }
 }

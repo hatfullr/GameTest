@@ -36,8 +36,8 @@ namespace UnityTest
         private GameObject instantiatedDefaultGO;
 
         private Coroutine coroutine;
-
-        public static Test current;
+        
+        public static Test current { get; private set; }
         private static GameObject coroutineGO;
         private static bool sceneWarningPrinted = false;
 
@@ -96,7 +96,20 @@ namespace UnityTest
 
         public override string ToString() => "Test(" + attribute.GetPath() + ")";
 
-        public bool IsExample() => Utilities.IsSample(attribute.sourceFile);
+        public static void SetCurrentTest(Test test)
+        {
+            if (test == null)
+            {
+                Assert.currentTestSource = null;
+                Assert.currentTestScript = null;
+            }
+            else
+            {
+                Assert.currentTestSource = test.attribute.sourceFile;
+                Assert.currentTestScript = test.GetScript();
+            }
+            current = test;
+        }
 
         /// <summary>
         /// Destroy the default prefab, which is stored in this project.
@@ -189,7 +202,7 @@ namespace UnityTest
             Application.logMessageReceived -= HandleLog; // In case it's already added, remove the event (works even if not added)
             Application.logMessageReceived += HandleLog;
 
-            current = this;
+            SetCurrentTest(this);
 
             // Check if this scene is empty
             GameObject[] gameObjects = Object.FindObjectsOfType<GameObject>();
@@ -280,7 +293,8 @@ namespace UnityTest
 
             if (attribute.pauseOnFail && result == Result.Fail) EditorApplication.isPaused = true;
 
-            current = null;
+            SetCurrentTest(null);
+
             if (onFinished != null) onFinished(this);
         }
 
