@@ -17,6 +17,8 @@ Are you tired of finding new bugs in old code? Use `UnityTest` to run automated 
 4. Press Enter, or click "Add".
 5. Open the test manager at `Window > UnityTest Manager`.
 
+If you run into issues, check [Installation Troubleshooting](#installation-troubleshooting).
+
 `UnityTest` will create a folder in `Assets`, which cannot be deleted unless `UnityTest` is uninstalled. This is where `UnityTest` stores data about your tests and other data required for the test manager UI.
 
 ## Quick Start
@@ -68,3 +70,14 @@ When a test fails, it will throw an exception that is visible in the console log
 4. Find the link to your script in the stack trace and click on it.
 
 Unfortunately, this is the best solution currently possible in Unity, at least until Unity adds an API for the console window.
+
+## Installation Troubleshooting
+
+###  `No 'git' executable was found. Please install Git on your system then restart Unity and Unity Hub`
+This means Unity can't find your Git installation. From the [Unity manual](https://docs.unity3d.com/Manual/upm-git.html):
+
+> To use Git dependencies in a project, make sure you installed the [Git client](https://git-scm.com/) (minimum version 2.14.0) on your computer and that you have added the Git executable path to the PATH system environment variable.
+>
+> **Warning:** Unity tested the Package Manager to work with Git 2.14.0 and above. Unity can’t guarantee the results if you use Git versions below 2.14.0.
+
+After installing Git, make sure you close the Unity editor as well as Unity Hub (make sure the process is killed; Unity Hub likes to hide). If installing Git doesn't work, you may need to add Git to your PATH variable. [This post](https://discussions.unity.com/t/no-git-executable-was-found-please-install-git-on-your-system-and-restart-unity/755063/6) might help.
