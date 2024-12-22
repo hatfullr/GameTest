@@ -77,7 +77,7 @@ namespace UnityTest
         /// </summary>
         void OnEnable()
         {
-            Utilities.debug = manager.debug;
+            Logger.debug = manager.debug;
 
             searchField = new UnityEditor.IMGUI.Controls.SearchField(); // Unity demands we do this in OnEnable and nowhere else
 
@@ -190,7 +190,7 @@ namespace UnityTest
             minWidth = default;
             settingsWindow = null;
 
-            Refresh(() => Utilities.Log("Reset"), message: "Resetting");
+            Refresh(() => Logger.Log("Reset"), message: "Resetting");
         }
 
         private void Refresh(System.Action onFinished = null, string message = "Refreshing")
@@ -666,7 +666,7 @@ namespace UnityTest
                 if (GUILayout.Button(Style.GetIcon("TestManagerUI/Toolbar/GoToEmptyScene"), Style.Get("TestManagerUI/Toolbar/GoToEmptyScene")))
                 {
                     EditorSceneManager.NewScene(NewSceneSetup.EmptyScene);
-                    Utilities.Log("Entered an empty scene");
+                    Logger.Log("Entered an empty scene");
                     GUIUtility.ExitGUI();
                 }
             }
@@ -674,13 +674,13 @@ namespace UnityTest
 
         private void DrawDebugButton()
         {
-            System.Array values = System.Enum.GetValues(typeof(Utilities.DebugMode));
+            System.Array values = System.Enum.GetValues(typeof(Logger.DebugMode));
 
             bool hasNothing = true;
             bool hasEverything = true;
             bool hasAnything = false;
             
-            foreach (Utilities.DebugMode mode in values)
+            foreach (Logger.DebugMode mode in values)
             {
                 if (manager.debug.HasFlag(mode))
                 {
@@ -695,11 +695,11 @@ namespace UnityTest
 
             void ClearFlags()
             {
-                foreach (Utilities.DebugMode mode in values) manager.debug &= ~mode;
+                foreach (Logger.DebugMode mode in values) manager.debug &= ~mode;
             }
             void SetAllFlags()
             {
-                foreach (Utilities.DebugMode mode in values) manager.debug |= mode;
+                foreach (Logger.DebugMode mode in values) manager.debug |= mode;
             }
 
             Rect rect = Style.GetRect("TestManagerUI/Toolbar/Debug", debugContent);
@@ -713,7 +713,7 @@ namespace UnityTest
                 if (hasEverything) toolsMenu.AddDisabledItem(new GUIContent("Everything"), true);
                 else toolsMenu.AddItem(new GUIContent("Everything"), hasEverything, SetAllFlags);
 
-                foreach (Utilities.DebugMode mode in System.Enum.GetValues(typeof(Utilities.DebugMode)))
+                foreach (Logger.DebugMode mode in System.Enum.GetValues(typeof(Logger.DebugMode)))
                 {
                     toolsMenu.AddItem(new GUIContent(mode.ToString()), manager.debug.HasFlag(mode), () =>
                     {

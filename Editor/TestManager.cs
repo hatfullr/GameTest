@@ -17,7 +17,7 @@ namespace UnityTest
     public class TestManager : ScriptableObject
     {
         public bool showWelcome = true;
-        public Utilities.DebugMode debug;
+        public Logger.DebugMode debug;
         public string search = null;
         public bool paused = false;
         public bool running = false;
@@ -189,8 +189,8 @@ namespace UnityTest
             searchMatches.Clear();
             originalQueue.Clear();
 
-            debug = Utilities.DebugMode.Log | Utilities.DebugMode.LogWarning | Utilities.DebugMode.LogError;
-            Utilities.debug = debug;
+            debug = Logger.DebugMode.Log | Logger.DebugMode.LogWarning | Logger.DebugMode.LogError;
+            Logger.debug = debug;
             previousFrameNumber = 0;
 
             guiQueue.Reset();
@@ -211,7 +211,7 @@ namespace UnityTest
             running = true;
 
             if (!EditorApplication.isPlaying) EditorApplication.EnterPlaymode(); // can cause recompile
-            else Utilities.Log("Starting");
+            else Logger.Log("Starting");
         }
 
         /// <summary>
@@ -232,7 +232,7 @@ namespace UnityTest
 
             if (EditorApplication.isPlaying) EditorApplication.ExitPlaymode();
             onStop();
-            Utilities.Log("Finished", null, null);
+            Logger.Log("Finished", null, null);
             stopping = false;
         }
         #endregion

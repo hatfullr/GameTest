@@ -182,7 +182,7 @@ namespace UnityTest
 
             if (!EditorApplication.isPlaying)
             {
-                Utilities.LogError("Cannot run a Test while not in Play mode");
+                Logger.LogError("Cannot run a Test while not in Play mode");
                 return;
             }
 
@@ -209,7 +209,7 @@ namespace UnityTest
                 }
                 if (!ignore)
                 {
-                    Utilities.LogWarning("You are not in an empty scene. Test results might be misleading. Perhaps your previous TearDown function " +
+                    Logger.LogWarning("You are not in an empty scene. Test results might be misleading. Perhaps your previous TearDown function " +
                         "didn't correctly remove all the GameObjects, or you used Destroy instead of DestroyImmediate. Otherwise this might be intended behavior for " +
                         "the custom tests you wrote, in which case you can ignore this error.");
                     sceneWarningPrinted = true;
@@ -235,12 +235,12 @@ namespace UnityTest
                 coroutineGO.hideFlags = HideFlags.HideAndDontSave;
                 
                 try { StartCoroutine(method.Invoke(component, new object[] { gameObject }) as System.Collections.IEnumerator); }
-                catch (TargetException) { Utilities.LogError("TargetException was thrown (1). Please submit a bug report."); }
+                catch (TargetException) { Logger.LogError("TargetException was thrown (1). Please submit a bug report."); }
             }
             else
             {
                 try { method.Invoke(component, new object[] { gameObject }); } // probably of type void
-                catch (TargetException) { Utilities.LogError("TargetException was thrown (2). Please submit a bug report."); }
+                catch (TargetException) { Logger.LogError("TargetException was thrown (2). Please submit a bug report."); }
                 
                 OnRunComplete();
             }
@@ -291,13 +291,13 @@ namespace UnityTest
         public void PrintResult()
         {
             string message = attribute.GetPath();
-            if (result == Result.Pass) message = string.Join(' ', Utilities.ColorString("(Passed)", Utilities.green), message);
-            else if (result == Result.Fail) message = string.Join(' ', Utilities.ColorString("(Failed)", Utilities.red), message);
-            else if (result == Result.Skipped) message = string.Join(' ', Utilities.ColorString("(Skipped)", Utilities.yellow), message);
+            if (result == Result.Pass) message = string.Join(' ', Logger.ColorString("(Passed)", Utilities.green), message);
+            else if (result == Result.Fail) message = string.Join(' ', Logger.ColorString("(Failed)", Utilities.red), message);
+            else if (result == Result.Skipped) message = string.Join(' ', Logger.ColorString("(Skipped)", Utilities.yellow), message);
             else if (result == Result.None) message = string.Join(' ', "(Finished)", message);
             else throw new System.NotImplementedException(result.ToString());
             
-            Utilities.Log(message, GetScript());
+            Logger.Log(message, GetScript());
         }
 
         public void CancelCoroutine()
@@ -360,7 +360,7 @@ namespace UnityTest
                 }
             }
 
-            if (matched == null) Utilities.LogError("Failed to find script '" + method.DeclaringType.FullName + "' in '" + pathToSearch + "'");
+            if (matched == null) Logger.LogError("Failed to find script '" + method.DeclaringType.FullName + "' in '" + pathToSearch + "'");
             else
             {
                 script = AssetDatabase.LoadAssetAtPath(AssetDatabase.GUIDToAssetPath(matched), typeof(MonoScript));
