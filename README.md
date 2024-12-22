@@ -19,7 +19,8 @@ Are you tired of finding new bugs in old code? Use `UnityTest` to run automated 
 
 If you run into issues, check [Installation Troubleshooting](#installation-troubleshooting).
 
-`UnityTest` will create a folder in `Assets`, which cannot be deleted unless `UnityTest` is uninstalled. This is where `UnityTest` stores data about your tests and other data required for the test manager UI.
+### The UnityTest Folder
+Upon opening the UnityTest Manager, a folder called "UnityTest" will be created in the "Assets" folder. This is where `UnityTest` will store `ScriptableObject`s containing data about the tests in your project as well as data for the UnityTest Manager. If you ever want to manually reset `UnityTest`, delete the "UnityTest" folder and re-open the UnityTest Manager. It is recommended that you do not rename or move this folder, and it's probably also a bad idea to store anything you care about there.
 
 ## Quick Start
 Unit testing is intended to make sure code runs properly throughout version changes. This is particularly helpful when there are many complicated and inter-dependent systems. The following example keeps things simple. Suppose you have some Unity class called `Example`:
