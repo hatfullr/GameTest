@@ -37,8 +37,8 @@ namespace UnityTest
             mainRect = default;
             height = Style.GUIQueue.minHeight;
             hideMain = false;
-            queue.Clear();
-            finished.Clear();
+            if (queue != null) queue.Clear();
+            if (finished != null) finished.Clear();
             ResetTimer();
         }
 

@@ -7,7 +7,7 @@ using UnityEngine;
 namespace UnityTest
 {
     [System.Serializable]
-    public class Foldout //: ScriptableObject
+    public class Foldout
     {
         /// <summary>
         /// All Test objects in this Foldout will have paths that start with this path.

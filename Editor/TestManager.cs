@@ -36,8 +36,16 @@ namespace UnityTest
         /// </summary>
         [SerializeField] private List<Test> originalQueue = new List<Test>();
 
-        public GUIQueue guiQueue;
-        
+        [SerializeField] private GUIQueue _guiQueue;
+        public GUIQueue guiQueue
+        {
+            get
+            {
+                if (_guiQueue == null) _guiQueue = new GUIQueue();
+                return _guiQueue;
+            }
+        }
+
         public bool loadingWheelVisible = false;
         public string loadingWheelText = null;
 
@@ -55,6 +63,30 @@ namespace UnityTest
         private List<System.Tuple<TestAttribute, MethodInfo>> attributesAndMethods = new List<System.Tuple<TestAttribute, MethodInfo>>();
 
         private System.Threading.Tasks.Task task;
+
+        /// <summary>
+        /// Don't set this. Should only be set in the AssetModificationProcessor.
+        /// </summary>
+        public static string filePath;
+
+        /// <summary>
+        /// Locate the TestManager ScriptableObject asset in this project, load it, then return it. If no asset was found, a new one is created at Utilities.dataPath. If more than one is found,
+        /// a Utilities.LogError is printed and null is returned.
+        /// </summary>
+        public static TestManager Load()
+        {
+            foreach (string guid in AssetDatabase.FindAssets("t:" + nameof(TestManager)))
+            {
+                filePath = AssetDatabase.GUIDToAssetPath(guid);
+                return AssetDatabase.LoadAssetAtPath<TestManager>(filePath);
+            }
+            
+            // Didn't find an existing TestManager, so create one
+            TestManager result = ScriptableObject.CreateInstance(typeof(TestManager)) as TestManager;
+            filePath = Path.Join(Utilities.dataPath, nameof(UnityTest) + ".asset");
+            AssetDatabase.CreateAsset(result, filePath);
+            return result;
+        }
 
         /// <summary>
         /// Save the TestManager asset as well as all assets linked to it.

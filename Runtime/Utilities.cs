@@ -73,6 +73,7 @@ namespace UnityTest
 
         private static HashSet<string> loggedExceptions = new HashSet<string>();
 
+        #region UI Helpers
         public enum  RectAlignment
         {
             LowerLeft,
@@ -186,6 +187,36 @@ namespace UnityTest
             }
         }
 
+        public static bool IsSceneEmpty()
+        {
+            GameObject[] objects = UnityEngine.SceneManagement.SceneManager.GetActiveScene().GetRootGameObjects();
+            if (objects == null) return true;
+            if (objects.Length == 0) return true;
+            if (objects.Length != 2) return false;
+            return objects[0].name == "MainCamera" && objects[1].name == "Directional Light";
+        }
+
+        /// <summary>
+        /// Returns true if the mouse is currently hovering over the given Rect, and false otherwise.
+        /// </summary>
+        public static bool IsMouseOverRect(Rect rect)
+        {
+            if (Event.current != null) return rect.Contains(Event.current.mousePosition);
+            return false;
+        }
+
+        /// <summary>
+        /// When the mouse cursor is hovering over the given rect, the mouse cursor will change to the type specified.
+        /// </summary>
+        public static void SetCursorInRect(Rect rect, MouseCursor cursor) => EditorGUIUtility.AddCursorRect(rect, cursor);
+
+        public static bool IsMouseButtonPressed() { if (Event.current == null) return false; return Event.current.rawType == EventType.MouseDown; }
+        public static bool IsMouseButtonReleased() { if (Event.current == null) return false; return Event.current.rawType == EventType.MouseUp; }
+        public static bool IsMouseDragging() { if (Event.current == null) return false; return Event.current.rawType == EventType.MouseDrag; }
+
+        #endregion
+
+        #region Filesystem Helpers
         /// <summary>
         /// Given the path to a file, returns true if the path is located in the Samples folder, and false otherwise.
         /// </summary>
@@ -244,32 +275,6 @@ namespace UnityTest
         /// input parameter to the criteria function is any Object. The result of the criteria function must be a bool.
         /// </summary>
         public static T LoadAssetAtPath<T>(string assetPath) => (T)(object)AssetDatabase.LoadAssetAtPath(GetUnityPath(assetPath), typeof(T));
-
-        /// <summary>
-        /// Create a new asset file at Assets/UnityTest/Data/[name].asset. If overwrite is true then if an asset with the same name already
-        /// exists, it is destroyed and a new one is created in its place. Otherwise, if overwrite is false, the asset is loaded and returned.
-        /// The type must inherit from ScriptableObject.
-        /// </summary>
-        public static T CreateAsset<T>(string name, string directory, System.Action<T> initializer = null, bool overwrite = false)
-        {
-            if (directory == null) directory = dataPath;
-
-            // First check if this asset already exists
-            string path = GetUnityPath(GetAssetPath(name, directory));
-            if (AssetExists(name, directory))
-            {
-                if (overwrite)
-                {
-                    if (!AssetDatabase.DeleteAsset(path)) throw new System.Exception("Failed to overwrite asset at path '" + path + "'");
-                }
-                else return (T)(object)AssetDatabase.LoadAssetAtPath(path, typeof(T));
-            }
-
-            ScriptableObject result = ScriptableObject.CreateInstance(typeof(T));
-            if (initializer != null) initializer((T)(object)result);
-            AssetDatabase.CreateAsset(result, path);
-            return (T)(object)result;
-        }
 
         
         public static void SaveAssets(IEnumerable<Object> assets)
@@ -339,15 +344,6 @@ namespace UnityTest
             }
 
             return directory;
-        }
-
-        public static bool IsSceneEmpty()
-        {
-            GameObject[] objects = UnityEngine.SceneManagement.SceneManager.GetActiveScene().GetRootGameObjects();
-            if (objects == null) return true;
-            if (objects.Length == 0) return true;
-            if (objects.Length != 2) return false;
-            return objects[0].name == "MainCamera" && objects[1].name == "Directional Light";
         }
 
         /// <summary>
@@ -439,25 +435,9 @@ namespace UnityTest
             }
             return false;
         }
+        #endregion
 
-        /// <summary>
-        /// Returns true if the mouse is currently hovering over the given Rect, and false otherwise.
-        /// </summary>
-        public static bool IsMouseOverRect(Rect rect)
-        {
-            if (Event.current != null) return rect.Contains(Event.current.mousePosition);
-            return false;
-        }
-
-        /// <summary>
-        /// When the mouse cursor is hovering over the given rect, the mouse cursor will change to the type specified.
-        /// </summary>
-        public static void SetCursorInRect(Rect rect, UnityEditor.MouseCursor cursor) => UnityEditor.EditorGUIUtility.AddCursorRect(rect, cursor);
-
-        public static bool IsMouseButtonPressed() { if (Event.current == null) return false; return Event.current.rawType == EventType.MouseDown; }
-        public static bool IsMouseButtonReleased() { if (Event.current == null) return false; return Event.current.rawType == EventType.MouseUp; }
-        public static bool IsMouseDragging() { if (Event.current == null) return false; return Event.current.rawType == EventType.MouseDrag; }
-
+        #region IO Helpers
         public static string ColorString(string text, string color)
         {
             if (string.IsNullOrEmpty(text)) return null;
@@ -514,7 +494,9 @@ namespace UnityTest
             Debug.LogException(exception);
             loggedExceptions.Add(exception.Message);
         }
+        #endregion
 
+        #region Exceptions
         /// <summary>
         /// Signifies that a path is not located in either the "Assets" or "Packages" folder of a project.
         /// </summary>
@@ -534,5 +516,6 @@ namespace UnityTest
             public AssetNotFound(string message) : base(message) { }
             public AssetNotFound(string message, System.Exception inner) : base(message, inner) { }
         }
+        #endregion
     }
 }

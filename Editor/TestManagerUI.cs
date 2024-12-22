@@ -20,27 +20,7 @@ namespace UnityTest
 
         public System.Action onLostFocus, onFocus;
 
-        private TestManager _manager;
-        public TestManager manager
-        {
-            get
-            {
-                if (_manager == null)
-                {
-                    string[] guids = AssetDatabase.FindAssets("t:" + nameof(TestManager));
-                    if (guids.Length == 0) _manager = Utilities.CreateAsset<TestManager>("UnityTest", Utilities.dataPath);
-                    else if (guids.Length == 1) _manager = AssetDatabase.LoadAssetAtPath<TestManager>(AssetDatabase.GUIDToAssetPath(guids[0]));
-                    else if (guids.Length > 1) 
-                    {
-                        string[] paths = new string[guids.Length];
-                        for (int i = 0; i < guids.Length; i++) paths[i] = AssetDatabase.GUIDToAssetPath(guids[i]);
-                        Utilities.LogError("Multiple TestManager ScriptableObjects found in the project for UnityTest. Please " +
-                            "choose one to keep and delete the rest. They are located at: " + string.Join(" ", paths));
-                    }
-                }
-                return _manager;
-            }
-        }
+        public TestManager manager;
 
         private SettingsWindow settingsWindow;
 
@@ -88,6 +68,7 @@ namespace UnityTest
         /// </summary>
         void Awake()
         {
+            manager = TestManager.Load();
             Refresh();
         }
 
@@ -123,22 +104,27 @@ namespace UnityTest
             AssemblyReloadEvents.afterAssemblyReload -= OnAfterAssemblyReload;
             EditorApplication.playModeStateChanged -= OnPlayStateChanged;
 
-            manager.onStop -= OnTestManagerFinished;
+            if (manager != null) manager.onStop -= OnTestManagerFinished;
         }
 
         void OnDestroy()
         {
-            if (manager.running) manager.Stop();
+            if (manager != null)
+            {
+                if (manager.running) manager.Stop();
 
-            // Save all the loaded assets
-            manager.Save();
+                // Save all the loaded assets
+                manager.Save();
+            }
         }
 
         private void OnAfterAssemblyReload()
         {
+            manager = TestManager.Load();
             Refresh(() =>
             {
-                if (manager.running && !manager.paused) manager.RunNext();
+                if (manager != null)
+                    if (manager.running && !manager.paused) manager.RunNext();
             });
         }
 
@@ -175,14 +161,17 @@ namespace UnityTest
         [HideInCallstack]
         void Update()
         {
-            if (manager.loadingWheelVisible)
+            if (manager != null)
             {
-                Repaint();
-                return;
+                if (manager.loadingWheelVisible)
+                {
+                    Repaint();
+                    return;
+                }
+                if (!EditorApplication.isPlaying) return;
+                manager.Update();
+                if (manager.running) Repaint(); // keeps the frame counter and timer up-to-date
             }
-            if (!EditorApplication.isPlaying) return;
-            manager.Update();
-            if (manager.running) Repaint(); // keeps the frame counter and timer up-to-date
         }
         #endregion Events
 
@@ -190,7 +179,8 @@ namespace UnityTest
         #region Methods
         private void DoReset()
         {
-            manager.Reset();
+            if (manager != null) manager.Reset();
+            else manager = TestManager.Load();
 
             indentLevel = default;
             spinStartTime = default;
@@ -211,22 +201,25 @@ namespace UnityTest
             Test previousSettingsTest = null;
             if (settingsWindow != null) previousSettingsTest = settingsWindow.GetTest();
 
-            manager.UpdateTests(() =>
-            {
-                StopLoadingWheel();
-                Repaint();
+            if (manager != null)
+                manager.UpdateTests(() =>
+                {
+                    StopLoadingWheel();
+                    Repaint();
 
-                if (onFinished != null) onFinished();
-            });
+                    if (onFinished != null) onFinished(); 
+                });
         }
 
         private void ResetSelected()
         {
+            if (manager == null) return;
             foreach (Test test in manager.GetTests())
                 if (test.selected) test.Reset();
         }
         private void ResetAll()
         {
+            if (manager == null) return;
             foreach (Test test in manager.GetTests()) test.Reset();
         }
         #endregion Methods
@@ -235,6 +228,8 @@ namespace UnityTest
         #region UI
         void OnGUI()
         {
+            if (manager == null) manager = TestManager.Load();
+
             Utilities.isDarkTheme = GUI.skin.name == "DarkSkin";
 
             EditorGUILayout.VerticalScope mainScope = new EditorGUILayout.VerticalScope(GUILayout.ExpandHeight(true), GUILayout.ExpandWidth(true));
@@ -468,6 +463,7 @@ namespace UnityTest
 
         private Mode GetMode()
         {
+            if (manager == null) return Mode.Normal;
             if (!string.IsNullOrEmpty(manager.search)) return Mode.Search;
             return Mode.Normal;
         }
@@ -749,12 +745,14 @@ namespace UnityTest
                 "If you have encountered a bug, first try closing the UnityTest Manager and opening it again.",
                 "Yes", "No"
             )) return;
+            
             // User clicked "OK"
             DoReset();
         }
 
         private void StartLoadingWheel(string text = null)
         {
+            if (manager == null) return;
             manager.loadingWheelText = text;
             spinStartTime = Time.realtimeSinceStartup;
             manager.loadingWheelVisible = true;
@@ -762,6 +760,7 @@ namespace UnityTest
 
         private void StopLoadingWheel()
         {
+            if (manager == null) return;
             manager.loadingWheelVisible = false;
             manager.loadingWheelText = null;
         }
