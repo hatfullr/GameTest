@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor;
-using UnityEditor.Compilation;
 using System.Reflection;
 using System.IO;
 using System.Text.RegularExpressions;
@@ -16,111 +15,90 @@ namespace UnityTest
     [System.Serializable]
     public class TestManager : ScriptableObject
     {
-        public const string fileName = nameof(TestManager);
+        public bool showWelcome = true;
+        public Logger.DebugMode debug;
+        public string search = null;
+        public bool paused = false;
+        public bool running = false;
+        public TestManagerUI.TestSortOrder testSortOrder = TestManagerUI.TestSortOrder.Name;
 
-        /// <summary>
-        /// The Test objects associated with the methods that have a TestAttribute attached to them.
-        /// </summary>
-        public Tests tests;
+        public Vector2 scrollPosition;
+
+        public List<Foldout> foldouts = new List<Foldout>();
 
         public List<Test> queue = new List<Test>();
-        public List<Test> finishedTests = new List<Test>();
-        public List<Test.Result> finishedResults = new List<Test.Result>();
+        public List<Test> finished = new List<Test>();
+
+        /// <summary>
+        /// When the tests begin, the queue is saved into this variable so that the orders of the tests can be maintained.
+        /// When testing stops, the queue is repopulated with this list, and then this list is cleared. 
+        /// </summary>
+        [SerializeField] private List<Test> originalQueue = new List<Test>();
 
         [SerializeField] private GUIQueue _guiQueue;
-        [SerializeField] private Foldout _rootFoldout;
-        public List<Foldout> foldouts = new List<Foldout>();
-        public Vector2 scrollPosition;
-        public bool showWelcome = true;
-        public bool loadingWheelVisible = false;
-        public string search = null;
-        public string loadingWheelText = null;
-        public List<Test> searchMatches = new List<Test>();
-
-        public Utilities.DebugMode debug;
-
         public GUIQueue guiQueue
         {
             get
             {
-                if (_guiQueue == null) _guiQueue = Utilities.CreateAsset<GUIQueue>(GUIQueue.fileName, Utilities.dataPath);
+                if (_guiQueue == null) _guiQueue = new GUIQueue();
                 return _guiQueue;
             }
         }
 
-        public Foldout rootFoldout
-        {
-            get
-            {
-                if (_rootFoldout == null) _rootFoldout = Utilities.CreateAsset<Foldout>("rootFoldout", Utilities.foldoutDataPath);
-                return _rootFoldout;
-            }
-        }
+        public bool loadingWheelVisible = false;
+        public string loadingWheelText = null;
 
-        public float timer;
-        public uint nframes;
-
-        public bool paused = false;
-        public bool running = false;
+        public List<Test> searchMatches = new List<Test>();
 
         private uint previousFrameNumber = 0;
+
+        public bool stopping = false;
 
         /// <summary>
         /// Invoked when all Tests in the queue have been run and the editor has exited Play mode.
         /// </summary>
         public System.Action onStop;
 
-        private List<AttributeAndMethod> attributesAndMethods = new List<AttributeAndMethod>();
+        private List<System.Tuple<TestAttribute, MethodInfo>> attributesAndMethods = new List<System.Tuple<TestAttribute, MethodInfo>>();
 
         private System.Threading.Tasks.Task task;
+
+        /// <summary>
+        /// Don't set this. Should only be set in the AssetModificationProcessor.
+        /// </summary>
+        public static string filePath;
+
+        /// <summary>
+        /// Locate the TestManager ScriptableObject asset in this project, load it, then return it. If no asset was found, a new one is created at Utilities.dataPath. If more than one is found,
+        /// a Utilities.LogError is printed and null is returned.
+        /// </summary>
+        public static TestManager Load()
+        {
+            foreach (string guid in AssetDatabase.FindAssets("t:" + nameof(TestManager)))
+            {
+                filePath = AssetDatabase.GUIDToAssetPath(guid);
+                return AssetDatabase.LoadAssetAtPath<TestManager>(filePath);
+            }
+            
+            // Didn't find an existing TestManager, so create one
+            TestManager result = ScriptableObject.CreateInstance(typeof(TestManager)) as TestManager;
+            filePath = Path.Join(Utilities.dataPath, nameof(UnityTest) + ".asset");
+            AssetDatabase.CreateAsset(result, filePath);
+            return result;
+        }
 
         /// <summary>
         /// Save the TestManager asset as well as all assets linked to it.
         /// </summary>
         public void Save()
         {
-            List<Object> assets = new List<Object>()
-            {
-                this,
-                guiQueue,
-                rootFoldout,
-            };
-            assets.AddRange(foldouts);
-            assets.AddRange(tests);
-
-            for (int i = 0; i < assets.Count; i++)
-            {
-                string message = AssetDatabase.GetAssetPath(assets[i]);
-                if (assets[i].GetType() == typeof(Test)) message = "test " + (assets[i] as Test).attribute.GetPath();
-                else if (assets[i].GetType() == typeof(Foldout)) message = "foldout " + (assets[i] as Foldout).path;
-
-                if (EditorUtility.DisplayCancelableProgressBar("UnityTest", "Saving " + message, (float)(i + 1) / assets.Count))
-                    break;
-
-                Utilities.SaveAsset(assets[i]);
-
-                //System.Threading.Thread.Sleep(2 * (int)1e3); // for testing the cancelable functionality
-            }
-            EditorUtility.ClearProgressBar();
-        }
-
-        
-
-        public void OnPlayStateChanged(PlayModeStateChange change)
-        {
-            if (change == PlayModeStateChange.ExitingPlayMode)
-            {
-                timer = 0f;
-                nframes = 0;
-                SkipRemainingTests();
-            }
-            if (change == PlayModeStateChange.EnteredEditMode) running = false;
+            EditorUtility.SetDirty(this);
+            AssetDatabase.SaveAssetIfDirty(this);
         }
 
         [HideInCallstack]
         public void Update()
         {
-            //Debug.Log(Time.frameCount + " " + previousFrameNumber);
             if (Time.frameCount > previousFrameNumber) OnUpdate();
             previousFrameNumber = (uint)Time.frameCount;
         }
@@ -131,70 +109,69 @@ namespace UnityTest
         [HideInCallstack]
         private void OnUpdate()
         {
-            if (running)
-            {
-                if (Test.current == null) // No test is currently running
-                {
-                    if (queue.Count > 0) // Start the next test if there is one
-                    {
-                        if (!paused) RunNext();
-                        return;
-                    }
-                }
-                else
-                {
-                    timer += Time.deltaTime;
-                    nframes++;
-                }
-            }
+            if (Test.current != null) guiQueue.IncrementTimer(Time.deltaTime);
         }
 
         [HideInCallstack]
-        private void RunNext()
+        public void RunNext()
         {
-            timer = 0f;
-            nframes = 0;
-            Test test = PopFromQueue();
+            guiQueue.ResetTimer();
 
-            [HideInCallstack]
-            void OnFinished()
+            // This is a redundancy fallback
+            if (queue.Count == 0)
             {
-                test.onFinished -= OnFinished;
-                test.PrintResult();
-                AddToFinishedQueue(test);
-                
-                if (test.attribute.pauseOnFail && test.result == Test.Result.Fail)
-                {
-                    EditorApplication.isPaused = true;
-                }
-
-                if (queue.Count == 0)
-                {
-                    Stop();
-                }
+                Stop();
+                return;
             }
-            
-            test.onFinished += OnFinished;
+
+            Test test = queue[0];
+            queue.RemoveAt(0);
+
+            if (test.result == Test.Result.Skipped)
+            {
+                AddToFinishedQueue(test);
+                test.PrintResult();
+                return;
+            }
+
+            test.onFinished -= OnRunFinished;
+            test.onFinished += OnRunFinished;
+
             test.Run();
         }
 
+        private void OnRunFinished(Test test)
+        {
+            test.onFinished -= OnRunFinished;
+            AddToFinishedQueue(test);
+            guiQueue.ResetTimer();
+            if (running && !paused)
+            {
+                if (queue.Count > 0) RunNext();
+                else Stop();
+            }
+        }
+
         /// <summary>
-        /// Stop running the current test and move to the next.
+        /// Stop running the current test and start running the next in the queue.
         /// </summary>
         [HideInCallstack]
         public void Skip()
         {
-            if (Test.current == null)
+            if (Test.current != null)
             {
-                RunNext();
-                return;
+                Test.current.result = Test.Result.Skipped;
+                Test.current.OnRunComplete();
             }
-            Test.current.result = Test.Result.Skipped;
+        }
 
-            Test.current.CancelCoroutines();
-            Test.current.OnRunComplete();
+        private void SkipRemainingTests()
+        {
+            // Mark all remaining tests for skipping
+            foreach (Test test in queue) test.result = Test.Result.Skipped;
 
-            Test.current = null;
+            // If there is a Test running currently, skip it
+            Skip();
         }
 
         /// <summary>
@@ -202,21 +179,20 @@ namespace UnityTest
         /// </summary>
         public void Reset()
         {
-            foldouts = new List<Foldout>();
+            foldouts.Clear();
             scrollPosition = default;
             showWelcome = true;
             loadingWheelVisible = false;
             loadingWheelText = null;
             search = default;
-            searchMatches = new List<Test>();
+            searchMatches.Clear();
+            originalQueue.Clear();
 
-            Utilities.debug = Utilities.DebugMode.Log | Utilities.DebugMode.LogWarning | Utilities.DebugMode.LogError;
+            debug = Logger.DebugMode.Log | Logger.DebugMode.LogWarning | Logger.DebugMode.LogError;
+            Logger.debug = debug;
             previousFrameNumber = 0;
-            timer = 0f;
-            nframes = 0;
-            queue = new List<Test>();
-            finishedTests = new List<Test>();
-            finishedResults = new List<Test.Result>();
+
+            guiQueue.Reset();
         }
 
 
@@ -226,39 +202,15 @@ namespace UnityTest
         /// </summary>
         public void Start()
         {
-            finishedTests.Clear();
-            finishedResults.Clear();
+            finished.Clear();
+
+            originalQueue.Clear();
+            originalQueue.AddRange(queue); // Save a copy of the original queue to restore queue order in Stop()
 
             running = true;
 
-            if (!EditorApplication.isPlaying)
-            {
-                EditorApplication.EnterPlaymode(); // can cause recompile
-            }
-            else
-            {
-                Utilities.Log("Starting");
-            }
-        }
-
-        private void SkipRemainingTests()
-        {
-            // Mark any remaining tests as skipped
-            if (Test.current != null)
-            {
-                Test.current.result = Test.Result.Skipped;
-                Test.current.CancelCoroutines();
-                AddToFinishedQueue(Test.current);
-                Test.current.PrintResult();
-                Test.current = null;
-            }
-            foreach (Test test in queue)
-            {
-                test.result = Test.Result.Skipped;
-                AddToFinishedQueue(test);
-                test.PrintResult();
-            }
-            queue.Clear();
+            if (!EditorApplication.isPlaying) EditorApplication.EnterPlaymode(); // can cause recompile
+            else Logger.Log("Starting");
         }
 
         /// <summary>
@@ -266,12 +218,21 @@ namespace UnityTest
         /// </summary>
         public void Stop()
         {
+            if (stopping) return;
+
+            stopping = true;
             SkipRemainingTests();
-            paused = false;
+
+            queue.AddRange(originalQueue); // Restore test ordering
+            originalQueue.Clear();
+
             running = false;
+            paused = false;
+
             if (EditorApplication.isPlaying) EditorApplication.ExitPlaymode();
             onStop();
-            Utilities.Log("Finished", null, null);
+            Logger.Log("Finished", null, null);
+            stopping = false;
         }
         #endregion
 
@@ -279,6 +240,17 @@ namespace UnityTest
 
 
         #region Assembly and Test Management
+        public IEnumerable<Test> GetTests()
+        {
+            foreach (Foldout foldout in foldouts)
+            {
+                foreach (Test test in foldout.tests)
+                {
+                    yield return test;
+                }
+            }
+        }
+
         public void UpdateSearchMatches(TestManagerUI ui, string newSearch)
         {
             searchMatches.Clear();
@@ -288,7 +260,7 @@ namespace UnityTest
 
             string path;
             MatchCollection matches;
-            foreach (Test test in rootFoldout.GetTests(this).OrderBy(x => x.attribute.GetPath()))
+            foreach (Test test in GetTests().OrderBy(x => x.attribute.GetPath()))
             {
                 path = test.attribute.GetPath();
                 matches = re.Matches(path);
@@ -297,26 +269,34 @@ namespace UnityTest
                 searchMatches.Add(test);
             }
         }
+        /// <summary>
+        /// Remove the Test from the queue if it is already there. Then insert the Test into the queue at the top.
+        /// </summary>
         public void AddToQueue(Test test)
         {
-            queue.Insert(0, test);
+            RemoveFromQueue(test);
+            queue.Add(test);
+        }
+        /// <summary>
+        /// If the Test is in the queue, remove it. Otherwise, do nothing.
+        /// </summary>
+        public void RemoveFromQueue(Test test)
+        {
+            foreach (Test t in queue.ToArray())
+            {
+                if (t.attribute.GetPath() == test.attribute.GetPath())
+                {
+                    queue.Remove(t);
+                    break;
+                }
+            }
         }
         private void AddToFinishedQueue(Test test)
         {
-            finishedTests.Insert(0, test);
-            finishedResults.Insert(0, test.result);
-        }
-        private Test PopFromQueue()
-        {
-            Test test = queue[0];
-            queue.RemoveAt(0);
-            return test;
+            finished.Add(test); // This makes a reverse order
         }
 
-        private T GetAttribute<T>(MethodInfo method) => (T)(object)method.GetCustomAttribute(typeof(T), false);
-        private T GetAttribute<T>(System.Type cls) => (T)(object)cls.GetCustomAttribute(typeof(T), false);
-
-        public bool IsMethodIgnored(MethodInfo method) => GetAttribute<IgnoreAttribute>(method) != null;
+        public bool IsMethodIgnored(MethodInfo method) => method.GetCustomAttribute<IgnoreAttribute>(false) != null;
 
         /// <summary>
         /// Collect all the assemblies that Unity has compiled.
@@ -326,9 +306,9 @@ namespace UnityTest
             List<string> added = new List<string>();
             HashSet<System.Reflection.Assembly> assemblies = new HashSet<System.Reflection.Assembly>();
             string path;
-            foreach (AssembliesType type in (AssembliesType[])System.Enum.GetValues(typeof(AssembliesType))) // Hit all assembly types
+            foreach (UnityEditor.Compilation.AssembliesType type in (UnityEditor.Compilation.AssembliesType[])System.Enum.GetValues(typeof(UnityEditor.Compilation.AssembliesType))) // Hit all assembly types
             {
-                foreach (UnityEditor.Compilation.Assembly assembly in CompilationPipeline.GetAssemblies(type))
+                foreach (UnityEditor.Compilation.Assembly assembly in UnityEditor.Compilation.CompilationPipeline.GetAssemblies(type))
                 {
                     path = Path.Join(Utilities.projectPath, assembly.outputPath);
                     if (added.Contains(path)) continue;
@@ -340,43 +320,70 @@ namespace UnityTest
         }
 
         
-
-        private Test CreateTest(TestAttribute attribute, MethodInfo method)
+        /// <summary>
+        /// Create a new Test with the given attribute and method. If a Foldout does not exist yet for the new Test,
+        /// Foldouts are created for the entire path of the new Test.
+        /// </summary>
+        private void CreateTest(TestAttribute attribute, MethodInfo method)
         {
-            // Try to locate an existing Test asset that matches the given TestAttribute.
-            // If none are found, create a new Test object and saves the asset to disk.
-
-            // It isn't efficient, but let's try just searching through all the existing Test objects for one that has a matching TestAttribute
-            Test test = Utilities.SearchForAsset<Test>((Test t) => t.attribute == attribute, Utilities.testDataPath, false);
-            if (test == null) // Didn't find it
+            // Locate the Foldout that this new Test would be a member of
+            Foldout foundFoldout = null;
+            Test foundTest = null;
+            string parent = Path.GetDirectoryName(attribute.GetPath());
+            foreach (Foldout foldout in foldouts)
             {
-                string name = System.Guid.NewGuid().ToString();
-                test = Utilities.CreateAsset<Test>(name, Utilities.testDataPath, (Test t) =>
+                if (foldout.path == parent)
                 {
-                    t.method = method;
-#pragma warning disable CS0618 // "obsolete" markers
-                    t.isInSuite = method.DeclaringType.GetCustomAttribute(typeof(SuiteAttribute)) != null;
-#pragma warning restore CS0618
-                    t.attribute = attribute;
-                });
-                 
-                // Each Test needs a "Default GameObject" that is stored in the UnityTest Data folder.
-                //test.CreateDefaultPrefab();
-            }
-            else
-            {
-                test.method = method;
-#pragma warning disable CS0618 // "obsolete" markers
-                test.isInSuite = method.DeclaringType.GetCustomAttribute(typeof(SuiteAttribute)) != null;
-#pragma warning restore CS0618
+                    foundFoldout = foldout;
+                    foreach (Test test in foundFoldout.tests)
+                    {
+                        if (test.attribute == attribute)
+                        {
+                            foundTest = test;
+                            break;
+                        }
+                    }
+                    break;
+                }
             }
 
-            return test;
+            if (foundTest != null) // Found existing matching Test, so update its method
+            {
+                foundTest.method = method;
+            }
+            else // Did not find any existing Test, so make a new one
+            {
+                if (foundFoldout == null) // No Foldout found for the Test, so we also need to make a new one
+                {
+                    // We might need to make several Foldouts so that there is a Foldout for each step on the path
+                    Foldout f;
+                    foreach (string path in Utilities.IterateDirectories(attribute.GetPath()))
+                    {
+                        f = null;
+                        foreach (Foldout foldout in foldouts)
+                        {
+                            if (foldout.path == path)
+                            {
+                                f = foldout;
+                                if (foundFoldout == null) foundFoldout = foldout;
+                                break;
+                            }
+                        }
+                        if (f == null)
+                        {
+                            foldouts.Add(new Foldout(path));
+                            if (foundFoldout == null) foundFoldout = foldouts[foldouts.Count - 1];
+                        }
+                    }
+                }
+
+                foundFoldout.tests.Add(new Test(attribute, method));
+            }
         }
-        
+
         private void UpdateTestAttributesAndMethods(HashSet<System.Reflection.Assembly> assemblies)
         {
-            List<AttributeAndMethod> result = new List<AttributeAndMethod>();
+            List<System.Tuple<TestAttribute, MethodInfo>> result = new List<System.Tuple<TestAttribute, MethodInfo>>();
             object[] classAttributes, methodAttributes;
             foreach (System.Reflection.Assembly assembly in assemblies)
             {
@@ -434,7 +441,7 @@ namespace UnityTest
                                 else
                                     testAttribute = new TestAttribute(suiteAttribute.pauseOnFail, method.Name, suiteAttribute.sourceFile);
 
-                                result.Add(new AttributeAndMethod(testAttribute, method));
+                                result.Add(new System.Tuple<TestAttribute, MethodInfo>(testAttribute, method));
                             }
                             break;
                         }
@@ -453,7 +460,7 @@ namespace UnityTest
                         foreach (object attribute in methodAttributes)
                         {
                             if (attribute.GetType() != typeof(TestAttribute)) continue;
-                            result.Add(new AttributeAndMethod(attribute as TestAttribute, method));
+                            result.Add(new System.Tuple<TestAttribute, MethodInfo>(attribute as TestAttribute, method));
                             break;
                         }
                     }
@@ -466,24 +473,47 @@ namespace UnityTest
         {
             if (task != null) return; // the task is already running, so do nothing and wait for it to finish
 
-            //Debug.Log("Running");
-
             task = System.Threading.Tasks.Task.Run(() => UpdateTestAttributesAndMethods(assemblies));
             await task;
             task = null;
 
             List<TestAttribute> foundAttributes = new List<TestAttribute>();
-            foreach (AttributeAndMethod obj in attributesAndMethods)
+            foreach (System.Tuple<TestAttribute, MethodInfo> obj in attributesAndMethods)
             {
-                foundAttributes.Add(obj.attribute);
-                if (tests.ContainsAttribute(obj.attribute)) tests.UpdateMethod(obj.attribute, obj.method);
-                else tests.Add(CreateTest(obj.attribute, obj.method)); // Also creates a Test asset in the database
+                TestAttribute attribute = obj.Item1;
+                MethodInfo method = obj.Item2;
+
+                foundAttributes.Add(attribute);
+                CreateTest(attribute, method);
             }
 
-            // Ensure that "tests" no longer contains any old Test objects that weren't found during this update
-            foreach (TestAttribute attribute in tests.GetAttributes())
+            // Remove any old Tests that have now been removed from the user's code
+            foreach (Foldout foldout in foldouts.ToArray())
             {
-                if (!foundAttributes.Contains(attribute)) tests.RemoveAtAttribute(attribute); // Also deletes the Test asset from the database
+                foreach (Test test in foldout.tests.ToArray())
+                {
+                    if (foundAttributes.Contains(test.attribute)) continue;
+                    foldout.tests.Remove(test);
+                    if (foldout.tests.Count == 0)
+                    {
+                        foldouts.Remove(foldout);
+                        break;
+                    }
+                }
+            }
+
+            // Check the GUIQueue for any Tests whose methods need to be updated now
+            foreach (List<Test> q in new List<List<Test>> { queue, finished })
+            {
+                foreach (Test test in q)
+                {
+                    foreach (System.Tuple<TestAttribute, MethodInfo> obj in attributesAndMethods)
+                    {
+                        if (obj.Item1 != test.attribute) continue;
+                        test.method = obj.Item2;
+                        break;
+                    }
+                }
             }
 
             // DEBUGGING: Pretend that the task took a long time
@@ -501,66 +531,6 @@ namespace UnityTest
             UpdateTestsAsync(GetAssemblies(), onFinished);
             //Utilities.Log("Tests updated");
         }
-
         #endregion
-
-
-        [System.Serializable]
-        public class Tests : List<Test>
-        {
-            /// <summary>
-            /// Remove the Test from this list and also delete its asset in the asset database
-            /// </summary>
-            public new void Remove(Test test)
-            {
-                Utilities.DeleteAsset(test);
-                base.Remove(test);
-            }
-            public void RemoveAtAttribute(TestAttribute attribute)
-            {
-                foreach (Test test in new List<Test>(this))
-                {
-                    if (test.attribute == attribute)
-                    {
-                        Remove(test);
-                        return;
-                    }
-                }
-            }
-            public bool ContainsAttribute(TestAttribute attribute)
-            {
-                foreach (TestAttribute a in GetAttributes())
-                    if (a == attribute) return true;
-                return false;
-            }
-            public void UpdateMethod(TestAttribute attribute, MethodInfo method)
-            {
-                foreach (Test test in this)
-                {
-                    if (test.attribute == attribute)
-                    {
-                        test.method = method;
-                        return;
-                    }
-                }
-            }
-            public IEnumerable<TestAttribute> GetAttributes()
-            {
-                foreach (Test test in new List<Test>(this))
-                    yield return test.attribute;
-            }
-        }
-
-        private struct AttributeAndMethod
-        {
-            public TestAttribute attribute;
-            public MethodInfo method;
-
-            public AttributeAndMethod(TestAttribute attribute, MethodInfo method)
-            {
-                this.attribute = attribute;
-                this.method = method;
-            }
-        }
     }
 }

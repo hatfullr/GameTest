@@ -399,14 +399,14 @@ namespace UnityTest
                     s.alignment = TextAnchor.MiddleCenter;
                     break;
                 case "Result":
-                    s = new GUIStyle(EditorStyles.iconButton);
+                    s = new GUIStyle(EditorStyles.label);
                     s.imagePosition = ImagePosition.ImageOnly;
                     s.fixedHeight = Get("Toggle").fixedHeight;
                     s.fixedWidth = Get("ClearResult").fixedWidth;
                     s.stretchHeight = false;
                     s.padding = new RectOffset(0, 0, 0, 0);
-                    s.margin = new RectOffset(0, 3, 0, 0);
-                    s.contentOffset = new Vector2(0f, -1f);
+                    s.margin = new RectOffset(0, 2, 0, 0);
+                    s.contentOffset = new Vector2(-1f, -1f);
                     s.alignment = TextAnchor.MiddleCenter;
                     break;
                 case "ClearResult":
@@ -437,12 +437,18 @@ namespace UnityTest
                     s = new GUIStyle(EditorStyles.label);
                     s.alignment = TextAnchor.MiddleLeft;
                     s.padding = new RectOffset(0, 0, 0, 0);
-                    //s.wordWrap = true;
                     break;
                 case "GUIQueue/Test":
                     s = new GUIStyle(EditorStyles.label);
                     s.alignment = TextAnchor.MiddleLeft;
                     s.clipping = TextClipping.Clip;
+                    break;
+                case "GUIQueue/DragHandle":
+                    s = "RL DragHandle"; // https://github.com/Unity-Technologies/UnityCsReference/blob/9cecb4a6817863f0134896edafa84753ae2be96f/Editor/Mono/GUI/ReorderableList.cs#L162
+                    s.contentOffset = new Vector2(0f, 7f);
+                    s.alignment = TextAnchor.MiddleCenter;
+                    s.margin.left = 5;
+                    s.margin.right = 5;
                     break;
                 case "GUIQueue/Toolbar/BoldLabel":
                     s = new GUIStyle(EditorStyles.boldLabel);
@@ -453,6 +459,8 @@ namespace UnityTest
                 case "GUIQueue/Queue":
                     s = new GUIStyle(EditorStyles.helpBox);
                     s.margin.top = 1;
+                    s.padding.left = 1;
+                    s.padding.right = 1;
                     break;
                 case "GUIQueue/Queue/Title":
                     s = new GUIStyle(EditorStyles.boldLabel);

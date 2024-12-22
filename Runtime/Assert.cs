@@ -12,6 +12,15 @@ namespace UnityTest
         public const float tolerance = 0.00001f;
 
         /// <summary>
+        /// This gets set by the Test class. Do not modify.
+        /// </summary>
+        public static string currentTestSource = null;
+        /// <summary>
+        /// This gets set by the Test class. Do not modify.
+        /// </summary>
+        public static Object currentTestScript = null;
+
+        /// <summary>
         /// Assert the values are approximately equal. An absolute error check is used for approximate equality check (|a-b| >= tolerance). 
         /// Default tolerance is 0.00001f.
         /// </summary>
@@ -326,8 +335,9 @@ namespace UnityTest
         private static void ThrowException(string message)
         {
             AssertionException e = new AssertionException(message);
-            e.Source = Test.current.attribute.sourceFile;
-            Utilities.LogException(e, Test.current.GetScript());
+            if (!string.IsNullOrEmpty(currentTestSource)) e.Source = currentTestSource; //Test.current.attribute.sourceFile;
+            if (currentTestScript != null) Logger.LogException(e, currentTestScript); //Test.current.GetScript());
+            else Logger.LogException(e);
         }
 
 

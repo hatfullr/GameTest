@@ -10,7 +10,8 @@ namespace UnityTest
     /// <summary>
     /// A unit test that will appear in the UnityTest Manager as a toggleable test. Each Test has an executable method and an attribute.
     /// </summary>
-    public class Test : ScriptableObject
+    [System.Serializable]
+    public class Test
     {
         /// <summary>
         /// The user-set prefab that is instantiated when running this test. If null, then "defaultPrefab" is used instead.
@@ -26,19 +27,18 @@ namespace UnityTest
         /// The attribute on the method to be executed.
         /// </summary>
         public TestAttribute attribute;
-        public bool selected, locked, expanded, isInSuite;
-        public static Test current;
-        public System.Action onFinished, onSelected, onDeselected;
+        public bool selected, locked;
+        [HideInInspector] public bool isInSuite;
+        public System.Action<Test> onFinished;
 
         private GameObject gameObject;
-        private Object script = null;
+        private Object script;
+        private GameObject instantiatedDefaultGO;
 
-        private GameObject instantiatedDefaultGO = null;
-
-        private static GameObject coroutineGO = null;
-        private static List<System.Collections.IEnumerator> coroutines = new List<System.Collections.IEnumerator>();
-        private static List<Coroutine> cos = new List<Coroutine>();
-
+        private Coroutine coroutine;
+        
+        public static Test current { get; private set; }
+        private static GameObject coroutineGO;
         private static bool sceneWarningPrinted = false;
 
         [SerializeField] private GameObject _defaultPrefab;
@@ -46,14 +46,15 @@ namespace UnityTest
         {
             get
             {
-                if (_defaultPrefab == null) _defaultPrefab = Utilities.SearchForAsset<GameObject>((GameObject g) => g.name == name, Utilities.testPrefabPath, false);
+                string name = attribute.GetPath();
+                if (_defaultPrefab == null) _defaultPrefab = Utilities.SearchForAsset((GameObject g) => g.name == name, Utilities.dataPath, false);
                 if (_defaultPrefab == null)
                 {
-                    string path = Utilities.GetUnityPath(Utilities.GetAssetPath(name, Utilities.testPrefabPath));
+                    string path = Utilities.GetUnityPath(Utilities.GetAssetPath(name, Utilities.dataPath));
                     path = Path.ChangeExtension(path, ".prefab");
                     GameObject gameObject = new GameObject(name, method.DeclaringType);
                     _defaultPrefab = PrefabUtility.SaveAsPrefabAsset(gameObject, path, out bool success);
-                    DestroyImmediate(gameObject);
+                    Object.DestroyImmediate(gameObject);
                     if (!success) throw new System.Exception("Failed to create prefab: " + gameObject.name);
                 }
                 return _defaultPrefab;
@@ -69,11 +70,46 @@ namespace UnityTest
             Skipped,
         }
 
+        public Test(TestAttribute attribute, MethodInfo method)
+        {
+            this.attribute = attribute;
+            this.method = method;
+#pragma warning disable CS0618 // "obsolete" markers
+            isInSuite = method.DeclaringType.GetCustomAttribute(typeof(SuiteAttribute)) != null;
+#pragma warning restore CS0618
+        }
+        
+        public Test(Test original)
+        {
+            attribute = original.attribute;
+            method = original.method;
+            isInSuite = original.isInSuite;
+
+            selected = original.selected;
+            locked = original.locked;
+            result = original.result;
+            script = original.script;
+            prefab = original.prefab;
+        }
+
         private class CoroutineMonoBehaviour : MonoBehaviour { }
 
         public override string ToString() => "Test(" + attribute.GetPath() + ")";
 
-        public bool IsExample() => Utilities.IsSample(attribute.sourceFile);
+        public static void SetCurrentTest(Test test)
+        {
+            if (test == null)
+            {
+                Assert.currentTestSource = null;
+                Assert.currentTestScript = null;
+            }
+            else
+            {
+                Assert.currentTestSource = test.attribute.sourceFile;
+                Assert.currentTestScript = test.GetScript();
+            }
+            current = test;
+        }
 
         /// <summary>
         /// Destroy the default prefab, which is stored in this project.
@@ -155,15 +191,18 @@ namespace UnityTest
         [HideInCallstack]
         public void Run()
         {
+            if (method == null) throw new System.Exception("Missing method reference on Test " + attribute.GetPath());
+
             if (!EditorApplication.isPlaying)
             {
-                Utilities.LogWarning("Cannot run Unit Tests outside of Play mode!");
+                Logger.LogError("Cannot run a Test while not in Play mode");
                 return;
             }
 
+            Application.logMessageReceived -= HandleLog; // In case it's already added, remove the event (works even if not added)
             Application.logMessageReceived += HandleLog;
 
-            current = this;
+            SetCurrentTest(this);
 
             // Check if this scene is empty
             GameObject[] gameObjects = Object.FindObjectsOfType<GameObject>();
@@ -183,7 +222,7 @@ namespace UnityTest
                 }
                 if (!ignore)
                 {
-                    Utilities.LogWarning("You are not in an empty scene. Test results might be misleading. Perhaps your previous TearDown function " +
+                    Logger.LogWarning("You are not in an empty scene. Test results might be misleading. Perhaps your previous TearDown function " +
                         "didn't correctly remove all the GameObjects, or you used Destroy instead of DestroyImmediate. Otherwise this might be intended behavior for " +
                         "the custom tests you wrote, in which case you can ignore this error.");
                     sceneWarningPrinted = true;
@@ -209,12 +248,12 @@ namespace UnityTest
                 coroutineGO.hideFlags = HideFlags.HideAndDontSave;
                 
                 try { StartCoroutine(method.Invoke(component, new object[] { gameObject }) as System.Collections.IEnumerator); }
-                catch (TargetException) { Utilities.LogError("TargetException was thrown (1). Please submit a bug report."); }
+                catch (TargetException) { Logger.LogError("TargetException was thrown (1). Please submit a bug report."); }
             }
             else
             {
                 try { method.Invoke(component, new object[] { gameObject }); } // probably of type void
-                catch (TargetException) { Utilities.LogError("TargetException was thrown (2). Please submit a bug report."); }
+                catch (TargetException) { Logger.LogError("TargetException was thrown (2). Please submit a bug report."); }
                 
                 OnRunComplete();
             }
@@ -223,43 +262,40 @@ namespace UnityTest
         private void StartCoroutine(System.Collections.IEnumerator coroutineMethod)
         {
             CoroutineMonoBehaviour mono = coroutineGO.GetComponent<CoroutineMonoBehaviour>();
-            cos.Add(mono.StartCoroutine(DoCoroutine(coroutineMethod)));
+            coroutine = mono.StartCoroutine(DoCoroutine(coroutineMethod));
         }
 
         private System.Collections.IEnumerator DoCoroutine(System.Collections.IEnumerator coroutineMethod)
         {
-            coroutines.Add(coroutineMethod);
-
-            // Wait until it's our turn to run
-            while (coroutines[0] != coroutineMethod)
-                yield return null;
-
             // Run the coroutine
             yield return coroutineMethod;
 
             // Clean up
             OnRunComplete();
-
-            coroutines.Remove(coroutineMethod);
         }
 
         /// <summary>
-        /// Called when the test is finished, regardless of the results. Pauses the editor if the test specifies to do so.
+        /// Called when the test is finished, regardless of the results. Calls the TearDown function.
         /// </summary>
         [HideInCallstack]
         public void OnRunComplete()
         {
+            CancelCoroutine();
+            if (coroutineGO != null) Object.DestroyImmediate(coroutineGO);
+            coroutineGO = null;
+
             TearDown();
             if (result == Result.None && result != Result.Skipped) result = Result.Pass;
 
             Application.logMessageReceived -= HandleLog;
 
-            if (coroutineGO != null) Object.DestroyImmediate(coroutineGO);
-            coroutineGO = null;
+            PrintResult();
 
-            onFinished.Invoke();
+            if (attribute.pauseOnFail && result == Result.Fail) EditorApplication.isPaused = true;
 
-            current = null;
+            SetCurrentTest(null);
+
+            if (onFinished != null) onFinished(this);
         }
 
         /// <summary>
@@ -269,36 +305,32 @@ namespace UnityTest
         public void PrintResult()
         {
             string message = attribute.GetPath();
-            if (result == Result.Pass) message = string.Join(' ', Utilities.ColorString("(Passed)", Utilities.green), message);
-            else if (result == Result.Fail) message = string.Join(' ', Utilities.ColorString("(Failed)", Utilities.red), message);
-            else if (result == Result.Skipped) message = string.Join(' ', Utilities.ColorString("(Skipped)", Utilities.yellow), message);
+            if (result == Result.Pass) message = string.Join(' ', Logger.ColorString("(Passed)", Utilities.green), message);
+            else if (result == Result.Fail) message = string.Join(' ', Logger.ColorString("(Failed)", Utilities.red), message);
+            else if (result == Result.Skipped) message = string.Join(' ', Logger.ColorString("(Skipped)", Utilities.yellow), message);
             else if (result == Result.None) message = string.Join(' ', "(Finished)", message);
             else throw new System.NotImplementedException(result.ToString());
             
-            Utilities.Log(message, GetScript());
+            Logger.Log(message, GetScript());
         }
 
-        public void CancelCoroutines()
+        public void CancelCoroutine()
         {
             if (coroutineGO != null)
             {
                 CoroutineMonoBehaviour mono = coroutineGO.GetComponent<CoroutineMonoBehaviour>();
-                if (mono != null)
+                if (mono != null && coroutine != null)
                 {
-                    foreach (Coroutine coroutine in cos)
-                    {
-                        mono.StopCoroutine(coroutine);
-                    }
+                    mono.StopCoroutine(coroutine);
                 }
             }
-            coroutines.Clear();
         }
 
         private void HandleLog(string logString, string stackTrace, LogType type)
         {
             if (type == LogType.Exception || type == LogType.Assert)
             {
-                CancelCoroutines();
+                CancelCoroutine();
                 result = Result.Fail;
                 EditorApplication.isPaused = !EditorApplication.isPaused && // If false (already paused), stay paused
                     attribute.pauseOnFail; // If not paused (playing) and we should pause, then pause
@@ -307,7 +339,7 @@ namespace UnityTest
 
         public void Reset()
         {
-            CancelCoroutines();
+            CancelCoroutine();
             result = Result.None;
         }
 
@@ -342,24 +374,12 @@ namespace UnityTest
                 }
             }
 
-            if (matched == null) Utilities.LogError("Failed to find script '" + method.DeclaringType.FullName + "' in '" + pathToSearch + "'");
+            if (matched == null) Logger.LogError("Failed to find script '" + method.DeclaringType.FullName + "' in '" + pathToSearch + "'");
             else
             {
                 script = AssetDatabase.LoadAssetAtPath(AssetDatabase.GUIDToAssetPath(matched), typeof(MonoScript));
             }
             return script;
-        }
-
-        /// <summary>
-        /// This object can be used in the inspector to set a default prefab to be instantiated when running a Test instead
-        /// of the default, which is to instantiate a new GameObject with an attached Component.
-        /// </summary>
-        [System.Serializable]
-        public class TestPrefab
-        {
-            [SerializeField] private string _methodName;
-            [SerializeField] private GameObject _gameObject;
-            [HideInInspector] public GameObject gameObject { get => _gameObject; }
         }
     }
 }

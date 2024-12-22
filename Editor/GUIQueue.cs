@@ -7,24 +7,22 @@ namespace UnityTest
     /// This is where the queued and finished tests in the TestManagerUI are drawn
     /// </summary>
     [System.Serializable]
-    public class GUIQueue : ScriptableObject
+    public class GUIQueue
     {
-        public const string fileName = nameof(GUIQueue);
-
-        [SerializeField] private Vector2 queueScrollPosition;
-        [SerializeField] private Vector2 finishedScrollPosition;
         [SerializeField] private bool hideMain = false;
+        [SerializeField] private float height = Style.GUIQueue.minHeight;
+        public float timer;
+        public uint nframes;
 
-        private float height = Style.GUIQueue.minHeight;
+        private ReorderableTestQueue queue;
+        private ReorderableTestQueue finished;
 
         private Rect splitterRect, mainRect;
         private bool dragging;
         private Vector2 dragPos;
 
-        private ReorderableTestQueue queue, finishedQueue;
-
-        private static TestManagerUI _ui;
-        private static TestManagerUI ui
+        private TestManagerUI _ui;
+        public TestManagerUI ui
         {
             get
             {
@@ -37,26 +35,33 @@ namespace UnityTest
         {
             splitterRect = default;
             mainRect = default;
-            queueScrollPosition = default;
-            finishedScrollPosition = default;
             height = Style.GUIQueue.minHeight;
             hideMain = false;
-            queue = null;
-            finishedQueue = null;
+            if (queue != null) queue.Clear();
+            if (finished != null) finished.Clear();
+            ResetTimer();
+        }
 
-            Utilities.DeleteAsset(fileName, Utilities.dataPath);
-            Utilities.SaveAsset(this);
+        public void IncrementTimer(float singleFrameDeltaTime)
+        {
+            timer += singleFrameDeltaTime;
+            nframes += 1;
+        }
+
+        public void ResetTimer()
+        {
+            timer = 0f;
+            nframes = 0;
         }
 
         public void Draw()
         {
             if (queue == null) queue = new ReorderableTestQueue(
                 ref ui.manager.queue,
-                new GUIContent("Selected"),
+                new GUIContent("Queued"),
                 testDrawer: (Rect rect, Test test) =>
                 {
                     bool dummy = false;
-                    //Utilities.DrawDebugOutline(ui.itemRect, Color.red);
                     ui.DrawListItem(rect, test, ref dummy, ref dummy, ref dummy,
                         showFoldout: false,
                         showScript: true,
@@ -72,16 +77,14 @@ namespace UnityTest
                     );
                 },
                 onDrag: ui.Repaint,
-                reversed: false,
                 deselectOnClear: true
             );
-            if(finishedQueue == null) finishedQueue = new ReorderableTestQueue(
-                ref ui.manager.finishedTests,
-                new GUIContent("Finished"),
+            if (finished == null) finished = new ReorderableTestQueue(
+                ref ui.manager.finished,
+                new GUIContent("Results"),
                 testDrawer: (Rect rect, Test test) =>
                 {
                     bool dummy = false;
-                    //Utilities.DrawDebugOutline(ui.itemRect, Color.red);
                     ui.DrawListItem(rect, test, ref dummy, ref dummy, ref dummy,
                         showFoldout: false,
                         showScript: true,
@@ -96,9 +99,9 @@ namespace UnityTest
                     );
                 },
                 onDrag: ui.Repaint,
-                reversed: true,
                 deselectOnClear: false,
-                allowReorder: false
+                allowReorder: false,
+                canClear: false
             );
 
             DrawSplitter();
@@ -133,13 +136,10 @@ namespace UnityTest
                 right.width -= 0.5f * queueStyle.margin.left;
 
                 queue.Draw(left);
-                finishedQueue.Draw(right);
+                finished.Draw(right);
             }
 
-            queueScrollPosition = queue.scrollPosition;
-            finishedScrollPosition = finishedQueue.scrollPosition;
-
-            mainRect = scope.rect; //GUILayoutUtility.GetLastRect();
+            mainRect = scope.rect;
 
             ProcessEvents();
         }
@@ -152,7 +152,7 @@ namespace UnityTest
             GUIStyle testStyle = Style.Get("GUIQueue/Test");
 
             GUIContent title = new GUIContent("Running");
-            GUIContent frames = new GUIContent("frame " + string.Format("{0,8}", ui.manager.nframes) + "    " + ui.manager.timer.ToString("0.0000 s"));
+            GUIContent frames = new GUIContent("frame " + string.Format("{0,8}", nframes) + "    " + timer.ToString("0.0000 s"));
 
             float titleWidth = Style.GetWidth(titleStyle, title);
             float frameWidth = Style.GetWidth(frameStyle, frames);

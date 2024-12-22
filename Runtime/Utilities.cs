@@ -9,20 +9,6 @@ namespace UnityTest
 {
     public static class Utilities
     {
-        /// <summary>
-        /// When true, debug messages are printed to Console.
-        /// </summary>
-        public static DebugMode debug = DebugMode.Log | DebugMode.LogWarning | DebugMode.LogError;
-
-        [System.Flags]
-        public enum DebugMode
-        {
-            Log = 1 << 0,
-            LogWarning = 1 << 1,
-            LogError = 1 << 2,
-        }
-
-        public static string debugTag { get => "[" + GetPackageInfo().displayName + "]"; }
         public const BindingFlags bindingFlags = BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly | BindingFlags.Static;
 
         /// <summary>
@@ -40,25 +26,12 @@ namespace UnityTest
         /// </summary>
         public static string packagesPath { get; } = Path.Join(projectPath, "Packages");
 
+#if UNITY_EDITOR
         /// <summary>
         /// Location where data assets are stored.
         /// </summary>
-        public static string dataPath { get => EnsureDirectoryExists(Path.Join(assetsPath, "UnityTest", "Data")); }
-
-        /// <summary>
-        /// Location where Foldout assets are stored.
-        /// </summary>
-        public static string foldoutDataPath { get => EnsureDirectoryExists(Path.Join(dataPath, "Foldouts")); }
-
-        /// <summary>
-        /// Location where Test assets are stored.
-        /// </summary>
-        public static string testDataPath { get => EnsureDirectoryExists(Path.Join(dataPath, "Tests")); }
-
-        /// <summary>
-        /// Location where Test defaultPrefab are stored.
-        /// </summary>
-        public static string testPrefabPath { get => EnsureDirectoryExists(Path.Join(testDataPath, "Default Prefabs")); }
+        public static string dataPath { get => EnsureDirectoryExists(Path.Join(assetsPath, "UnityTest")); }
+#endif
 
         /// <summary>
         /// True if the editor is using the theme called "DarkSkin". Otherwise, false.
@@ -81,13 +54,8 @@ namespace UnityTest
         public static float searchBarMinWidth = 80f;
         public static float searchBarMaxWidth = 300f;
 
-        /// <summary>
-        /// Query the package.json file to determine exactly what the current name of this package is.
-        /// </summary>
-        public static UnityEditor.PackageManager.PackageInfo GetPackageInfo() => UnityEditor.PackageManager.PackageInfo.FindForAssembly(typeof(Utilities).Assembly);
-
-        private static HashSet<string> loggedExceptions = new HashSet<string>();
-
+        #region UI Helpers
+#if UNITY_EDITOR
         public enum  RectAlignment
         {
             LowerLeft,
@@ -201,42 +169,37 @@ namespace UnityTest
             }
         }
 
-        /// <summary>
-        /// Given the path to a file, returns true if the path is located in the Samples folder, and false otherwise.
-        /// </summary>
-        public static bool IsSample(string path)
+        public static bool IsSceneEmpty()
         {
-            foreach (UnityEditor.PackageManager.UI.Sample sample in GetSamples())
-            {
-                if (sample.importPath == path) return true;
-            }
+            GameObject[] objects = UnityEngine.SceneManagement.SceneManager.GetActiveScene().GetRootGameObjects();
+            if (objects == null) return true;
+            if (objects.Length == 0) return true;
+            if (objects.Length != 2) return false;
+            return objects[0].name == "MainCamera" && objects[1].name == "Directional Light";
+        }
+
+        /// <summary>
+        /// Returns true if the mouse is currently hovering over the given Rect, and false otherwise.
+        /// </summary>
+        public static bool IsMouseOverRect(Rect rect)
+        {
+            if (Event.current != null) return rect.Contains(Event.current.mousePosition);
             return false;
         }
 
-        public static IEnumerable<UnityEditor.PackageManager.UI.Sample> GetSamples()
-        {
-            UnityEditor.PackageManager.PackageInfo info = GetPackageInfo();
-            return UnityEditor.PackageManager.UI.Sample.FindByPackage(info.name, info.version);
-        }
-
         /// <summary>
-        /// Get the file path to Assets/UnityPath/Data/[name].asset.
+        /// When the mouse cursor is hovering over the given rect, the mouse cursor will change to the type specified.
         /// </summary>
-        public static string GetAssetPath(string name, string directory)
-        {
-            if (directory == null) directory = dataPath;
-            string path = Path.Join(directory, name);
-            if (Path.GetExtension(path) != ".asset") path = Path.ChangeExtension(path, ".asset");
-            return GetUnityPath(path);
-        }
+        public static void SetCursorInRect(Rect rect, MouseCursor cursor) => EditorGUIUtility.AddCursorRect(rect, cursor);
 
-        public static string GetAssetPath(Object asset) => GetUnityPath(AssetDatabase.GetAssetPath(asset));
+        public static bool IsMouseButtonPressed() { if (Event.current == null) return false; return Event.current.rawType == EventType.MouseDown; }
+        public static bool IsMouseButtonReleased() { if (Event.current == null) return false; return Event.current.rawType == EventType.MouseUp; }
+        public static bool IsMouseDragging() { if (Event.current == null) return false; return Event.current.rawType == EventType.MouseDrag; }
+#endif
+        #endregion
 
-        /// <summary>
-        /// Check Assets/UnityTest/Data/[name].asset to see if it exists.
-        /// </summary>
-        public static bool AssetExists(string name, string directory) => File.Exists(GetAssetPath(name, directory));
-
+        #region Filesystem Helpers
+#if UNITY_EDITOR
         /// <summary>
         /// Loop through all *.asset files in Assets/UnityTest/Data to find the first asset that meets the given criteria function. The
         /// input parameter to the criteria function is any Object. The result of the criteria function must be a bool.
@@ -258,68 +221,7 @@ namespace UnityTest
         /// input parameter to the criteria function is any Object. The result of the criteria function must be a bool.
         /// </summary>
         public static T LoadAssetAtPath<T>(string assetPath) => (T)(object)AssetDatabase.LoadAssetAtPath(GetUnityPath(assetPath), typeof(T));
-
-        /// <summary>
-        /// Create a new asset file at Assets/UnityTest/Data/[name].asset. If overwrite is true then if an asset with the same name already
-        /// exists, it is destroyed and a new one is created in its place. Otherwise, if overwrite is false, the asset is loaded and returned.
-        /// The type must inherit from ScriptableObject.
-        /// </summary>
-        public static T CreateAsset<T>(string name, string directory, System.Action<T> initializer = null, bool overwrite = false)
-        {
-            if (directory == null) directory = dataPath;
-
-            // First check if this asset already exists
-            string path = GetUnityPath(GetAssetPath(name, directory));
-            if (AssetExists(name, directory))
-            {
-                if (overwrite)
-                {
-                    if (!AssetDatabase.DeleteAsset(path)) throw new System.Exception("Failed to overwrite asset at path '" + path + "'");
-                }
-                else return (T)(object)AssetDatabase.LoadAssetAtPath(path, typeof(T));
-            }
-
-            ScriptableObject result = ScriptableObject.CreateInstance(typeof(T));
-            if (initializer != null) initializer((T)(object)result);
-            AssetDatabase.CreateAsset(result, path);
-            return (T)(object)result;
-        }
-
-        public static void SaveAssets(IEnumerable<Object> assets)
-        {
-            MarkAssetsForSave(assets);
-            SaveDirtyAssets(assets);
-        }
-        public static void SaveAsset(Object asset) => SaveAssets(new List<Object> { asset });
-
-        public static void SaveDirtyAsset(Object asset) => AssetDatabase.SaveAssetIfDirty(asset);
-        public static void SaveDirtyAssets(IEnumerable<Object> assets)
-        {
-            foreach (Object asset in assets)
-            {
-                if (asset == null) continue;
-                SaveDirtyAsset(asset);
-            }
-        }
-
-        public static void MarkAssetForSave(Object asset) => EditorUtility.SetDirty(asset);
-        public static void MarkAssetsForSave(IEnumerable<Object> assets)
-        {
-            foreach (Object asset in assets)
-            {
-                if (asset == null) continue;
-                MarkAssetForSave(asset);
-            }
-        }
-
-        public static bool DeleteAsset(string name, string directory) => AssetDatabase.DeleteAsset(GetAssetPath(name, directory));
-        public static bool DeleteAsset(Object asset)
-        {
-            string path = GetAssetPath(asset);
-            return DeleteAsset(Path.GetFileName(path), GetUnityPath(Path.GetDirectoryName(path)));
-        }
-
-        public static void DeleteFolder(string path) => AssetDatabase.DeleteAsset(GetUnityPath(path));
+        
 
         /// <summary>
         /// Create directories so that the given directory path exists. Returns the given directory path.
@@ -335,31 +237,28 @@ namespace UnityTest
             {
                 parent = Path.GetDirectoryName(dir);
                 newFolderName = Path.GetFileName(dir);
-                if (!AssetDatabase.IsValidFolder(dir))
-                {
-                    AssetDatabase.CreateFolder(parent, newFolderName);
-                }
+                if (!AssetDatabase.IsValidFolder(dir)) AssetDatabase.CreateFolder(parent, newFolderName);
             }
 
             // Create the final directory at the destination path
             parent = Path.GetDirectoryName(directory);
             newFolderName = Path.GetFileName(directory);
-            if (!AssetDatabase.IsValidFolder(directory))
-            {
-                AssetDatabase.CreateFolder(parent, newFolderName);
-            }
+            if (!AssetDatabase.IsValidFolder(directory)) AssetDatabase.CreateFolder(parent, newFolderName);
 
             return directory;
         }
 
-        public static bool IsSceneEmpty()
+        /// <summary>
+        /// Get the file path to Assets/UnityPath/Data/[name].asset.
+        /// </summary>
+        public static string GetAssetPath(string name, string directory)
         {
-            GameObject[] objects = UnityEngine.SceneManagement.SceneManager.GetActiveScene().GetRootGameObjects();
-            if (objects == null) return true;
-            if (objects.Length == 0) return true;
-            if (objects.Length != 2) return false;
-            return objects[0].name == "MainCamera" && objects[1].name == "Directional Light";
+            if (directory == null) directory = dataPath;
+            string path = Path.Join(directory, name);
+            if (Path.GetExtension(path) != ".asset") path = Path.ChangeExtension(path, ".asset");
+            return GetUnityPath(path);
         }
+#endif
 
         /// <summary>
         /// Return each successive directory, starting at the directory of the given path and moving outward toward the root path, 
@@ -450,82 +349,9 @@ namespace UnityTest
             }
             return false;
         }
+#endregion
 
-        /// <summary>
-        /// Returns true if the mouse is currently hovering over the given Rect, and false otherwise.
-        /// </summary>
-        public static bool IsMouseOverRect(Rect rect)
-        {
-            if (Event.current != null) return rect.Contains(Event.current.mousePosition);
-            return false;
-        }
-
-        /// <summary>
-        /// When the mouse cursor is hovering over the given rect, the mouse cursor will change to the type specified.
-        /// </summary>
-        public static void SetCursorInRect(Rect rect, UnityEditor.MouseCursor cursor) => UnityEditor.EditorGUIUtility.AddCursorRect(rect, cursor);
-
-        public static bool IsMouseButtonPressed() { if (Event.current == null) return false; return Event.current.rawType == EventType.MouseDown; }
-        public static bool IsMouseButtonReleased() { if (Event.current == null) return false; return Event.current.rawType == EventType.MouseUp; }
-        public static bool IsMouseDragging() { if (Event.current == null) return false; return Event.current.rawType == EventType.MouseDrag; }
-
-        public static string ColorString(string text, string color)
-        {
-            if (string.IsNullOrEmpty(text)) return null;
-            return "<color=" + color + ">" + text + "</color>";
-        }
-
-        [HideInCallstack]
-        private static string GetLogString(string message, string color = null, bool hideMessage = true)
-        {
-            string tag = "<size=10>" + debugTag + "</size>";
-            if (!string.IsNullOrEmpty(color)) tag = ColorString(tag, color);
-            return string.Join(' ', tag, message) + "\n<size=10>(Disable these messages with the debug toolbar button)</size>";
-        }
-
-
-        /// <summary>
-        /// Print a log message to the console, intended for debug messages.
-        /// </summary>
-        [HideInCallstack] public static void Log(string message, Object context, string color, bool hideMessage = true) { if (debug.HasFlag(DebugMode.Log)) Debug.LogFormat(LogType.Log, LogOption.NoStacktrace, context, "{0}", GetLogString(message, color, hideMessage)); }
-        [HideInCallstack] public static void Log(string message, Object context) => Log(message, context, null);
-        [HideInCallstack] public static void Log(string message, string color) => Log(message, null, color);
-        [HideInCallstack] public static void Log(string message) => Log(message, null, null);
-
-        /// <summary>
-        /// Print a warning message to the console.
-        /// </summary>
-        [HideInCallstack] public static void LogWarning(string message, Object context, string color, bool hideMessage = true) { if (debug.HasFlag(DebugMode.LogWarning)) Debug.LogWarning(GetLogString(message, color, hideMessage), context); }
-        [HideInCallstack] public static void LogWarning(string message, Object context) => LogWarning(message, context, null);
-        [HideInCallstack] public static void LogWarning(string message, string color) => LogWarning(message, null, color);
-        [HideInCallstack] public static void LogWarning(string message) => LogWarning(message, null, null);
-
-
-        /// <summary>
-        /// Print a warning message to the console.
-        /// </summary>
-        [HideInCallstack] public static void LogError(string message, Object context, string color, bool hideMessage = true) { if (debug.HasFlag(DebugMode.LogError)) Debug.LogError(GetLogString(message, color, hideMessage), context); }
-        [HideInCallstack] public static void LogError(string message, Object context) => LogError(message, context, null);
-        [HideInCallstack] public static void LogError(string message, string color) => LogError(message, null, color);
-        [HideInCallstack] public static void LogError(string message) => LogError(message, null, null);
-
-        /// <summary>
-        /// Print an exception to the console. The color cannot be changed. To ensure that an exception is logged only a single time
-        /// per assembly reload, set "once" to true. Only the exception's message is checked when "once" is true.
-        /// </summary>
-        [HideInCallstack] public static void LogException(System.Exception exception, Object context, bool once = false)
-        {
-            if (once && loggedExceptions.Contains(exception.Message)) return;
-            Debug.LogException(exception, context);
-            loggedExceptions.Add(exception.Message);
-        }
-        [HideInCallstack] public static void LogException(System.Exception exception, bool once = false)
-        {
-            if (once && loggedExceptions.Contains(exception.Message)) return;
-            Debug.LogException(exception);
-            loggedExceptions.Add(exception.Message);
-        }
-
+        #region Exceptions
         /// <summary>
         /// Signifies that a path is not located in either the "Assets" or "Packages" folder of a project.
         /// </summary>
@@ -545,5 +371,6 @@ namespace UnityTest
             public AssetNotFound(string message) : base(message) { }
             public AssetNotFound(string message, System.Exception inner) : base(message, inner) { }
         }
+        #endregion
     }
 }
