@@ -21,50 +21,50 @@ namespace UnityTest
         public static Object currentTestScript = null;
 
         /// <summary>
-        /// Assert the values are approximately equal. An absolute error check is used for approximate equality check (|a-b| >= tolerance). 
+        /// Assert the values are approximately equal. An absolute error check is used for approximate equality check (|a-b| <= tolerance). 
         /// Default tolerance is 0.00001f.
         /// </summary>
         /// <param name="expected">The assumed Assert value.</param>
         /// <param name="actual">The exact Assert value.</param>
         /// <param name="tolerance">Tolerance of approximation.</param>
         /// <param name="message">The string used to describe the Assert.</param>
-        /// <exception cref="AssertionException"></exception>
-        [HideInCallstack]
-        public static void AreApproximatelyEqual(float expected, float actual, float tolerance, string message = "")
+        /// <exception cref="AssertionException">Thrown when the assertion fails.</exception>
+        /// <exception cref="System.ArgumentOutOfRangeException">Thrown when the given tolerance value is negative.</exception>
+        [HideInCallstack] public static void AreApproximatelyEqual(float expected, float actual, float tolerance, string message = "")
         {
-            if (System.Math.Abs(expected - actual) >= tolerance)
+            if (tolerance < 0) throw new System.ArgumentOutOfRangeException("tolerance argument cannot be < 0, but got " + tolerance);
+            if (!(System.Math.Abs(expected - actual) <= tolerance))
             {
-                string final = "|" + expected.ToString() + " - " + actual.ToString() + "| >= " + tolerance.ToString();
+                string final = "|" + expected.ToString() + " - " + actual.ToString() + "| > " + tolerance.ToString();
                 if (!string.IsNullOrEmpty(message)) final += ", " + message;
                 ThrowException(final);
             }
         }
-        [HideInCallstack] public static void AreApproximatelyEqual(float expected, float actual, float tolerance) => AreApproximatelyEqual(expected, actual, tolerance, "");
         [HideInCallstack] public static void AreApproximatelyEqual(float expected, float actual, string message) => AreApproximatelyEqual(expected, actual, tolerance, message);
         [HideInCallstack] public static void AreApproximatelyEqual(float expected, float actual) => AreApproximatelyEqual(expected, actual, tolerance, "");
 
 
 
         /// <summary>
-        /// Assert the values are approximately equal. An absolute error check is used for approximate equality check (|a-b| < tolerance). 
+        /// Assert the values are not approximately equal. An absolute error check is used for approximate equality check (not |a-b| <= tolerance). 
         /// Default tolerance is 0.00001f.
         /// </summary>
         /// <param name="expected">The assumed Assert value.</param>
         /// <param name="actual">The exact Assert value.</param>
         /// <param name="tolerance">Tolerance of approximation.</param>
         /// <param name="message">The string used to describe the Assert.</param>
-        /// <exception cref="AssertionException"></exception>
-        [HideInCallstack]
-        public static void AreNotApproximatelyEqual(float expected, float actual, float tolerance, string message = "")
+        /// <exception cref="AssertionException">Thrown when the assertion fails.</exception>
+        /// <exception cref="System.ArgumentOutOfRangeException">Thrown when the given tolerance value is negative.</exception>
+        [HideInCallstack] public static void AreNotApproximatelyEqual(float expected, float actual, float tolerance, string message = "")
         {
-            if (System.Math.Abs(expected - actual) < tolerance)
+            if (tolerance < 0) throw new System.ArgumentOutOfRangeException("tolerance argument cannot be < 0, but got " + tolerance);
+            if (System.Math.Abs(expected - actual) <= tolerance)
             {
-                string final = "|" + expected.ToString() + " - " + actual.ToString() + "| < " + tolerance.ToString();
+                string final = "|" + expected.ToString() + " - " + actual.ToString() + "| <= " + tolerance.ToString();
                 if (!string.IsNullOrEmpty(message)) final += ", " + message;
                 ThrowException(final);
             }
         }
-        [HideInCallstack] public static void AreNotApproximatelyEqual(float expected, float actual, float tolerance) => AreNotApproximatelyEqual(expected, actual, tolerance, "");
         [HideInCallstack] public static void AreNotApproximatelyEqual(float expected, float actual, string message) => AreNotApproximatelyEqual(expected, actual, tolerance, message);
         [HideInCallstack] public static void AreNotApproximatelyEqual(float expected, float actual) => AreNotApproximatelyEqual(expected, actual, tolerance, "");
 
@@ -77,9 +77,8 @@ namespace UnityTest
         /// <param name="actual">The exact Assert value.</param>
         /// <param name="message">The string used to describe the Assert.</param>
         /// <param name="comparer">Method to compare expected and actual arguments have the same value.</param>
-        /// <exception cref="AssertionException"></exception>
-        [HideInCallstack]
-        public static void AreEqual<T>(T expected, T actual, string message, IEqualityComparer<T> comparer)
+        /// <exception cref="AssertionException">Thrown when the assertion fails.</exception>
+        [HideInCallstack] public static void AreEqual<T>(T expected, T actual, string message, IEqualityComparer<T> comparer)
         {
             if (!comparer.Equals(expected, actual))
             {
@@ -101,9 +100,8 @@ namespace UnityTest
         /// <param name="actual">The exact Assert value.</param>
         /// <param name="message">The string used to describe the Assert.</param>
         /// <param name="comparer">Method to compare expected and actual arguments have the same value.</param>
-        /// <exception cref="AssertionException"></exception>
-        [HideInCallstack]
-        public static void AreNotEqual<T>(T expected, T actual, string message, IEqualityComparer<T> comparer)
+        /// <exception cref="AssertionException">Thrown when the assertion fails.</exception>
+        [HideInCallstack] public static void AreNotEqual<T>(T expected, T actual, string message, IEqualityComparer<T> comparer)
         {
             if (comparer.Equals(expected, actual))
             {
@@ -121,9 +119,8 @@ namespace UnityTest
         /// </summary>
         /// <param name="condition">true or false.</param>
         /// <param name="message">The string used to describe the Assert.</param>
-        /// <exception cref="AssertionException"></exception>
-        [HideInCallstack]
-        public static void IsTrue(bool condition, string message = "")
+        /// <exception cref="AssertionException">Thrown when the assertion fails.</exception>
+        [HideInCallstack] public static void IsTrue(bool condition, string message = "")
         {
             if (!condition) ThrowException(message);
         }
@@ -134,9 +131,8 @@ namespace UnityTest
         /// </summary>
         /// <param name="condition">true or false.</param>
         /// <param name="message">The string used to describe the Assert.</param>
-        /// <exception cref="AssertionException"></exception>
-        [HideInCallstack]
-        public static void IsFalse(bool condition, string message = "")
+        /// <exception cref="AssertionException">Thrown when the assertion fails.</exception>
+        [HideInCallstack] public static void IsFalse(bool condition, string message = "")
         {
             if (condition) ThrowException(message);
         }
@@ -147,14 +143,12 @@ namespace UnityTest
         /// </summary>
         /// <param name="value">The Object or type being checked for.</param>
         /// <param name="message">The string used to describe the Assert.</param>
-        /// <exception cref="AssertionException"></exception>
-        [HideInCallstack]
-        public static void IsNull(UnityEngine.Object value, string message = "")
+        /// <exception cref="AssertionException">Thrown when the assertion fails.</exception>
+        [HideInCallstack] public static void IsNull(Object value, string message = "")
         {
             if (value != null) ThrowException(message);
         }
-        [HideInCallstack]
-        public static void IsNull<T>(T value, string message = "")
+        [HideInCallstack] public static void IsNull<T>(T value, string message = "")
         {
             if (value != null) ThrowException(message);
         }
@@ -164,14 +158,12 @@ namespace UnityTest
         /// </summary>
         /// <param name="value">The Object or type being checked for.</param>
         /// <param name="message">The string used to describe the Assert.</param>
-        /// <exception cref="AssertionException"></exception>
-        [HideInCallstack]
-        public static void IsNotNull(UnityEngine.Object value, string message = "")
+        /// <exception cref="AssertionException">Thrown when the assertion fails.</exception>
+        [HideInCallstack] public static void IsNotNull(Object value, string message = "")
         {
             if (value == null) ThrowException(message);
         }
-        [HideInCallstack]
-        public static void IsNotNull<T>(T value, string message = "")
+        [HideInCallstack] public static void IsNotNull<T>(T value, string message = "")
         {
             if (value == null) ThrowException(message);
         }
@@ -184,9 +176,8 @@ namespace UnityTest
         /// <param name="value">The assumed Assert value.</param>
         /// <param name="other">The number that value is expected to be greater than.</param>
         /// <param name="message"></param>
-        /// <exception cref="AssertionException"></exception>
-        [HideInCallstack]
-        public static void IsGreater(float value, float other, string message = "")
+        /// <exception cref="AssertionException">Thrown when the assertion fails.</exception>
+        [HideInCallstack] public static void IsGreater(float value, float other, string message = "")
         {
             if (!(value > other))
             {
@@ -208,9 +199,8 @@ namespace UnityTest
         /// <param name="value">The assumed Assert value.</param>
         /// <param name="other">The number that value is expected to be greater than or equal to.</param>
         /// <param name="message"></param>
-        /// <exception cref="AssertionException"></exception>
-        [HideInCallstack]
-        public static void IsGreaterEqual(float value, float other, string message = "")
+        /// <exception cref="AssertionException">Thrown when the assertion fails.</exception>
+        [HideInCallstack] public static void IsGreaterEqual(float value, float other, string message = "")
         {
             if (!(value >= other))
             {
@@ -233,11 +223,12 @@ namespace UnityTest
         /// <param name="value">The assumed Assert value.</param>
         /// <param name="other">The number that value is expected to be greater than or equal to.</param>
         /// <param name="message"></param>
-        /// <exception cref="AssertionException"></exception>
-        [HideInCallstack]
-        public static void IsGreaterApproximatelyEqual(float value, float other, float tolerance, string message = "")
+        /// <exception cref="AssertionException">Thrown when the assertion fails.</exception>
+        /// <exception cref="System.ArgumentOutOfRangeException">Thrown when the given tolerance value is negative.</exception>
+        [HideInCallstack] public static void IsGreaterApproximatelyEqual(float value, float other, float tolerance, string message = "")
         {
-            if (!(value >= other || System.Math.Abs(value - other) < tolerance))
+            if (tolerance < 0) throw new System.ArgumentOutOfRangeException("tolerance argument cannot be < 0, but got " + tolerance);
+            if (!(value >= other || System.Math.Abs(value - other) <= tolerance))
             {
                 string final = value.ToString() + " < " + other.ToString() + " and " + 
                     "|" + value.ToString() + " - " + other.ToString() + "| >= " + tolerance.ToString();
@@ -245,9 +236,8 @@ namespace UnityTest
                 ThrowException(final);
             }
         }
-        [HideInCallstack] public static void IsGreaterApproximatelyEqual(float expected, float actual, float tolerance) => IsGreaterApproximatelyEqual(expected, actual, tolerance);
-        [HideInCallstack] public static void IsGreaterApproximatelyEqual(float expected, float actual, string message) => IsGreaterApproximatelyEqual(expected, actual, tolerance, message);
-        [HideInCallstack] public static void IsGreaterApproximatelyEqual(float expected, float actual) => IsGreaterApproximatelyEqual(expected, actual, tolerance);
+        [HideInCallstack] public static void IsGreaterApproximatelyEqual(float value, float other, string message) => IsGreaterApproximatelyEqual(value, other, tolerance, message);
+        [HideInCallstack] public static void IsGreaterApproximatelyEqual(float value, float other) => IsGreaterApproximatelyEqual(value, other, tolerance);
 
 
 
@@ -257,9 +247,8 @@ namespace UnityTest
         /// <param name="value">The assumed Assert value.</param>
         /// <param name="other">The number that value is expected to be less than.</param>
         /// <param name="message"></param>
-        /// <exception cref="AssertionException"></exception>
-        [HideInCallstack]
-        public static void IsLess(float value, float other, string message = "")
+        /// <exception cref="AssertionException">Thrown when the assertion fails.</exception>
+        [HideInCallstack] public static void IsLess(float value, float other, string message = "")
         {
             if (!(value < other))
             {
@@ -279,9 +268,8 @@ namespace UnityTest
         /// <param name="value">The assumed Assert value.</param>
         /// <param name="other">The number that value is expected to be less than or equal to.</param>
         /// <param name="message"></param>
-        /// <exception cref="AssertionException"></exception>
-        [HideInCallstack]
-        public static void IsLessEqual(float value, float other, string message = "")
+        /// <exception cref="AssertionException">Thrown when the assertion fails.</exception>
+        [HideInCallstack] public static void IsLessEqual(float value, float other, string message = "")
         {
             if (!(value <= other))
             {
@@ -304,11 +292,13 @@ namespace UnityTest
         /// <param name="value">The assumed Assert value.</param>
         /// <param name="other">The number that value is expected to be less than or equal to.</param>
         /// <param name="message"></param>
-        /// <exception cref="AssertionException"></exception>
+        /// <exception cref="AssertionException">Thrown when the assertion fails.</exception>
+        /// <exception cref="System.ArgumentOutOfRangeException">Thrown when the given tolerance value is negative.</exception>
         [HideInCallstack]
         public static void IsLessApproximatelyEqual(float value, float other, float tolerance, string message = "")
         {
-            if (!(value <= other || System.Math.Abs(value - other) < tolerance))
+            if (tolerance < 0) throw new System.ArgumentOutOfRangeException("tolerance argument cannot be < 0, but got " + tolerance);
+            if (!(value <= other || System.Math.Abs(value - other) <= tolerance))
             {
                 string final = value.ToString() + " > " + other.ToString() + " and " +
                     "|" + value.ToString() + " - " + other.ToString() + "| >= " + tolerance.ToString();
@@ -316,12 +306,8 @@ namespace UnityTest
                 ThrowException(final);
             }
         }
-        [HideInCallstack]
-        public static void IsLessApproximatelyEqual(float expected, float actual, float tolerance) => IsLessApproximatelyEqual(expected, actual, tolerance);
-        [HideInCallstack]
-        public static void IsLessApproximatelyEqual(float expected, float actual, string message) => IsLessApproximatelyEqual(expected, actual, tolerance, message);
-        [HideInCallstack]
-        public static void IsLessApproximatelyEqual(float expected, float actual) => IsLessApproximatelyEqual(expected, actual, tolerance);
+        [HideInCallstack] public static void IsLessApproximatelyEqual(float value, float other, string message) => IsLessApproximatelyEqual(value, other, tolerance, message);
+        [HideInCallstack] public static void IsLessApproximatelyEqual(float value, float other) => IsLessApproximatelyEqual(value, other, tolerance);
 
         /// <summary>
         /// Throw an exception to the UnityEditor.
@@ -335,8 +321,8 @@ namespace UnityTest
         private static void ThrowException(string message)
         {
             AssertionException e = new AssertionException(message);
-            if (!string.IsNullOrEmpty(currentTestSource)) e.Source = currentTestSource; //Test.current.attribute.sourceFile;
-            if (currentTestScript != null) Logger.LogException(e, currentTestScript); //Test.current.GetScript());
+            if (!string.IsNullOrEmpty(currentTestSource)) e.Source = currentTestSource;
+            if (currentTestScript != null) Logger.LogException(e, currentTestScript);
             else Logger.LogException(e);
         }
 

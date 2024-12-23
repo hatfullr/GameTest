@@ -493,12 +493,7 @@ namespace UnityTest
                 foreach (Test test in foldout.tests.ToArray())
                 {
                     if (foundAttributes.Contains(test.attribute)) continue;
-                    foldout.tests.Remove(test);
-                    if (foldout.tests.Count == 0)
-                    {
-                        RemoveFoldout(foldout);
-                        break;
-                    }
+                    RemoveTest(test, foldout: foldout);
                 }
             }
 
@@ -520,6 +515,21 @@ namespace UnityTest
             //await Task.Delay(5000);
 
             if (onFinished != null) onFinished();
+        }
+
+        /// <summary>
+        /// Removes the given Test from the given Foldout (if given), and from both the queue and finished queue. If the Foldout now has no Tests, the Foldout is removed, 
+        /// along with any parent Foldouts that now have no Tests in any of their children.
+        /// </summary>
+        public void RemoveTest(Test test, Foldout foldout = null)
+        {
+            if (foldout != null)
+            {
+                foldout.tests.Remove(test);
+                if (foldout.tests.Count == 0) RemoveFoldout(foldout);
+            }
+            if (queue.Contains(test)) queue.Remove(test);
+            if (finished.Contains(test)) finished.Remove(test);
         }
 
         /// <summary>
