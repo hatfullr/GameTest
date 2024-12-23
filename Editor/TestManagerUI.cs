@@ -989,7 +989,7 @@ namespace UnityTest
                         {
                             minWidth = itemRect.width + (Style.TestManagerUI.minTextWidth - textRect.width);
                         }
-                        toggleStyle = new GUIStyle(Style.GetTextOverflowAlignmentStyle(textRect, toggleStyle, toggleContent.text, TextAnchor.MiddleRight));
+                        toggleStyle = Style.GetTextOverflowAlignmentStyle(textRect, toggleStyle, toggleContent.text, TextAnchor.MiddleRight);
                         
 
                         if (showToggle)

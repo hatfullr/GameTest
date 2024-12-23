@@ -567,6 +567,22 @@ namespace UnityTest
             }
             RemoveFromQueue(test);
             RemoveFromFinishedQueue(test);
+            // Clean up the default prefab if there is one
+            test.DeleteDefaultPrefab();
+
+            void CloseRelevantSettingsWindows()
+            {
+                if (EditorWindow.HasOpenInstances<SettingsWindow>())
+                {
+                    SettingsWindow settings = EditorWindow.GetWindow<SettingsWindow>();
+                    if (settings.GetTest().attribute.GetPath() == test.attribute.GetPath())
+                    {
+                        settings.Close();
+                        CloseRelevantSettingsWindows(); // Go again to try and close all open settings windows that are open on this Test
+                    }
+                }
+            }
+            CloseRelevantSettingsWindows();
         }
 
         /// <summary>

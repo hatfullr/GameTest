@@ -49,7 +49,9 @@ namespace UnityTest
                 if (_defaultPrefab == null) _defaultPrefab = Utilities.SearchForAsset((GameObject g) => g.name == name, Utilities.dataPath, false);
                 if (_defaultPrefab == null)
                 {
-                    string path = Utilities.GetUnityPath(Utilities.GetAssetPath(name, Utilities.dataPath));
+                    string rawPath = Utilities.GetAssetPath(name);
+                    Utilities.EnsureDirectoryExists(Path.GetDirectoryName(rawPath));
+                    string path = Utilities.GetUnityPath(rawPath);
                     path = Path.ChangeExtension(path, ".prefab");
                     GameObject gameObject = new GameObject(name, method.DeclaringType);
                     _defaultPrefab = PrefabUtility.SaveAsPrefabAsset(gameObject, path, out bool success);
@@ -379,6 +381,30 @@ namespace UnityTest
                 script = AssetDatabase.LoadAssetAtPath(AssetDatabase.GUIDToAssetPath(matched), typeof(MonoScript));
             }
             return script;
+        }
+
+        /// <summary>
+        /// This never destroys the user's set prefab for this object.
+        /// </summary>
+        public void DeleteDefaultPrefab()
+        {
+            if (_defaultPrefab == null) return;
+            
+            Object.DestroyImmediate(_defaultPrefab, true);
+
+            string path = Utilities.GetAssetPath(attribute.GetPath());
+            string dir = Path.GetDirectoryName(path);
+
+            // Find and remove empty directories
+            foreach (string directory in Utilities.IterateDirectories(dir, true))
+            {
+                string basename = Path.GetFileName(directory);
+                if (basename == nameof(UnityTest)) return;
+                string[] files = Directory.GetFiles(directory, "*", SearchOption.TopDirectoryOnly);
+                if (files == null) return;
+                if (files.Length > 0) return;
+                FileUtil.DeleteFileOrDirectory(directory);
+            }
         }
     }
 }
