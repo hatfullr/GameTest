@@ -327,29 +327,6 @@ namespace UnityTest
                         }
                     }
 
-
-                    if (!manager.running && !manager.stopping) // Otherwise stuff will keep being added into the queue during testing time
-                    {
-                        bool hasTest = false;
-                        string path;
-                        foreach (Test test in manager.GetTests())
-                        {
-                            hasTest = false;
-                            path = test.attribute.GetPath();
-                            foreach (Test t in manager.queue)
-                            {
-                                if (t.attribute.GetPath() == path)
-                                {
-                                    hasTest = true;
-                                    break;
-                                }
-                            }
-
-                            if (test.selected && !hasTest) manager.AddToQueue(test);
-                            else if (hasTest && !test.selected) manager.RemoveFromQueue(test);
-                        }
-                    }
-
                     manager.guiQueue.Draw();
                 }
 
@@ -1029,18 +1006,31 @@ namespace UnityTest
 
                         if (showToggle)
                         {
-                            bool wasMixed = EditorGUI.showMixedValue;
-                            EditorGUI.showMixedValue = isMixed;
                             using (new EditorGUI.IndentLevelScope(-EditorGUI.indentLevel))
                             {
-                                using (new EditorGUI.DisabledScope(locked)) selected = EditorGUI.ToggleLeft(
-                                    tempRect,
-                                    toggleContent,
-                                    selected,
-                                    toggleStyle
-                                );
+                                using (new EditorGUI.DisabledScope(locked))
+                                {
+                                    bool wasSelected = selected;
+                                    bool wasMixed = EditorGUI.showMixedValue;
+                                    EditorGUI.showMixedValue = isMixed;
+                                    selected = EditorGUI.ToggleLeft(
+                                        tempRect,
+                                        toggleContent,
+                                        selected,
+                                        toggleStyle
+                                    );
+                                    EditorGUI.showMixedValue = wasMixed;
+                                    if (isMixed) // If the value is mixed, then clicking on it should select all.
+                                    {
+                                        if (selected) OnSelected(item);
+                                    }
+                                    else
+                                    {
+                                        if (selected && !wasSelected) OnSelected(item);
+                                        else if (!selected && wasSelected) OnDeselected(item);
+                                    }
+                                }
                             }
-                            EditorGUI.showMixedValue = wasMixed;
                         }
                         else
                         {
@@ -1080,6 +1070,23 @@ namespace UnityTest
 
                 GUI.backgroundColor = previousBackgroundColor;
             }
+        }
+
+        private void OnSelected(object item)
+        {
+            if (manager.running || manager.stopping) return; // Otherwise stuff will keep being added into the queue during testing time
+
+            if (item.GetType() == typeof(Test)) manager.AddToQueue(item as Test);
+            else if (item.GetType() == typeof(Foldout)) (item as Foldout).Select(manager);
+            else throw new System.NotImplementedException("Unrecognized type " + item.GetType());
+        }
+        private void OnDeselected(object item)
+        {
+            if (manager.running || manager.stopping) return; // Otherwise stuff will keep being added into the queue during testing time
+
+            if (item.GetType() == typeof(Test)) manager.RemoveFromQueue(item as Test);
+            else if (item.GetType() == typeof(Foldout)) (item as Foldout).Deselect(manager);
+            else throw new System.NotImplementedException("Unrecognized type " + item.GetType());
         }
         #endregion Tests
 
