@@ -29,6 +29,8 @@ namespace UnityTest
 
         private float minWidth = 0f;
 
+        private bool reloadingDomain = false;
+
         public enum Mode
         {
             Normal,
@@ -82,14 +84,13 @@ namespace UnityTest
             searchField = new UnityEditor.IMGUI.Controls.SearchField(); // Unity demands we do this in OnEnable and nowhere else
 
             // Clear these events out if they are already added
+            AssemblyReloadEvents.beforeAssemblyReload -= OnBeforeAssemblyReload;
             AssemblyReloadEvents.afterAssemblyReload -= OnAfterAssemblyReload;
             EditorApplication.playModeStateChanged -= OnPlayStateChanged;
 
+            AssemblyReloadEvents.beforeAssemblyReload += OnBeforeAssemblyReload;
             AssemblyReloadEvents.afterAssemblyReload += OnAfterAssemblyReload;
             EditorApplication.playModeStateChanged += OnPlayStateChanged;
-
-            manager.onStop -= OnTestManagerFinished;
-            manager.onStop += OnTestManagerFinished;
 
             // Before the editor application quits, save the assets for next time
             EditorApplication.quitting -= manager.Save;
@@ -103,8 +104,6 @@ namespace UnityTest
         {
             AssemblyReloadEvents.afterAssemblyReload -= OnAfterAssemblyReload;
             EditorApplication.playModeStateChanged -= OnPlayStateChanged;
-
-            if (manager != null) manager.onStop -= OnTestManagerFinished;
         }
 
         void OnDestroy()
@@ -118,9 +117,15 @@ namespace UnityTest
             }
         }
 
+        private void OnBeforeAssemblyReload()
+        {
+            reloadingDomain = true;
+        }
+
         private void OnAfterAssemblyReload()
         {
             manager = TestManager.Load();
+            reloadingDomain = false;
             Refresh(() =>
             {
                 if (manager != null)
@@ -132,20 +137,13 @@ namespace UnityTest
         {
             if (change == PlayModeStateChange.EnteredPlayMode && Utilities.IsSceneEmpty()) Focus();
 
-            // If we don't Repaint() here, then the toolbar buttons can appear incorrect.
-            if (change == PlayModeStateChange.EnteredEditMode) Repaint();
-        }
+            if (change == PlayModeStateChange.EnteredEditMode && manager.running)
+            {
+                manager.Stop();
+            }
 
-        /// <summary>
-        /// Called when the TestManager has finished all queued tests and exited Play mode. In this method, we repopulate the queue with the
-        /// currently selected Tests.
-        /// </summary>
-        private void OnTestManagerFinished()
-        {
-            //foreach (Test test in manager.GetTests())
-            //{
-            //    if (test.selected) manager.AddToQueue(test);
-            //}
+            // If we don't Repaint() here, then the toolbar buttons can appear incorrect. This should always happen as the very last thing.
+            if (change == PlayModeStateChange.EnteredEditMode) Repaint();
         }
 
         void OnLostFocus()
@@ -189,6 +187,7 @@ namespace UnityTest
             itemRect = new Rect();
             minWidth = default;
             settingsWindow = null;
+            reloadingDomain = false;
 
             Refresh(() => Logger.Log("Reset"), message: "Resetting");
         }
@@ -228,6 +227,7 @@ namespace UnityTest
         #region UI
         void OnGUI()
         {
+            if (reloadingDomain) return;
             if (manager == null) manager = TestManager.Load();
 
             Utilities.isDarkTheme = GUI.skin.name == "DarkSkin";
@@ -312,27 +312,6 @@ namespace UnityTest
                                     else DrawSearchMode();
                                 }
                             }
-                        }
-                    }
-
-
-                    if (!manager.running && !manager.stopping) // Otherwise stuff will keep being added into the queue during testing time
-                    {
-                        bool hasTest = false;
-                        foreach (Test test in manager.GetTests())
-                        {
-                            hasTest = false;
-                            foreach (Test t in manager.queue)
-                            {
-                                if (t.attribute == test.attribute)
-                                {
-                                    hasTest = true;
-                                    break;
-                                }
-                            }
-
-                            if (test.selected && !hasTest) manager.queue.Add(test); //manager.AddToQueue(test);
-                            else if (hasTest && !test.selected) manager.queue.Remove(test);
                         }
                     }
 
@@ -1015,18 +994,31 @@ namespace UnityTest
 
                         if (showToggle)
                         {
-                            bool wasMixed = EditorGUI.showMixedValue;
-                            EditorGUI.showMixedValue = isMixed;
                             using (new EditorGUI.IndentLevelScope(-EditorGUI.indentLevel))
                             {
-                                using (new EditorGUI.DisabledScope(locked)) selected = EditorGUI.ToggleLeft(
-                                    tempRect,
-                                    toggleContent,
-                                    selected,
-                                    toggleStyle
-                                );
+                                using (new EditorGUI.DisabledScope(locked))
+                                {
+                                    bool wasSelected = selected;
+                                    bool wasMixed = EditorGUI.showMixedValue;
+                                    EditorGUI.showMixedValue = isMixed;
+                                    selected = EditorGUI.ToggleLeft(
+                                        tempRect,
+                                        toggleContent,
+                                        selected,
+                                        toggleStyle
+                                    );
+                                    EditorGUI.showMixedValue = wasMixed;
+                                    if (isMixed) // If the value is mixed, then clicking on it should select all.
+                                    {
+                                        if (selected) OnSelected(item);
+                                    }
+                                    else
+                                    {
+                                        if (selected && !wasSelected) OnSelected(item);
+                                        else if (!selected && wasSelected) OnDeselected(item);
+                                    }
+                                }
                             }
-                            EditorGUI.showMixedValue = wasMixed;
                         }
                         else
                         {
@@ -1066,6 +1058,23 @@ namespace UnityTest
 
                 GUI.backgroundColor = previousBackgroundColor;
             }
+        }
+
+        private void OnSelected(object item)
+        {
+            if (manager.running || manager.stopping) return; // Otherwise stuff will keep being added into the queue during testing time
+
+            if (item.GetType() == typeof(Test)) manager.AddToQueue(item as Test);
+            else if (item.GetType() == typeof(Foldout)) (item as Foldout).Select(manager);
+            else throw new System.NotImplementedException("Unrecognized type " + item.GetType());
+        }
+        private void OnDeselected(object item)
+        {
+            if (manager.running || manager.stopping) return; // Otherwise stuff will keep being added into the queue during testing time
+
+            if (item.GetType() == typeof(Test)) manager.RemoveFromQueue(item as Test);
+            else if (item.GetType() == typeof(Foldout)) (item as Foldout).Deselect(manager);
+            else throw new System.NotImplementedException("Unrecognized type " + item.GetType());
         }
         #endregion Tests
 

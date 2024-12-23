@@ -13,8 +13,7 @@ namespace UnityTest
         private List<Test> queue;
         public GUIContent title;
         public System.Action<Rect, Test> testDrawer;
-        public System.Action onDrag;
-        public bool deselectOnClear;
+        public System.Action onDrag, onClearPressed;
         public bool allowReorder;
         public bool canClear;
 
@@ -41,7 +40,7 @@ namespace UnityTest
             GUIContent title,
             System.Action<Rect, Test> testDrawer = null,
             System.Action onDrag = null,
-            bool deselectOnClear = false,
+            System.Action onClearPressed = null,
             bool allowReorder = true,
             bool canClear = true
         )
@@ -50,7 +49,7 @@ namespace UnityTest
             this.title = title;
             this.testDrawer = testDrawer;
             this.onDrag = onDrag;
-            this.deselectOnClear = deselectOnClear;
+            this.onClearPressed = onClearPressed;
             this.allowReorder = allowReorder;
             this.canClear = canClear;
         }
@@ -93,9 +92,7 @@ namespace UnityTest
                 {
                     if (GUI.Button(clearRect, clear, clearStyle) && !disabled)
                     {
-                        if (deselectOnClear)
-                            foreach (Test test in queue)
-                                test.selected = false;
+                        if (onClearPressed != null) onClearPressed.Invoke();
                         queue.Clear();
                     }
                 }

@@ -77,7 +77,24 @@ namespace UnityTest
                     );
                 },
                 onDrag: ui.Repaint,
-                deselectOnClear: true
+                onClearPressed: () =>
+                {
+                    // deselect all the tests that are currently in the queue (this runs before the queue is cleared)
+                    string path;
+                    foreach (Test test in ui.manager.queue)
+                    {
+                        path = test.attribute.GetPath();
+                        foreach (Foldout foldout in ui.manager.foldouts)
+                        {
+                            foreach (Test t in foldout.tests)
+                            {
+                                if (t.locked) continue;
+                                if (t.attribute.GetPath() != path) continue;
+                                t.selected = false;
+                            }
+                        }
+                    }
+                }
             );
             if (finished == null) finished = new ReorderableTestQueue(
                 ref ui.manager.finished,
@@ -99,7 +116,6 @@ namespace UnityTest
                     );
                 },
                 onDrag: ui.Repaint,
-                deselectOnClear: false,
                 allowReorder: false,
                 canClear: false
             );

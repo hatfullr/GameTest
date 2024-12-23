@@ -128,6 +128,7 @@ namespace UnityTest
             // Check if the user just expanded the Foldout while holding down the Alt key
             if (Event.current.alt && expanded != wasExpanded) ExpandAll(ui.manager, expanded);
 
+            /*
             if (wasSelected != selected)
             {
                 // mixed is the same as the toggle not being selected
@@ -141,6 +142,7 @@ namespace UnityTest
                     else Select(ui.manager);
                 }
             }
+            */
 
             if (locked != wasLocked)
             {
@@ -159,7 +161,11 @@ namespace UnityTest
         {
             selected = true;
             foreach (Test test in tests)
-                if (!test.locked) test.selected = selected;
+            {
+                if (test.locked) continue;
+                test.selected = selected;
+                manager.AddToQueue(test);
+            }
             foreach (Foldout foldout in GetChildren(manager)) foldout.Select(manager);
         }
         /// <summary>
@@ -169,7 +175,11 @@ namespace UnityTest
         {
             selected = false;
             foreach (Test test in tests)
-                if (!test.locked) test.selected = selected;
+            {
+                if (test.locked) continue;
+                test.selected = selected;
+                manager.RemoveFromQueue(test);
+            }
             foreach (Foldout foldout in GetChildren(manager)) foldout.Deselect(manager);
         }
         /// <summary>
