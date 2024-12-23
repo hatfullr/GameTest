@@ -282,9 +282,10 @@ namespace UnityTest
         /// </summary>
         public void RemoveFromQueue(Test test)
         {
+            string path = test.attribute.GetPath();
             foreach (Test t in queue.ToArray())
             {
-                if (t.attribute.GetPath() == test.attribute.GetPath())
+                if (t.attribute.GetPath() == path)
                 {
                     queue.Remove(t);
                     break;
@@ -294,6 +295,22 @@ namespace UnityTest
         private void AddToFinishedQueue(Test test)
         {
             finished.Add(test); // This makes a reverse order
+        }
+
+        /// <summary>
+        /// If the Test is in the finished queue, remove it. Otherwise, do nothing.
+        /// </summary>
+        private void RemoveFromFinishedQueue(Test test)
+        {
+            string path = test.attribute.GetPath();
+            foreach (Test t in finished.ToArray())
+            {
+                if (t.attribute.GetPath() == path)
+                {
+                    finished.Remove(t);
+                    break;
+                }
+            }
         }
 
         public bool IsMethodIgnored(MethodInfo method) => method.GetCustomAttribute<IgnoreAttribute>(false) != null;
@@ -528,8 +545,8 @@ namespace UnityTest
                 foldout.tests.Remove(test);
                 if (foldout.tests.Count == 0) RemoveFoldout(foldout);
             }
-            if (queue.Contains(test)) queue.Remove(test);
-            if (finished.Contains(test)) finished.Remove(test);
+            RemoveFromQueue(test);
+            RemoveFromFinishedQueue(test);
         }
 
         /// <summary>

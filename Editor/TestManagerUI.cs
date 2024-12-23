@@ -331,20 +331,22 @@ namespace UnityTest
                     if (!manager.running && !manager.stopping) // Otherwise stuff will keep being added into the queue during testing time
                     {
                         bool hasTest = false;
+                        string path;
                         foreach (Test test in manager.GetTests())
                         {
                             hasTest = false;
+                            path = test.attribute.GetPath();
                             foreach (Test t in manager.queue)
                             {
-                                if (t.attribute == test.attribute)
+                                if (t.attribute.GetPath() == path)
                                 {
                                     hasTest = true;
                                     break;
                                 }
                             }
 
-                            if (test.selected && !hasTest) manager.queue.Add(test); //manager.AddToQueue(test);
-                            else if (hasTest && !test.selected) manager.queue.Remove(test);
+                            if (test.selected && !hasTest) manager.AddToQueue(test);
+                            else if (hasTest && !test.selected) manager.RemoveFromQueue(test);
                         }
                     }
 
