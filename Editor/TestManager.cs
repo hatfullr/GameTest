@@ -145,11 +145,9 @@ namespace UnityTest
             test.onFinished -= OnRunFinished;
             AddToFinishedQueue(test);
             guiQueue.ResetTimer();
-            if (running && !paused)
-            {
-                if (queue.Count > 0) RunNext();
-                else Stop();
-            }
+
+            if (queue.Count == 0) Stop(); // no more tests left to run
+            else if (running && !paused) RunNext();
         }
 
         /// <summary>
@@ -163,6 +161,20 @@ namespace UnityTest
                 Test.current.result = Test.Result.Skipped;
                 Test.current.OnRunComplete();
             }
+            else
+            {
+                if (queue.Count == 0) Stop(); // this shouldn't happen, but is a fallback in case it does somehow
+                else
+                {
+                    RunNext();
+                    //if (paused)
+                    //{
+                    //    Test.SetCurrentTest(queue[0]);
+                    //    queue.RemoveAt(0);
+                    //}
+                    //else RunNext();
+                }
+            }
         }
 
         private void SkipRemainingTests()
@@ -172,6 +184,15 @@ namespace UnityTest
 
             // If there is a Test running currently, skip it
             Skip();
+
+            if (paused)
+            {
+                foreach (Test test in queue)
+                {
+                    AddToFinishedQueue(test);
+                    test.PrintResult();
+                }
+            }
         }
 
         /// <summary>
@@ -187,9 +208,12 @@ namespace UnityTest
             search = default;
             searchMatches.Clear();
             originalQueue.Clear();
+            running = default;
+            stopping = default;
 
             debug = Logger.DebugMode.Log | Logger.DebugMode.LogWarning | Logger.DebugMode.LogError;
             Logger.debug = debug;
+            testSortOrder = default;
             previousFrameNumber = 0;
 
             guiQueue.Reset();
@@ -223,14 +247,16 @@ namespace UnityTest
             stopping = true;
             SkipRemainingTests();
 
-            queue.AddRange(originalQueue); // Restore test ordering
+            // Restore test ordering
+            queue.Clear();
+            queue.AddRange(originalQueue);
             originalQueue.Clear();
 
             running = false;
             paused = false;
 
             if (EditorApplication.isPlaying) EditorApplication.ExitPlaymode();
-            onStop();
+            if (onStop != null) onStop.Invoke();
             Logger.Log("Finished", null, null);
             stopping = false;
         }
@@ -278,18 +304,15 @@ namespace UnityTest
             queue.Add(test);
         }
         /// <summary>
-        /// If the Test is in the queue, remove it. Otherwise, do nothing.
+        /// Remove all Tests in the queue whose paths match the path of the given Test.
         /// </summary>
         public void RemoveFromQueue(Test test)
         {
             string path = test.attribute.GetPath();
-            foreach (Test t in queue.ToArray())
+            for (int i = queue.Count - 1; i >= 0; i--)
             {
-                if (t.attribute.GetPath() == path)
-                {
-                    queue.Remove(t);
-                    break;
-                }
+                if (queue[i].attribute.GetPath() != path) continue;
+                queue.RemoveAt(i);
             }
         }
         private void AddToFinishedQueue(Test test)
@@ -298,18 +321,15 @@ namespace UnityTest
         }
 
         /// <summary>
-        /// If the Test is in the finished queue, remove it. Otherwise, do nothing.
+        /// Remove all Tests in the finished queue whose paths match the path of the given Test.
         /// </summary>
         private void RemoveFromFinishedQueue(Test test)
         {
             string path = test.attribute.GetPath();
-            foreach (Test t in finished.ToArray())
+            for (int i = finished.Count - 1; i >= 0; i--)
             {
-                if (t.attribute.GetPath() == path)
-                {
-                    finished.Remove(t);
-                    break;
-                }
+                if (finished[i].attribute.GetPath() != path) continue;
+                finished.RemoveAt(i);
             }
         }
 

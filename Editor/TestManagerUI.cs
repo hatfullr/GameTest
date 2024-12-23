@@ -92,9 +92,6 @@ namespace UnityTest
             AssemblyReloadEvents.afterAssemblyReload += OnAfterAssemblyReload;
             EditorApplication.playModeStateChanged += OnPlayStateChanged;
 
-            manager.onStop -= OnTestManagerFinished;
-            manager.onStop += OnTestManagerFinished;
-
             // Before the editor application quits, save the assets for next time
             EditorApplication.quitting -= manager.Save;
             EditorApplication.quitting += manager.Save;
@@ -107,8 +104,6 @@ namespace UnityTest
         {
             AssemblyReloadEvents.afterAssemblyReload -= OnAfterAssemblyReload;
             EditorApplication.playModeStateChanged -= OnPlayStateChanged;
-
-            if (manager != null) manager.onStop -= OnTestManagerFinished;
         }
 
         void OnDestroy()
@@ -142,20 +137,13 @@ namespace UnityTest
         {
             if (change == PlayModeStateChange.EnteredPlayMode && Utilities.IsSceneEmpty()) Focus();
 
-            // If we don't Repaint() here, then the toolbar buttons can appear incorrect.
-            if (change == PlayModeStateChange.EnteredEditMode) Repaint();
-        }
+            if (change == PlayModeStateChange.EnteredEditMode && manager.running)
+            {
+                manager.Stop();
+            }
 
-        /// <summary>
-        /// Called when the TestManager has finished all queued tests and exited Play mode. In this method, we repopulate the queue with the
-        /// currently selected Tests.
-        /// </summary>
-        private void OnTestManagerFinished()
-        {
-            //foreach (Test test in manager.GetTests())
-            //{
-            //    if (test.selected) manager.AddToQueue(test);
-            //}
+            // If we don't Repaint() here, then the toolbar buttons can appear incorrect. This should always happen as the very last thing.
+            if (change == PlayModeStateChange.EnteredEditMode) Repaint();
         }
 
         void OnLostFocus()
