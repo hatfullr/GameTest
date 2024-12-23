@@ -249,9 +249,9 @@ namespace UnityTest
         }
 
         /// <summary>
-        /// Get the file path to Assets/UnityPath/Data/[name].asset.
+        /// Get the file path to Assets/UnityTest/Data/[name].asset.
         /// </summary>
-        public static string GetAssetPath(string name, string directory)
+        public static string GetAssetPath(string name, string directory = null)
         {
             if (directory == null) directory = dataPath;
             string path = Path.Join(directory, name);
