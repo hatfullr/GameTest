@@ -29,6 +29,8 @@ namespace UnityTest
 
         private float minWidth = 0f;
 
+        private bool reloadingDomain = false;
+
         public enum Mode
         {
             Normal,
@@ -82,9 +84,11 @@ namespace UnityTest
             searchField = new UnityEditor.IMGUI.Controls.SearchField(); // Unity demands we do this in OnEnable and nowhere else
 
             // Clear these events out if they are already added
+            AssemblyReloadEvents.beforeAssemblyReload -= OnBeforeAssemblyReload;
             AssemblyReloadEvents.afterAssemblyReload -= OnAfterAssemblyReload;
             EditorApplication.playModeStateChanged -= OnPlayStateChanged;
 
+            AssemblyReloadEvents.beforeAssemblyReload += OnBeforeAssemblyReload;
             AssemblyReloadEvents.afterAssemblyReload += OnAfterAssemblyReload;
             EditorApplication.playModeStateChanged += OnPlayStateChanged;
 
@@ -118,9 +122,15 @@ namespace UnityTest
             }
         }
 
+        private void OnBeforeAssemblyReload()
+        {
+            reloadingDomain = true;
+        }
+
         private void OnAfterAssemblyReload()
         {
             manager = TestManager.Load();
+            reloadingDomain = false;
             Refresh(() =>
             {
                 if (manager != null)
@@ -189,6 +199,7 @@ namespace UnityTest
             itemRect = new Rect();
             minWidth = default;
             settingsWindow = null;
+            reloadingDomain = false;
 
             Refresh(() => Logger.Log("Reset"), message: "Resetting");
         }
@@ -228,6 +239,7 @@ namespace UnityTest
         #region UI
         void OnGUI()
         {
+            if (reloadingDomain) return;
             if (manager == null) manager = TestManager.Load();
 
             Utilities.isDarkTheme = GUI.skin.name == "DarkSkin";

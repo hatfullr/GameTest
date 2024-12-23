@@ -496,7 +496,7 @@ namespace UnityTest
                     foldout.tests.Remove(test);
                     if (foldout.tests.Count == 0)
                     {
-                        foldouts.Remove(foldout);
+                        RemoveFoldout(foldout);
                         break;
                     }
                 }
@@ -520,6 +520,29 @@ namespace UnityTest
             //await Task.Delay(5000);
 
             if (onFinished != null) onFinished();
+        }
+
+        /// <summary>
+        /// Remove the given Foldout. Then remove the parents of this Foldout that no longer lead to any tests.
+        /// </summary>
+        public void RemoveFoldout(Foldout foldout)
+        {
+            if (foldouts.Contains(foldout)) foldouts.Remove(foldout);
+
+            foreach (Foldout f in foldouts.ToArray())
+            {
+                if (!f.IsParentOf(foldout)) continue;
+                bool hasTests = false;
+                foreach (Test test in f.GetTests(this, includeSubdirectories: true))
+                {
+                    hasTests = true;
+                    break;
+                }
+                if (!hasTests)
+                {
+                    RemoveFoldout(f);
+                }
+            }
         }
 
         /// <summary>
