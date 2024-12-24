@@ -36,6 +36,13 @@ namespace GameTest
         public int lineNumber;
 
         /// <summary>
+        /// Used internally to store the test's file path the first time GetPath() gets called. This doesn't get serialized, so whenever a TestAttribute
+        /// gets loaded into memory and GetPath() is called, this variable will be updated. Caching the path saves on GUI draw calls, particularly in
+        /// the GUIQueue for some reason.
+        /// </summary>
+        private string path = null;
+
+        /// <summary>
         /// This method will be added to Window > GameTest Manager.
         /// </summary>
         /// <param name="setUp">Name of a static method which returns a GameObject and accepts no parameters.</param>
@@ -119,9 +126,13 @@ namespace GameTest
         /// </summary>
         public string GetPath()
         {
-            string path = Utilities.GetUnityPath(sourceFile);
-            string directory = Path.Join(Path.GetDirectoryName(path), Path.GetFileNameWithoutExtension(path));
-            return Path.Join(directory, name);
+            if (string.IsNullOrEmpty(path))
+            {
+                string p = Utilities.GetUnityPath(sourceFile);
+                string directory = Path.Join(Path.GetDirectoryName(p), Path.GetFileNameWithoutExtension(p));
+                path = Path.Join(directory, name);
+            }
+            return path;
         }
 
 
