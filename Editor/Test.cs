@@ -7,7 +7,7 @@ using UnityEditor;
 namespace GameTest
 {
     /// <summary>
-    /// A unit test that will appear in the GameTest Manager as a toggleable test. Each Test has an executable method and an attribute.
+    /// A unit test that will appear in GameTest as a toggleable test. Each Test has an executable method and an attribute.
     /// </summary>
     [System.Serializable]
     public class Test
