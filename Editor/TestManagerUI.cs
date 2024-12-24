@@ -9,7 +9,7 @@ using System.Text.RegularExpressions;
 ///    1. Add a preferences window
 ///        a. Let the user control the sorting order of the tests in the TestManager
 
-namespace UnityTest
+namespace GameTest
 {
     public class TestManagerUI : EditorWindow, IHasCustomMenu
     {
@@ -50,7 +50,7 @@ namespace UnityTest
             menu.AddItem(new GUIContent("Reset"), false, ShowResetConfirmation);
         }
 
-        [MenuItem("Window/UnityTest Manager")]
+        [MenuItem("Window/GameTest Manager")]
         public static void ShowWindow()
         {
             TestManagerUI window = GetWindow<TestManagerUI>(Style.TestManagerUI.windowTitle);
@@ -720,8 +720,8 @@ namespace UnityTest
         /// </summary>
         private void ShowResetConfirmation()
         {
-            if (!EditorUtility.DisplayDialog("Reset UnityTest Manager?", "This will clear all saved information about tests, GameObjects, etc. " +
-                "If you have encountered a bug, first try closing the UnityTest Manager and opening it again.",
+            if (!EditorUtility.DisplayDialog("Reset GameTest Manager?", "This will clear all saved information about tests, GameObjects, etc. " +
+                "If you have encountered a bug, first try closing the GameTest Manager and opening it again.",
                 "Yes", "No"
             )) return;
             

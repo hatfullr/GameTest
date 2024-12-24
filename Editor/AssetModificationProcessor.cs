@@ -1,7 +1,7 @@
 using UnityEditor;
 using System.IO;
 
-namespace UnityTest
+namespace GameTest
 {
     /// <summary>
     /// This class is for detecting changes to assets so we can do things like clean up old assets and follow certain assets when they move around.
@@ -20,9 +20,9 @@ namespace UnityTest
                 if (File.Exists(fullPath)) File.Delete(fullPath);
                 // Do we need to also delete the .meta files??
             }
-            if (sourcePath == TestManager.filePath) // Prevent the user from deleting the TestManager asset. Note this isn't called when UnityTest package is uninstalled
+            if (sourcePath == TestManager.filePath) // Prevent the user from deleting the TestManager asset. Note this isn't called when GameTest package is uninstalled
             {
-                EditorUtility.DisplayDialog("Deletion Failed", "You must uninstall UnityTest first via the Package Manager (Window > Package Manager) before deleting this ScriptableObject.", "Ok");
+                EditorUtility.DisplayDialog("Deletion Failed", "You must uninstall GameTest first via the Package Manager (Window > Package Manager) before deleting this ScriptableObject.", "Ok");
                 return AssetDeleteResult.DidDelete;
             }
             return AssetDeleteResult.DidNotDelete; // We didn't delete the sourcePath file.

@@ -5,7 +5,7 @@ using UnityEditor;
 using UnityEngine;
 
 
-namespace UnityTest
+namespace GameTest
 {
     public static class Utilities
     {
@@ -30,7 +30,7 @@ namespace UnityTest
         /// <summary>
         /// Location where data assets are stored.
         /// </summary>
-        public static string dataPath { get => EnsureDirectoryExists(Path.Join(assetsPath, "UnityTest")); }
+        public static string dataPath { get => EnsureDirectoryExists(Path.Join(assetsPath, "GameTest")); }
 #endif
 
         /// <summary>
@@ -201,7 +201,7 @@ namespace UnityTest
         #region Filesystem Helpers
 #if UNITY_EDITOR
         /// <summary>
-        /// Loop through all *.asset files in Assets/UnityTest/Data to find the first asset that meets the given criteria function. The
+        /// Loop through all *.asset files in Assets/GameTest/Data to find the first asset that meets the given criteria function. The
         /// input parameter to the criteria function is any Object. The result of the criteria function must be a bool.
         /// </summary>
         public static T SearchForAsset<T>(System.Func<T, bool> criteria, string searchDirectory, bool errorOnMissing = true)
@@ -217,7 +217,7 @@ namespace UnityTest
         }
 
         /// <summary>
-        /// Loop through all *.asset files in Assets/UnityTest/Data to find the first asset that meets the given criteria function. The
+        /// Loop through all *.asset files in Assets/GameTest/Data to find the first asset that meets the given criteria function. The
         /// input parameter to the criteria function is any Object. The result of the criteria function must be a bool.
         /// </summary>
         public static T LoadAssetAtPath<T>(string assetPath) => (T)(object)AssetDatabase.LoadAssetAtPath(GetUnityPath(assetPath), typeof(T));
@@ -249,7 +249,7 @@ namespace UnityTest
         }
 
         /// <summary>
-        /// Get the file path to Assets/UnityTest/Data/[name].asset.
+        /// Get the file path to Assets/GameTest/Data/[name].asset.
         /// </summary>
         public static string GetAssetPath(string name, string directory = null)
         {

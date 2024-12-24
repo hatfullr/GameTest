@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor;
 
-namespace UnityTest
+namespace GameTest
 {
     /// <summary>
     /// I didn't like Unity's implementation of ReorderableList / it was too confusing to implement. This is my own

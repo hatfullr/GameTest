@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace UnityTest
+namespace GameTest
 {
     /// <summary>
     /// The Assert class contains assertion methods for setting invariants in the code.

@@ -1,6 +1,6 @@
 using System.IO;
 
-namespace UnityTest
+namespace GameTest
 {
     /// <summary>
     /// This method will be included in Window > Unit Test Manager. It must return void and accept a GameObject, which has this method's
@@ -36,7 +36,7 @@ namespace UnityTest
         public int lineNumber;
 
         /// <summary>
-        /// This method will be added to Window > UnityTest Manager.
+        /// This method will be added to Window > GameTest Manager.
         /// </summary>
         /// <param name="setUp">Name of a static method which returns a GameObject and accepts no parameters.</param>
         /// <param name="tearDown">Name of a static method which returns void and accepts the GameObject returned by SetUp.</param>
@@ -61,7 +61,7 @@ namespace UnityTest
         }
 
         /// <summary>
-        /// This method will be added to Window > UnityTest Manager.
+        /// This method will be added to Window > GameTest Manager.
         /// </summary>
         /// <param name="pauseOnFail">Pause testing when this test fails. No other subsequent tests will run. default = false.</param>
         /// <param name="name">The test method name which appears in the test manager. The default is the name of the method. Names must be unique per-file.</param>
@@ -82,7 +82,7 @@ namespace UnityTest
         }
 
         /// <summary>
-        /// This method will be added to Window > UnityTest Manager.
+        /// This method will be added to Window > GameTest Manager.
         /// </summary>
         /// <param name="setUp">Name of a static method which returns a GameObject and accepts no parameters.</param>
         /// <param name="pauseOnFail">Pause testing when this test fails. No other subsequent tests will run. default = false.</param>

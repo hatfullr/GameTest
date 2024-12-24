@@ -1,7 +1,7 @@
 using UnityEditor;
 using UnityEngine;
 
-namespace UnityTest
+namespace GameTest
 {
     /// <summary>
     /// This is where the queued and finished tests in the TestManagerUI are drawn

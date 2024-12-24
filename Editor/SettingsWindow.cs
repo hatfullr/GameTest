@@ -3,7 +3,7 @@ using UnityEditor;
 using UnityEngine;
 
 
-namespace UnityTest
+namespace GameTest
 {
     /// <summary>
     /// The window that pops up when a settings cog button is clicked

@@ -3,7 +3,7 @@ using UnityEngine;
 /// <summary>
 /// This is just for showing helpful (hopefully) Test examples
 /// </summary>
-namespace UnityTest
+namespace GameTest
 {
     namespace Examples // Separating by a namespace to avoid domain problems in your code
     {

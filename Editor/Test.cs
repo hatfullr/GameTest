@@ -4,10 +4,10 @@ using System.IO;
 using UnityEditor;
 
 
-namespace UnityTest
+namespace GameTest
 {
     /// <summary>
-    /// A unit test that will appear in the UnityTest Manager as a toggleable test. Each Test has an executable method and an attribute.
+    /// A unit test that will appear in the GameTest Manager as a toggleable test. Each Test has an executable method and an attribute.
     /// </summary>
     [System.Serializable]
     public class Test
@@ -399,7 +399,7 @@ namespace UnityTest
             foreach (string directory in Utilities.IterateDirectories(dir, true))
             {
                 string basename = Path.GetFileName(directory);
-                if (basename == nameof(UnityTest)) return;
+                if (basename == nameof(GameTest)) return;
                 string[] files = Directory.GetFiles(directory, "*", SearchOption.TopDirectoryOnly);
                 if (files == null) return;
                 if (files.Length > 0) return;

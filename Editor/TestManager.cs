@@ -7,7 +7,7 @@ using System.Text.RegularExpressions;
 using System.Linq;
 
 
-namespace UnityTest
+namespace GameTest
 {
     /// <summary>
     /// Holds the assemblies, Test methods, and queues. Executes the tests when instructed.
@@ -82,7 +82,7 @@ namespace UnityTest
             
             // Didn't find an existing TestManager, so create one
             TestManager result = ScriptableObject.CreateInstance(typeof(TestManager)) as TestManager;
-            filePath = Path.Join(Utilities.dataPath, nameof(UnityTest) + ".asset");
+            filePath = Path.Join(Utilities.dataPath, nameof(GameTest) + ".asset");
             AssetDatabase.CreateAsset(result, filePath);
             return result;
         }

@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace UnityTest
+namespace GameTest
 {
     public class Logger
     {
@@ -18,7 +18,7 @@ namespace UnityTest
             LogError = 1 << 2,
         }
 
-        public static string debugTag { get => "[" + nameof(UnityTest) +"]"; }
+        public static string debugTag { get => "[" + nameof(GameTest) +"]"; }
 
         private static HashSet<string> loggedExceptions = new HashSet<string>();
 

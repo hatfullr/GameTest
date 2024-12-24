@@ -4,7 +4,7 @@ using System.Linq;
 using UnityEditor;
 using UnityEngine;
 
-namespace UnityTest
+namespace GameTest
 {
     [System.Serializable]
     public class Foldout
