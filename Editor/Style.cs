@@ -138,14 +138,6 @@ namespace GameTest
         }
 
         /// <summary>
-        /// Re-initialize all styles. Helpful for making minor modifications and then resetting afterward.
-        /// </summary>
-        public static void Reset()
-        {
-            styles.Clear();
-        }
-
-        /// <summary>
         /// Get the pixel width of the given GUIContent as used with the given GUIStyle.
         /// </summary>
         public static float GetWidth(GUIStyle style) => style.CalcSize(GUIContent.none).x;
