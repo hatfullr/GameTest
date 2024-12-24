@@ -1,7 +1,7 @@
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/K3K415S8MR)
 
-# UnityTest
-Are you tired of finding new bugs in old code? Use `UnityTest` to run automated tests that ensure code is working as intended. Unlike the [Unity Test Framework](https://docs.unity3d.com/Packages/com.unity.test-framework@1.4/manual/index.html) (UTF), `UnityTest` does not require any special assembly definition files (`*.asmdef`) or any other prerequisites. `UnityTest` works "out of the box".
+# GameTest
+Are you tired of finding new bugs in old code? Use `GameTest` to run automated tests that ensure code is working as intended. Unlike the [Unity Test Framework](https://docs.unity3d.com/Packages/com.unity.test-framework@1.4/manual/index.html) (UTF), `GameTest` does not require any special assembly definition files (`*.asmdef`) or any other prerequisites. `GameTest` works "out of the box".
 
 ## Features
 1. User interface with granular control of testing parameters
@@ -13,14 +13,14 @@ Are you tired of finding new bugs in old code? Use `UnityTest` to run automated 
 ## Installation
 1. Go to `Window > Package Manager` in the Unity application menu bar.
 2. Click "+" in the top left and select "Add package from git URL...".
-3. Paste in the GitHub repo link: https://github.com/hatfullr/UnityTest.git
+3. Paste in the GitHub repo link: https://github.com/hatfullr/GameTest.git
 4. Press Enter, or click "Add".
-5. Open the test manager at `Window > UnityTest Manager`.
+5. Open GameTest at `Window > GameTest`.
 
 If you run into issues, check [Installation Troubleshooting](#installation-troubleshooting).
 
-### The UnityTest Folder
-Upon opening the UnityTest Manager, a folder called "UnityTest" will be created in the "Assets" folder. This is where `UnityTest` will store `ScriptableObject`s containing data about the tests in your project as well as data for the UnityTest Manager. If you ever want to manually reset `UnityTest`, delete the "UnityTest" folder and re-open the UnityTest Manager. It is recommended that you do not rename or move this folder, and it's probably also a bad idea to store anything you care about there.
+### The GameTest Folder
+Upon opening the GameTest window, a folder called "GameTest" will be created in the "Assets" folder. This is where `GameTest` will store data about the tests in your project. If you ever need to manually reset `GameTest`, delete this folder and re-open GameTest. It is recommended that you do not rename or move this folder, and it's probably also a bad idea to store anything you care about there.
 
 ## Quick Start
 Unit testing is intended to make sure code runs properly throughout version changes. This is particularly helpful when there are many complicated and inter-dependent systems. The following example keeps things simple. Suppose you have some Unity class called `Example`:
@@ -40,7 +40,7 @@ public class Example : MonoBehaviour
 Are we sure that `Method` actually increments `number` by one as we expect? Let's make a test:
 ```C#
 using UnityEngine;
-using UnityTest;
+using GameTest;
 
 public class Example : MonoBehaviour
 {
@@ -61,12 +61,12 @@ public class Example : MonoBehaviour
     }
 }
 ```
-Open the test manager at `Window > UnityTest Manager` and type "Method" in the search bar. Check the box to enable the test and then press the play button in the top left of the window (not the editor's play button). The editor will then enter Play mode and run the test. First, a `GameObject` is instantiated with an attached `Example` component. Then, that component's `TestMethod` is called. The results of the test are shown in the console.
+Open GameTest at `Window > GameTest` and type "Method" in the search bar. Check the box to enable the test and then press the play button in the top left of the window (not the editor's play button). The editor will then enter Play mode and run the test. First, a `GameObject` is instantiated with an attached `Example` component. Then, that component's `TestMethod` is called. The results of the test are shown in the console.
 
 ## Debugging
 When a test fails, it will throw an exception that is visible in the console log. Unfortunately, double-clicking the message will not deliver you to the line of code where the test failed. This is a limitation of the Unity editor API. To find the line where a test failed, follow these steps:
 1. In the console, click the "triple dot" button in the top-right.
-2. Turn on "Strip logging callstack". This removes any clutter from the stack trace in the console that might have come from `UnityTest`.
+2. Turn on "Strip logging callstack". This removes any clutter from the stack trace in the console that might have come from `GameTest`.
 3. Click the message in the console.
 4. Find the link to your script in the stack trace and click on it.
 
