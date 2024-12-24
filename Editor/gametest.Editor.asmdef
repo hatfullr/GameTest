@@ -1,5 +1,5 @@
 {
-    "name": "unitytest.Editor",
+    "name": "gametest.Editor",
     "rootNamespace": "",
     "references": [
         "GUID:219fefa90e8f60742934de6d5718c1bb"

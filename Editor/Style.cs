@@ -2,7 +2,7 @@
 using UnityEditor;
 using UnityEngine;
 
-namespace UnityTest
+namespace GameTest
 {
     /// <summary>
     /// Handles all the GUI styling.
@@ -13,18 +13,20 @@ namespace UnityTest
         private static Dictionary<string, GUIContent> icons = new Dictionary<string, GUIContent>();
 
         public const string donationLink = "https://ko-fi.com/rogerhatfull";
-        public const string documentationLink = "https://github.com/hatfullr/UnityTest";
+        public const string documentationLink = "https://github.com/hatfullr/GameTest";
         public static string welcomeMessage = string.Join('\n',
-            "<b>1.</b> Create a method in a MonoBehaviour with a [UnityTest.Test] attribute and UnityTest.Assert statements, then recompile.",
-            "<b>2.</b> Select your test below to add it to the queue.",
-            "<b>3.</b> Click the Play button in the toolbar. A test fails if it throws an AssertionException, " +
-            "and passes otherwise. Check the Console for detailed results.",
-            "Click the GitHub button or see README.md for additional information. <b>If this tool has helped you, please consider donating " +
-            "to help me create more cool stuff.</b> Thank you for using UnityTest.",
+            "<b>If this tool has helped you, please consider donating to help me create more cool stuff.</b> Thank you for using GameTest.",
             "",
+            "<size=14>Getting Started:</size>",
+            "<b>1.</b> In any MonoBehaviour, write \"using GameTest;\" at the top, write a method with a \"[Test]\" attribute, and include \"Assert.\" statement(s). Then recompile.",
+            "<b>2.</b> After recompiling, find and select your test below to add it to the queue.",
+            "<b>3.</b> Click the Play button above (in the toolbar). A test fails if it throws an AssertionException, and passes otherwise. Check the Console for detailed results.",
+            "Click the GitHub button or see README.md for additional information.",
+            "",
+            "<size=14>Tips:</size>",
             "• Click script icons to open test code",
             "• Check tooltips, and Edit > Preferences > Enable PlayMode Tooltips",
-            "• Hide UnityTest from stack trace with \"Strip logging callstack\" in the triple-dot menu (top right of Console window)",
+            "• Hide GameTest from stack trace with \"Strip logging callstack\" in the triple-dot menu (top right of Console window)",
             "",
             "<i><size=10>To hide this message, press the speech bubble in the toolbar.</size></i>"
         );
@@ -34,7 +36,7 @@ namespace UnityTest
 
         public static class TestManagerUI
         {
-            public const string windowTitle = "UnityTest Manager";
+            public const string windowTitle = nameof(GameTest);
             public const float minHeight = 300f;
             public const float minWidth = 350f;
             public const float spinRate = 0.05f;
@@ -92,7 +94,7 @@ namespace UnityTest
             public const string debugOff = "Enable/disable debug messages";
             public const string debugOn = "Enable/disable debug messages";
             public const string refresh = "Refresh test methods and classes by searching all assemblies. This should never be necessary, but could " +
-                        "be helpful if UnityTest is having trouble detecting your tests.";
+                        "be helpful if GameTest is having trouble detecting your tests.";
             public const string welcome = "Show/hide the welcome message";
             public const string testPassed = "Passed";
             public const string testFailed = "Failed";
@@ -133,14 +135,6 @@ namespace UnityTest
                 return icon;
             }
             return icons[iconName];
-        }
-
-        /// <summary>
-        /// Re-initialize all styles. Helpful for making minor modifications and then resetting afterward.
-        /// </summary>
-        public static void Reset()
-        {
-            styles.Clear();
         }
 
         /// <summary>

@@ -1,4 +1,4 @@
-namespace UnityTest
+namespace GameTest
 {
     /// <summary>
     /// Indicate that this UnitTest method is to be ignored. It will not show up in the Unit Test Manager.

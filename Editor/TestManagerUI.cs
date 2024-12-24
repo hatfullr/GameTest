@@ -9,7 +9,7 @@ using System.Text.RegularExpressions;
 ///    1. Add a preferences window
 ///        a. Let the user control the sorting order of the tests in the TestManager
 
-namespace UnityTest
+namespace GameTest
 {
     public class TestManagerUI : EditorWindow, IHasCustomMenu
     {
@@ -48,9 +48,10 @@ namespace UnityTest
         public void AddItemsToMenu(GenericMenu menu)
         {
             menu.AddItem(new GUIContent("Reset"), false, ShowResetConfirmation);
+            menu.AddItem(new GUIContent("About"), false, ShowAbout);
         }
 
-        [MenuItem("Window/UnityTest Manager")]
+        [MenuItem("Window/GameTest")]
         public static void ShowWindow()
         {
             TestManagerUI window = GetWindow<TestManagerUI>(Style.TestManagerUI.windowTitle);
@@ -720,13 +721,29 @@ namespace UnityTest
         /// </summary>
         private void ShowResetConfirmation()
         {
-            if (!EditorUtility.DisplayDialog("Reset UnityTest Manager?", "This will clear all saved information about tests, GameObjects, etc. " +
-                "If you have encountered a bug, first try closing the UnityTest Manager and opening it again.",
+            if (!EditorUtility.DisplayDialog("Reset GameTest?", "This will clear all saved information about tests, GameObjects, etc. " +
+                "If you have encountered a bug, first try closing the GameTest and opening it again.",
                 "Yes", "No"
             )) return;
             
             // User clicked "OK"
             DoReset();
+        }
+
+        private void ShowAbout()
+        {
+            if (!EditorUtility.DisplayDialog(nameof(GameTest) + " (" + UnityEditor.PackageManager.PackageInfo.FindForAssembly(GetType().Assembly).version + ")",
+                string.Join("\n",
+                    "Created by Roger Hatfull",
+                    "Special thanks to Gan",
+                    "",
+                    "The author is an independent developer who benefits greatly from donations. Please consider donating if you have found this package useful.",
+                    "",
+                    "Thank you for using " + nameof(GameTest) + "!"
+                ),
+                "Donate", "Close"
+            )) return;
+            Application.OpenURL(Style.donationLink);
         }
 
         private void StartLoadingWheel(string text = null)

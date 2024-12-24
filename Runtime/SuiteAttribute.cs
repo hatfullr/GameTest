@@ -1,6 +1,6 @@
 using System.IO;
 
-namespace UnityTest
+namespace GameTest
 {
     /// <summary>
     /// A suite of unit tests that can be used as an attribute for individual classes to define a series of tests. Each method

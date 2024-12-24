@@ -1,9 +1,9 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityTest;
+using GameTest;
 
-namespace UnityTest
+namespace GameTest
 {
     public class AssertionTests : MonoBehaviour
     {

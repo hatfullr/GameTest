@@ -1,21 +1,20 @@
 {
-  "name": "unitytest",
+  "name": "gametest",
   "version": "0.0.0",
-  "displayName": "UnityTest",
+  "displayName": "GameTest",
   "description": "Create and manage unit tests.\nSee the Samples tab!",
   "author": "Roger Hatfull",
-  "changelogUrl": "https://github.com/hatfullr/UnityTest",
+  "changelogUrl": "https://github.com/hatfullr/GameTest",
   "keywords": [
      "test",
-	 "unit",
-	 "unitytest"
+	 "gametest"
   ],
   "license": "See LICENSE file",
   "type": "tool",
   "samples": [
       {
 		  "displayName": "Fundamental",
-		  "description": "Simple tests that showcase how to use UnityTest at the most fundamental level.",
+		  "description": "Simple tests that showcase how to use GameTest at the most fundamental level.",
 		  "path": "Samples~/Fundamental"
 	  },
 	  {

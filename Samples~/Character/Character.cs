@@ -1,7 +1,7 @@
 using System.Collections;
 using UnityEngine;
 
-namespace UnityTest // Separating the namespaces so that this code doesn't conflict with your project
+namespace GameTest // Separating the namespaces so that this code doesn't conflict with your project
 {
     public class Character : MonoBehaviour
     {
@@ -25,7 +25,7 @@ namespace UnityTest // Separating the namespaces so that this code doesn't confl
         // It can be helpful to separate your tests visually by using a #region.
         #region Tests
         [Test]
-        private void TestMovement(GameObject gameObject) // Appears as "MoveForward" in the UnityTest Manager
+        private void TestMovement(GameObject gameObject) // Appears as "MoveForward" in the GameTest Manager
         {
             // This test will happen all a single frame
 
@@ -63,14 +63,14 @@ namespace UnityTest // Separating the namespaces so that this code doesn't confl
         ///    1) Run this test normally, without pressing WASD. It should succeed.
         ///    2) Run this test while holding down W or S. It succeeds, because we never check the z component.
         ///    3) Run this test while holding down A or D. It fails, because the Character is not where we expected.
-        ///    4) Click the Pause button (||) in the UnityTest Manager, then click Play (>). The test will not run yet.
-        ///       Press the Step (>|) button in the UnityTest Manager. The test will run. Note that the Pause button stops
+        ///    4) Click the Pause button (||) in the GameTest Manager, then click Play (>). The test will not run yet.
+        ///       Press the Step (>|) button in the GameTest Manager. The test will run. Note that the Pause button stops
         ///       the next test from running immediately after the current test, and the Step button either runs the
         ///       next test if no test is running, or it skips the current test. A skipped test has an inconclusive result.
-        ///    5) Click the Pause button (||) in the editor (not the UnityTest Manager), then click the Play button (>) in
-        ///       the UnityTest Manager. This will bring you into Play mode. Press the Step button (>|) in the editor
+        ///    5) Click the Pause button (||) in the editor (not the GameTest Manager), then click the Play button (>) in
+        ///       the GameTest Manager. This will bring you into Play mode. Press the Step button (>|) in the editor
         ///       to begin the test. You should see the GameObject get instantiated. Keep pressing the Step button
-        ///       to advance frames. You should see a moving cube. In the bottom panel of the UnityTest Manager (labelled 
+        ///       to advance frames. You should see a moving cube. In the bottom panel of the GameTest Manager (labelled 
         ///       "Tests"), the frame count indicator should increase with each press of the Step button, as well as
         ///       the time indicator. Keep pressing the Step button until the test finishes, which should be at about 2s.
         ///
