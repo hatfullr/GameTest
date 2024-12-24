@@ -15,13 +15,15 @@ namespace GameTest
         public const string donationLink = "https://ko-fi.com/rogerhatfull";
         public const string documentationLink = "https://github.com/hatfullr/GameTest";
         public static string welcomeMessage = string.Join('\n',
-            "<b>1.</b> Create a method in a MonoBehaviour with a [GameTest.Test] attribute and GameTest.Assert statements, then recompile.",
-            "<b>2.</b> Select your test below to add it to the queue.",
-            "<b>3.</b> Click the Play button in the toolbar. A test fails if it throws an AssertionException, " +
-            "and passes otherwise. Check the Console for detailed results.",
-            "Click the GitHub button or see README.md for additional information. <b>If this tool has helped you, please consider donating " +
-            "to help me create more cool stuff.</b> Thank you for using GameTest.",
+            "<b>If this tool has helped you, please consider donating to help me create more cool stuff.</b> Thank you for using GameTest.",
             "",
+            "<size=14>Getting Started:</size>",
+            "<b>1.</b> In any MonoBehaviour, write \"using GameTest;\" at the top, write a method with a \"[Test]\" attribute, and include \"Assert.\" statement(s). Then recompile.",
+            "<b>2.</b> After recompiling, find and select your test below to add it to the queue.",
+            "<b>3.</b> Click the Play button above (in the toolbar). A test fails if it throws an AssertionException, and passes otherwise. Check the Console for detailed results.",
+            "Click the GitHub button or see README.md for additional information.",
+            "",
+            "<size=14>Tips:</size>",
             "• Click script icons to open test code",
             "• Check tooltips, and Edit > Preferences > Enable PlayMode Tooltips",
             "• Hide GameTest from stack trace with \"Strip logging callstack\" in the triple-dot menu (top right of Console window)",
@@ -34,7 +36,7 @@ namespace GameTest
 
         public static class TestManagerUI
         {
-            public const string windowTitle = "GameTest Manager";
+            public const string windowTitle = nameof(GameTest);
             public const float minHeight = 300f;
             public const float minWidth = 350f;
             public const float spinRate = 0.05f;
