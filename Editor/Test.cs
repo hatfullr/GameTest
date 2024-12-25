@@ -2,7 +2,7 @@ using System.Reflection;
 using UnityEngine;
 using System.IO;
 using UnityEditor;
-
+using System.Collections.Generic;
 
 namespace GameTest
 {
@@ -406,5 +406,30 @@ namespace GameTest
                 FileUtil.DeleteFileOrDirectory(directory);
             }
         }
+
+        #region UI
+        /// <summary>
+        /// Iterates through all the parent Foldouts in the "outward" direction (towards the root directory), starting with the first parent to this Test. If reverse = true,
+        /// the order starts from the root directory and moves "inward".
+        /// </summary>
+        public IEnumerable<Foldout> GetParentFoldouts(TestManager manager, bool reverse = false)
+        {
+            Foldout parent;
+            foreach (string parentPath in Utilities.IterateDirectories(attribute.GetPath(), reverse: reverse))
+            {
+                // Locate the parent Foldout
+                parent = null;
+                foreach (Foldout foldout in manager.foldouts)
+                {
+                    if (foldout.path != parentPath) continue;
+                    parent = foldout;
+                    break;
+                }
+                if (parent == null) throw new System.Exception("Failed to find Foldout with path " + parentPath);
+                yield return parent;
+            }
+        }
+        #endregion
+
     }
 }
