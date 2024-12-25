@@ -19,6 +19,13 @@ namespace GameTest
 
         public List<Test> tests = new List<Test>();
 
+        /// <summary>
+        /// This is updated in method UpdateIsMixed, which is only called at certain times.
+        /// </summary>
+        [SerializeField] private bool isMixed;
+
+        public Test.Result result { get; private set; }
+
         public Foldout(string path, bool selected = false, bool expanded = false, bool locked = false)
         {
             this.path = path;
@@ -40,17 +47,17 @@ namespace GameTest
         #region UI Methods
         public void Draw(TestManagerUI ui)
         {
-            bool wasExpanded = expanded;
-            bool wasSelected = selected;
-            bool wasMixed = IsMixed(ui.manager);
-            bool wasLocked = locked;
+            UnityEngine.Profiling.Profiler.BeginSample(nameof(GameTest) + ".Foldout");
+
+            //bool wasExpanded = expanded;
+            //bool wasSelected = selected;
+            //bool wasMixed = isMixed; //IsMixed(ui.manager);
+            //bool wasLocked = locked;
 
             EditorGUILayout.VerticalScope scope = new EditorGUILayout.VerticalScope();
             Rect rect = scope.rect;
             using (scope)
             {
-                Test.Result result = GetTotalResult(ui.manager);
-
                 // This creates a nice visual grouping for the tests to hang out in
                 if (expanded && tests.Count > 0)
                 {
@@ -69,8 +76,8 @@ namespace GameTest
                     GUI.Box(header, GUIContent.none, style);
                 }
 
-                selected |= IsAllSelected(ui.manager); // Set to the proper state ahead of time if needed
-                if (!IsAnySelected(ui.manager)) selected = false;
+                //selected |= IsAllSelected(ui.manager); // Set to the proper state ahead of time if needed
+                //if (!IsAnySelected(ui.manager)) selected = false;
 
                 ui.DrawListItem(ui.itemRect, this, ref expanded, ref locked, ref selected,
                     showFoldout: true,
@@ -126,7 +133,7 @@ namespace GameTest
 
             // Process events
             // Check if the user just expanded the Foldout while holding down the Alt key
-            if (Event.current.alt && expanded != wasExpanded) ExpandAll(ui.manager, expanded);
+            //if (Event.current.alt && expanded != wasExpanded) ExpandAll(ui.manager, expanded);
 
             /*
             if (wasSelected != selected)
@@ -142,7 +149,7 @@ namespace GameTest
                     else Select(ui.manager);
                 }
             }
-            */
+            
 
             if (locked != wasLocked)
             {
@@ -150,15 +157,23 @@ namespace GameTest
                 else if (!locked && wasLocked) Unlock(ui.manager);
             }
             else locked = IsAllLocked(ui.manager);
+            */
+
+            UnityEngine.Profiling.Profiler.EndSample();
         }
         #endregion
 
         #region Controls
+        public bool IsSelected() => selected;
+        public bool IsLocked() => locked;
+        public bool IsExpanded() => expanded;
+
         /// <summary>
         /// Toggle on the Foldout, and thereby all its children. Does not affect locked items.
         /// </summary>
         public void Select(TestManager manager)
         {
+            isMixed = false;
             selected = true;
             foreach (Test test in tests)
             {
@@ -173,6 +188,7 @@ namespace GameTest
         /// </summary>
         public void Deselect(TestManager manager)
         {
+            isMixed = false;
             selected = false;
             foreach (Test test in tests)
             {
@@ -235,6 +251,24 @@ namespace GameTest
                     if (isRoot && string.IsNullOrEmpty(dirname)) yield return foldout;
                     else if (dirname == path) yield return foldout;
                 }
+            }
+        }
+
+        public IEnumerable<Foldout> GetParents(TestManager manager, bool reverse = false)
+        {
+            Foldout parent;
+            foreach (string parentPath in Utilities.IterateDirectories(path, reverse: reverse))
+            {
+                // Locate the parent Foldout
+                parent = null;
+                foreach (Foldout foldout in manager.foldouts)
+                {
+                    if (foldout.path != parentPath) continue;
+                    parent = foldout;
+                    break;
+                }
+                if (parent == null) throw new System.Exception("Failed to find Foldout with path " + parentPath);
+                yield return parent;
             }
         }
 
@@ -309,6 +343,70 @@ namespace GameTest
 
         #region Properties Methods
         /// <summary>
+        /// Update the value of isMixed based on the current state. This is expensive and should only be called when a Test or Foldout has been selected.
+        /// Returns true if the Foldout's state changed, and false otherwise.
+        /// </summary>
+        public bool UpdateState(TestManager manager)
+        {
+            bool wasMixed = isMixed;
+            bool wasLocked = locked;
+            bool wasSelected = selected;
+            Test.Result previousResult = result;
+
+            result = Test.Result.None;
+            int nSelected = 0;
+            int nPassed = 0;
+            int nFailed = 0;
+            int nSkipped = 0;
+            int nLocked = 0;
+            int total = 0;
+            foreach (Test test in GetTests(manager, false))
+            {
+                if (test.selected) nSelected++;
+                if (test.locked) nLocked++;
+
+                if (test.result == Test.Result.Pass) nPassed++;
+                else if (test.result == Test.Result.Fail) nFailed++;
+                else if (test.result == Test.Result.Skipped) nSkipped++;
+
+                total++;
+            }
+            int nMixed = 0;
+            foreach (Foldout child in GetChildren(manager, false))
+            {
+                if (child.selected) nSelected++;
+                if (child.isMixed) nMixed++;
+                if (child.locked) nLocked++;
+
+                if (child.result == Test.Result.Pass) nPassed++;
+                else if (child.result == Test.Result.Fail) nFailed++;
+                else if (child.result == Test.Result.Skipped) nSkipped++;
+
+                total++;
+            }
+
+            isMixed = (nSelected > 0 && nSelected != total) || nMixed > 0;
+
+            if (!isMixed)
+            {
+                if (nSelected > 0 && nSelected == total) selected = true;
+                else if (nSelected == 0 && total > 0) selected = false;
+            }
+
+            if (total > 0) locked = nLocked == total;
+
+            int totalRan = nPassed + nFailed + nSkipped;
+            if (totalRan > 0)
+            {
+                if (nPassed + nSkipped == totalRan) result = Test.Result.Pass;
+                else if (nFailed + nSkipped == totalRan) result = Test.Result.Fail;
+                else if (nSkipped == totalRan) result = Test.Result.Skipped;
+            }
+
+            return isMixed != wasMixed || result != previousResult || selected != wasSelected || locked != wasLocked;
+        }
+
+        /// <summary>
         /// Returns true if the other Foldout contains this Foldout in any of its subdirectories, and false otherwise.
         /// </summary>
         public bool IsChildOf(Foldout other) => Utilities.IsPathChild(other.path, path);
@@ -328,19 +426,10 @@ namespace GameTest
         }
 
         /// <summary>
-        /// Returns true if more than one of this Foldout's tests is selected, but not all of them. The tests that are checked are
-        /// all of those in every subdirectory.
+        /// Returns true if more than one of this Foldout's tests is selected, but not all of them.
         /// </summary>
-        public bool IsMixed(TestManager manager)
-        {
-            int nSelected = 0;
-            List<Test> tests = new List<Test>(GetTests(manager));
-            foreach (Test test in tests)
-            {
-                if (test.selected) nSelected++;
-            }
-            return nSelected != 0 && nSelected != tests.Count;
-        }
+        public bool IsMixed() => isMixed;
+        
         /// <summary>
         /// Returns true if all tests and child Foldouts are selected, in every subdirectory.
         /// </summary>

@@ -3,7 +3,7 @@ using UnityEngine;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using System.Text.RegularExpressions;
-
+using System.Linq;
 
 /// TODO ideas:
 ///    1. Add a preferences window
@@ -31,6 +31,20 @@ namespace GameTest
 
         private bool reloadingDomain = false;
 
+        private class Change
+        {
+            public object what;
+            public UIEvent how;
+
+            public Change(object what, UIEvent how)
+            {
+                this.what = what;
+                this.how = how;
+            }
+        }
+
+        private Change change;
+
         public enum Mode
         {
             Normal,
@@ -41,6 +55,17 @@ namespace GameTest
         {
             Name,
             LineNumber,
+        }
+
+        private enum UIEvent
+        {
+            Selected,
+            Deselected,
+            Locked,
+            Unlocked,
+            AllExpanded,
+            AllCollapsed,
+            Result,
         }
 
 
@@ -204,6 +229,7 @@ namespace GameTest
             if (manager != null)
                 manager.UpdateTests(() =>
                 {
+                    UpdateFoldoutStates();
                     StopLoadingWheel();
                     Repaint();
 
@@ -229,9 +255,16 @@ namespace GameTest
         void OnGUI()
         {
             if (reloadingDomain) return;
+
+            change = null;
+
+            EditorGUI.BeginChangeCheck();
+
             if (manager == null) manager = TestManager.Load();
 
             Utilities.isDarkTheme = GUI.skin.name == "DarkSkin";
+
+            UnityEngine.Profiling.Profiler.BeginSample(nameof(GameTest), this);
 
             EditorGUILayout.VerticalScope mainScope = new EditorGUILayout.VerticalScope(GUILayout.ExpandHeight(true), GUILayout.ExpandWidth(true));
             using (mainScope)
@@ -321,6 +354,10 @@ namespace GameTest
 
                 if (manager.loadingWheelVisible) DrawLoadingWheel(mainScope.rect);
             }
+
+            if (EditorGUI.EndChangeCheck() && change != null) ProcessChange();
+
+            UnityEngine.Profiling.Profiler.EndSample();
         }
 
         private float GetWelcomeHeight()
@@ -819,9 +856,9 @@ namespace GameTest
                 if (item.GetType() == typeof(Foldout))
                 {
                     if (string.IsNullOrEmpty(name)) name = (item as Foldout).GetName();
-                    isMixed = (item as Foldout).IsMixed(manager);
+                    isMixed = (item as Foldout).IsMixed();
                     if ((item as Foldout).tests.Count > 0 && (item as Foldout).expanded) toggleStyle = Style.Get("ToggleHeader");
-                    result = (item as Foldout).GetTotalResult(manager);
+                    result = (item as Foldout).result; //GetTotalResult(manager);
                     onClearPressed += () =>
                     {
                         foreach (Test test in (item as Foldout).GetTests(manager)) test.Reset();
@@ -919,6 +956,7 @@ namespace GameTest
                         if (showFoldout)
                         {
                             tempRect.width = Style.GetWidth(foldoutStyle);
+                            bool wasExpanded = expanded;
                             expanded = GUI.Toggle(
                                 tempRect,
                                 expanded,
@@ -926,6 +964,13 @@ namespace GameTest
                                 foldoutStyle
                             );
                             tempRect.x += tempRect.width;
+
+                            if (change == null && expanded != wasExpanded && Event.current.alt)
+                            {
+                                UIEvent evt = UIEvent.AllExpanded;
+                                if (wasExpanded && !expanded) evt = UIEvent.AllCollapsed;
+                                change = new Change(item, evt);
+                            }
                         }
 
                         if (showGoTo)
@@ -985,7 +1030,18 @@ namespace GameTest
                             // Desperately trying to save my light skin users
                             Color contentColor = GUI.contentColor;
                             if (!Utilities.isDarkTheme) GUI.contentColor = Color.black * 0.5f;
-                            if (GUI.Button(tempRect, lockIcon, lockedStyle)) locked = !locked;
+                            if (GUI.Button(tempRect, lockIcon, lockedStyle))
+                            {
+                                bool wasLocked = locked;
+                                locked = !locked;
+
+                                if (change == null)
+                                {
+                                    UIEvent evt = UIEvent.Unlocked;
+                                    if (!wasLocked && locked) evt = UIEvent.Locked;
+                                    change = new Change(item, evt);
+                                }
+                            }
                             tempRect.x += tempRect.width;
                             GUI.contentColor = contentColor;
                         }
@@ -1018,22 +1074,39 @@ namespace GameTest
                                     bool wasSelected = selected;
                                     bool wasMixed = EditorGUI.showMixedValue;
                                     EditorGUI.showMixedValue = isMixed;
-                                    selected = EditorGUI.ToggleLeft(
+                                    selected = EditorGUI.ToggleLeft(  // "controlled" flow
                                         tempRect,
                                         toggleContent,
                                         selected,
                                         toggleStyle
                                     );
                                     EditorGUI.showMixedValue = wasMixed;
-                                    if (isMixed) // If the value is mixed, then clicking on it should select all.
+
+                                    if (wasSelected != selected && change == null)
                                     {
-                                        if (selected) OnSelected(item);
+                                        UIEvent evt = UIEvent.Selected;
+                                        if (wasSelected && !selected) evt = UIEvent.Deselected;
+                                        change = new Change(item, evt);
                                     }
-                                    else
+                                    
+
+                                    /*
+                                    // TODO: record that a change happened, then at the end of OnGUI in TestManagerUI update everything that needs updating.
+                                    if (wasSelected != selected)
                                     {
-                                        if (selected && !wasSelected) OnSelected(item);
-                                        else if (!selected && wasSelected) OnDeselected(item);
+                                        if (item.GetType() == typeof(Test))
+                                        {
+                                            if (!wasSelected && selected) (item as Test).Select(manager);
+                                            else if (wasSelected && !selected) (item as Test).Deselect(manager);
+                                        }
+                                        else if (item.GetType() == typeof(Foldout))
+                                        {
+                                            if (!wasSelected && selected) (item as Foldout).Select(manager);
+                                            else if (wasSelected && !selected) (item as Foldout).Deselect(manager);
+                                        }
+                                        else throw new System.NotImplementedException("Unrecognized UI object '" + item.GetType() + "'");
                                     }
+                                    */
                                 }
                             }
                         }
@@ -1077,6 +1150,62 @@ namespace GameTest
             }
         }
 
+        private void UpdateFoldoutStates()
+        {
+            // First, make a list of all the Tests and their depth in the tree. Sort the list of Tests by depth, in reverse order. Update the foldouts in that order.
+            Dictionary<Foldout, int> foldouts = new Dictionary<Foldout, int>();
+            char[] separators = new char[3] { System.IO.Path.PathSeparator, System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar };
+            int deepest = 0;
+            int depth;
+            foreach (Foldout foldout in manager.foldouts)
+            {
+                depth = foldout.path.Count(x => separators.Contains(x));
+                deepest = Mathf.Max(deepest, depth);
+                foldouts.Add(foldout, depth);
+            }
+            foldouts = new Dictionary<Foldout, int>(foldouts.OrderBy(x => deepest - x.Value)); // this sorts by deepest first
+            foreach (Foldout foldout in foldouts.Keys)
+            {
+                if (!foldout.UpdateState(manager)) break; // stop updating early if there was no change 
+            }
+        }
+
+        private void ProcessChange()
+        {
+            if (change == null) throw new System.NullReferenceException("Property whatChanged of TestManagerUI cannot be null before calling ProcessChange()");
+
+            if (change.what.GetType() == typeof(Test))
+            {
+                // Update the Foldouts
+                foreach (Foldout parent in (change.what as Test).GetParentFoldouts(manager))
+                {
+                    if (!parent.UpdateState(manager)) break; // stop updating early if there was no change 
+                }
+            }
+            else if (change.what.GetType() == typeof(Foldout))
+            {
+                // Update the Tests and Foldouts in all children
+                Foldout foldout = change.what as Foldout;
+                if (change.how == UIEvent.Locked) foldout.Lock(manager);
+                else if (change.how == UIEvent.Unlocked) foldout.Unlock(manager);
+                else if (change.how == UIEvent.Selected) foldout.Select(manager);
+                else if (change.how == UIEvent.Deselected) foldout.Deselect(manager);
+                else if (change.how == UIEvent.AllExpanded) foldout.ExpandAll(manager, true);
+                else if (change.how == UIEvent.AllCollapsed) foldout.ExpandAll(manager, false);
+                else throw new System.NotImplementedException("Unrecognized UIEvent \"" + change.how + "\" for change in Foldout");
+
+                // Update the parents
+                foreach (Foldout parent in foldout.GetParents(manager))
+                {
+                    if (!parent.UpdateState(manager)) break; // stop updating early if there was no change 
+                }
+            }
+            else throw new System.NotImplementedException("Unrecognized UI item of type \"" + change.what.GetType() + "\"");
+
+            change = null;
+        }
+
+        /*
         private void OnSelected(object item)
         {
             if (manager.running || manager.stopping) return; // Otherwise stuff will keep being added into the queue during testing time
@@ -1093,6 +1222,7 @@ namespace GameTest
             else if (item.GetType() == typeof(Foldout)) (item as Foldout).Deselect(manager);
             else throw new System.NotImplementedException("Unrecognized type " + item.GetType());
         }
+        */
         #endregion Tests
 
         #endregion UI
