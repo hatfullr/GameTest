@@ -79,20 +79,12 @@ namespace GameTest
                 onDrag: ui.Repaint,
                 onClearPressed: () =>
                 {
-                    // deselect all the tests that are currently in the queue (this runs before the queue is cleared)
-                    string path;
-                    foreach (Test test in ui.manager.queue)
+                    // deselect all tests
+                    foreach (Foldout foldout in ui.manager.foldouts)
                     {
-                        path = test.attribute.GetPath();
-                        foreach (Foldout foldout in ui.manager.foldouts)
-                        {
-                            foreach (Test t in foldout.tests)
-                            {
-                                if (t.locked) continue;
-                                if (t.attribute.GetPath() != path) continue;
-                                t.selected = false;
-                            }
-                        }
+                        if (!foldout.IsRoot()) continue;
+                        foldout.Deselect(ui.manager);
+                        break;
                     }
                 }
             );
