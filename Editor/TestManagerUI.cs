@@ -4,6 +4,7 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using System.Text.RegularExpressions;
 using System.Linq;
+using Codice.CM.Common.Tree;
 
 /// TODO ideas:
 ///    1. Add a preferences window
@@ -26,10 +27,16 @@ namespace GameTest
 
         public Rect viewRect = new Rect(0f, 0f, -1f, -1f);
         public Rect itemRect;
+        private Rect scrollRect;
 
         private float minWidth = 0f;
 
         private bool reloadingDomain = false;
+
+        private Change change;
+
+        private bool drawingMainView = false;
+        private Dictionary<string, Rect> testRects = new Dictionary<string, Rect>();
 
         private class Change
         {
@@ -43,7 +50,6 @@ namespace GameTest
             }
         }
 
-        private Change change;
 
         public enum Mode
         {
@@ -66,6 +72,7 @@ namespace GameTest
             AllExpanded,
             AllCollapsed,
             Result,
+            RevealTest,
         }
 
 
@@ -214,6 +221,7 @@ namespace GameTest
             minWidth = default;
             settingsWindow = null;
             reloadingDomain = false;
+            testRects = new Dictionary<string, Rect>();
 
             Refresh(() => Logger.Log("Reset"), message: "Resetting");
         }
@@ -256,7 +264,8 @@ namespace GameTest
         {
             if (reloadingDomain) return;
 
-            change = null;
+            testRects = new Dictionary<string, Rect>();
+            //change = null;
 
             EditorGUI.BeginChangeCheck();
 
@@ -314,6 +323,7 @@ namespace GameTest
                                 viewRect.width -= GUI.skin.verticalScrollbar.CalcSize(GUIContent.none).x;
                             }
 
+                            scrollRect = GUIUtility.GUIToScreenRect(scrollScope.rect);
                             GUI.ScrollViewScope scrollViewScope = new GUI.ScrollViewScope(
                                 scrollScope.rect,
                                 manager.scrollPosition,
@@ -342,8 +352,10 @@ namespace GameTest
 
                                 using (new EditorGUI.DisabledGroupScope(manager.running))
                                 {
+                                    drawingMainView = true;
                                     if (string.IsNullOrEmpty(manager.search)) DrawNormalMode();
                                     else DrawSearchMode();
+                                    drawingMainView = false;
                                 }
                             }
                         }
@@ -355,40 +367,77 @@ namespace GameTest
                 if (manager.loadingWheelVisible) DrawLoadingWheel(mainScope.rect);
             }
 
-            if (EditorGUI.EndChangeCheck() && change != null) ProcessChange();
+            if (EditorGUI.EndChangeCheck() || change != null) ProcessChange();
 
             UnityEngine.Profiling.Profiler.EndSample();
         }
 
-        private float GetWelcomeHeight()
+        private void GetWelcomeRects(out Rect title, out Rect body, out Rect bg, out Rect[] links)
         {
-            GUIStyle messageStyle = Style.Get("TestManagerUI/Welcome/Message");
+            // Setup styles and content
             GUIContent message = new GUIContent(Style.welcomeMessage);
-            GUIStyle donateStyle = Style.Get("TestManagerUI/Donate");
-            GUIStyle docStyle = Style.Get("TestManagerUI/Documentation");
             GUIContent donate = Style.GetIcon("TestManagerUI/Donate");
             GUIContent doc = Style.GetIcon("TestManagerUI/Documentation");
 
-            const int nLinks = 2;
+            GUIStyle welcomeStyle = Style.Get("TestManagerUI/Welcome");
+            GUIStyle titleStyle = Style.Get("TestManagerUI/Welcome/Title");
+            GUIStyle messageStyle = Style.Get("TestManagerUI/Welcome/Message");
+            GUIStyle donateStyle = Style.Get("TestManagerUI/Donate");
+            GUIStyle docStyle = Style.Get("TestManagerUI/Documentation");
 
+            // Setup stuff relating to the link buttons
+            const int nLinks = 2;
             GUIStyle[] linkStyles = new GUIStyle[nLinks] { donateStyle, docStyle };
             GUIContent[] linkContent = new GUIContent[nLinks] { donate, doc };
+            RectOffset[] padding = new RectOffset[nLinks];
+            for (int i = 0; i < nLinks; i++) padding[i] = linkStyles[i].margin;
 
-            Rect[] linkRects = new Rect[nLinks];
-            for (int i = 0; i < nLinks; i++) linkRects[i] = new Rect(Vector2.zero, linkStyles[i].CalcSize(linkContent[i]));
+            links = new Rect[nLinks];
+            for (int i = 0; i < nLinks; i++) links[i] = new Rect(Vector2.zero, linkStyles[i].CalcSize(linkContent[i]));
 
-            Rect titleRect = new Rect(viewRect.x, viewRect.y, viewRect.width, 0f);
-            titleRect.height = 0;
-            for (int i = 0; i < nLinks; i++) titleRect.height = Mathf.Max(titleRect.height, linkRects[i].height);
+            // Setup Rects
+            title = new Rect(viewRect.x, viewRect.y, viewRect.width, 0f);
+            title.height = 0;
+            for (int i = 0; i < nLinks; i++) title.height = Mathf.Max(title.height, links[i].height);
 
-            Rect body = new Rect(
+            body = new Rect(
                 viewRect.x,
-                titleRect.yMax,
+                title.yMax,
                 viewRect.width,
-                messageStyle.CalcHeight(message, titleRect.width) + messageStyle.padding.vertical
+                messageStyle.CalcHeight(message, title.width) + messageStyle.padding.vertical
             );
 
-            return titleRect.height + body.height;
+            bg = new Rect(viewRect.x, viewRect.y, viewRect.width, title.height + body.height);
+            bg.y -= welcomeStyle.padding.top; // This hides the top part of the background, making it look kinda like a tab in the UI
+            bg.height += welcomeStyle.padding.top;
+
+            // Apply margins
+            float dy = titleStyle.margin.bottom + messageStyle.margin.top;
+            body.y += dy;
+            bg.height += dy;
+
+            // Alignment
+            links = Utilities.AlignRects(
+                links,
+                title,
+                Utilities.RectAlignment.LowerRight,
+                Utilities.RectAlignment.MiddleLeft,
+                padding: padding
+            );
+
+            title = Utilities.GetPaddedRect(title, titleStyle.padding);
+            for (int i = 0; i < nLinks; i++)
+            {
+                links[i] = Utilities.GetPaddedRect(links[i], EditorStyles.linkLabel.padding);
+            }
+
+            body = Utilities.GetPaddedRect(body, messageStyle.padding);
+        }
+
+        private float GetWelcomeHeight()
+        {
+            GetWelcomeRects(out Rect _, out Rect _, out Rect bgRect, out Rect[] _);
+            return bgRect.height;
         }
 
         private Rect DrawWelcome()
@@ -403,49 +452,14 @@ namespace GameTest
             GUIStyle welcomeStyle = Style.Get("TestManagerUI/Welcome");
             GUIStyle titleStyle = Style.Get("TestManagerUI/Welcome/Title");
             GUIStyle messageStyle = Style.Get("TestManagerUI/Welcome/Message");
-            GUIStyle donateStyle = Style.Get("TestManagerUI/Donate");
-            GUIStyle docStyle = Style.Get("TestManagerUI/Documentation");
 
-            // Setup stuff relating to the link buttons
             const int nLinks = 2;
             string[] links = new string[nLinks] { Style.donationLink, Style.documentationLink };
-            GUIStyle[] linkStyles = new GUIStyle[nLinks] { donateStyle, docStyle };
             GUIContent[] linkContent = new GUIContent[nLinks] { donate, doc };
-            RectOffset[] padding = new RectOffset[nLinks];
-            for (int i = 0; i < nLinks; i++) padding[i] = linkStyles[i].margin;
 
-            Rect[] linkRects = new Rect[nLinks];
-            for (int i = 0; i < nLinks; i++) linkRects[i] = new Rect(Vector2.zero, linkStyles[i].CalcSize(linkContent[i]));
-
-            // Setup Rects
-            Rect titleRect = new Rect(viewRect.x, viewRect.y, viewRect.width, 0f);
-            titleRect.height = 0;
-            for (int i = 0; i < nLinks; i++) titleRect.height = Mathf.Max(titleRect.height, linkRects[i].height);
-
-            Rect body = new Rect(
-                viewRect.x,
-                titleRect.yMax,
-                viewRect.width,
-                messageStyle.CalcHeight(message, titleRect.width) + messageStyle.padding.vertical
-            );
-
-            Rect bgRect = new Rect(viewRect.x, viewRect.y, viewRect.width, titleRect.height + body.height);
-            bgRect.y -= welcomeStyle.padding.top; // This hides the top part of the background, making it look kinda like a tab in the UI
-            bgRect.height += welcomeStyle.padding.top;
-
-            // Apply margins
             float dy = titleStyle.margin.bottom + messageStyle.margin.top;
-            body.y += dy;
-            bgRect.height += dy;
 
-            // Alignment
-            linkRects = Utilities.AlignRects(
-                linkRects,
-                titleRect,
-                Utilities.RectAlignment.LowerRight,
-                Utilities.RectAlignment.MiddleLeft,
-                padding: padding
-            );
+            GetWelcomeRects(out Rect titleRect, out Rect body, out Rect bgRect, out Rect[] linkRects);
 
             Color bg = Color.black * 0.2f;
 
@@ -456,23 +470,23 @@ namespace GameTest
 
             using (new EditorGUIUtility.IconSizeScope(new Vector2(titleRect.height - welcomeStyle.padding.vertical, titleRect.height - welcomeStyle.padding.vertical)))
             {
-                EditorGUI.LabelField(Utilities.GetPaddedRect(titleRect, titleStyle.padding), title, titleStyle);
+                EditorGUI.LabelField(titleRect, title, titleStyle);
             }
 
-            for (int i = 0; i < nLinks; i++)
+            for (int i = 0; i < linkRects.Length; i++)
             {
-                if (EditorGUI.LinkButton(Utilities.GetPaddedRect(linkRects[i], EditorStyles.linkLabel.padding), linkContent[i])) Application.OpenURL(links[i]);
+                if (EditorGUI.LinkButton(linkRects[i], linkContent[i])) Application.OpenURL(links[i]);
             }
 
-            EditorGUI.LabelField(Utilities.GetPaddedRect(body, messageStyle.padding), message, messageStyle);
+            EditorGUI.LabelField(body, message, messageStyle);
 
             // DEBUGGING
             //foreach (System.Tuple<Rect, Color> kvp in new System.Tuple<Rect, Color>[]
             //{
-                //new System.Tuple<Rect,Color>(bgRect,      Color.green),
+                //new System.Tuple<Rect,Color>(bgRect,    Color.green),
                 //new System.Tuple<Rect,Color>(titleRect, Color.red),
-                //new System.Tuple<Rect,Color>(body,      Color.red)
-                //new System.Tuple<Rect,Color>(viewRect,      Color.red)
+                //new System.Tuple<Rect,Color>(body,      Color.yellow),
+                //new System.Tuple<Rect,Color>(viewRect,  Color.cyan)
             //}) Utilities.DrawDebugOutline(kvp.Item1, kvp.Item2);
 
             return bgRect;
@@ -501,6 +515,7 @@ namespace GameTest
                         if (foldout.tests.Count > 0) height += Style.TestManagerUI.foldoutMargin;
                     }
                 }
+                height += Style.TestManagerUI.foldoutMargin; // a bit of extra space at the bottom looks cleanest
             }
             else if (mode == Mode.Search)
             {
@@ -521,6 +536,7 @@ namespace GameTest
         {
             foreach (Foldout foldout in manager.foldouts)
                 if (foldout.IsRoot()) foldout.Draw(this);
+            manager.pingData.HandlePing(this);
         }
             
 
@@ -798,6 +814,48 @@ namespace GameTest
             manager.loadingWheelText = null;
         }
 
+        /// <summary>
+        /// Do the same thing that UnityEditor does when a click occurs, e.g. on a console message that has a context attached to it. Creates a yellow highlight box that zooms in, holds, and then fades
+        /// to show where in the project the thing is that was just clicked.
+        /// </summary>
+        public void PingTest(Test test)
+        {
+            manager.pingData.test = test;
+        }
+
+        /// <summary>
+        /// Expand foldouts as necessary so that the given Test can be seen. If the Test is out of the scroll view, this will scroll the view to make the Test visible.
+        /// Does not ping the test. See the PingTest method.
+        /// </summary>
+        public void RevealTest(Test test)
+        {
+            manager.testToReveal = test.attribute.GetPath();
+            foreach (Foldout parent in test.GetParentFoldouts(manager))
+            {
+                parent.expanded = true;
+            }
+            change = new Change(null, UIEvent.RevealTest);
+            Repaint();
+        }
+
+        private void DoReveal()
+        {
+            if (!testRects.ContainsKey(manager.testToReveal)) return;
+            Rect rect = testRects[manager.testToReveal];
+
+            if (rect.yMin < scrollRect.yMin) // need to scroll the view upwards
+            {
+                manager.scrollPosition.y -= scrollRect.yMin - rect.yMin;
+            }
+            else if (rect.yMax > scrollRect.yMax) // need to scroll the view downwards
+            {
+                manager.scrollPosition.y += rect.yMax - scrollRect.yMax;
+            }
+
+            manager.testToReveal = null;
+            change = null;
+        }
+
         #region Tests
         /// <summary>
         /// Draw an item in the manager's list, which will be either a Foldout or a Test. This method draws only the following controls:
@@ -874,6 +932,17 @@ namespace GameTest
                     onClearPressed += (item as Test).Reset;
                     scriptIcon.tooltip = System.IO.Path.GetFileName((item as Test).attribute.sourceFile) + " (L" + lineNumber + ")\n" +
                         "<size=10>double-click to open</size>";
+                    string path = (item as Test).attribute.GetPath();
+
+                    if (drawingMainView)
+                    {
+                        testRects.Add(path, GUIUtility.GUIToScreenRect(itemRect));
+
+                        if (manager.pingData.test != null)
+                        {
+                            if (manager.pingData.test.attribute.GetPath() == path) manager.pingData.rect = itemRect;
+                        }
+                    }
                 }
                 else throw new System.NotImplementedException("Unimplemented type " + item);
 
@@ -1088,25 +1157,6 @@ namespace GameTest
                                         if (wasSelected && !selected) evt = UIEvent.Deselected;
                                         change = new Change(item, evt);
                                     }
-                                    
-
-                                    /*
-                                    // TODO: record that a change happened, then at the end of OnGUI in TestManagerUI update everything that needs updating.
-                                    if (wasSelected != selected)
-                                    {
-                                        if (item.GetType() == typeof(Test))
-                                        {
-                                            if (!wasSelected && selected) (item as Test).Select(manager);
-                                            else if (wasSelected && !selected) (item as Test).Deselect(manager);
-                                        }
-                                        else if (item.GetType() == typeof(Foldout))
-                                        {
-                                            if (!wasSelected && selected) (item as Foldout).Select(manager);
-                                            else if (wasSelected && !selected) (item as Foldout).Deselect(manager);
-                                        }
-                                        else throw new System.NotImplementedException("Unrecognized UI object '" + item.GetType() + "'");
-                                    }
-                                    */
                                 }
                             }
                         }
@@ -1172,38 +1222,45 @@ namespace GameTest
 
         private void ProcessChange()
         {
-            if (change == null) throw new System.NullReferenceException("Property whatChanged of TestManagerUI cannot be null before calling ProcessChange()");
+            if (change == null) return;
 
-            if (change.what.GetType() == typeof(Test))
+            if (change.how == UIEvent.RevealTest)
             {
-                // Update the Foldouts
-                foreach (Foldout parent in (change.what as Test).GetParentFoldouts(manager))
-                {
-                    if (!parent.UpdateState(manager)) break; // stop updating early if there was no change 
-                }
-                if (change.how == UIEvent.Selected) manager.AddToQueue(change.what as Test);
-                else if (change.how == UIEvent.Deselected) manager.RemoveFromQueue(change.what as Test);
+                DoReveal();
+                return;
             }
-            else if (change.what.GetType() == typeof(Foldout))
+            else
             {
-                // Update the Tests and Foldouts in all children
-                Foldout foldout = change.what as Foldout;
-                if (change.how == UIEvent.Locked) foldout.Lock(manager);
-                else if (change.how == UIEvent.Unlocked) foldout.Unlock(manager);
-                else if (change.how == UIEvent.Selected) foldout.Select(manager);
-                else if (change.how == UIEvent.Deselected) foldout.Deselect(manager);
-                else if (change.how == UIEvent.AllExpanded) foldout.ExpandAll(manager, true);
-                else if (change.how == UIEvent.AllCollapsed) foldout.ExpandAll(manager, false);
-                else throw new System.NotImplementedException("Unrecognized UIEvent \"" + change.how + "\" for change in Foldout");
-
-                // Update the parents
-                foreach (Foldout parent in foldout.GetParents(manager))
+                if (change.what.GetType() == typeof(Test))
                 {
-                    if (!parent.UpdateState(manager)) break; // stop updating early if there was no change 
+                    // Update the Foldouts
+                    foreach (Foldout parent in (change.what as Test).GetParentFoldouts(manager))
+                    {
+                        if (!parent.UpdateState(manager)) break; // stop updating early if there was no change 
+                    }
+                    if (change.how == UIEvent.Selected) manager.AddToQueue(change.what as Test);
+                    else if (change.how == UIEvent.Deselected) manager.RemoveFromQueue(change.what as Test);
                 }
-            }
-            else throw new System.NotImplementedException("Unrecognized UI item of type \"" + change.what.GetType() + "\"");
+                else if (change.what.GetType() == typeof(Foldout))
+                {
+                    // Update the Tests and Foldouts in all children
+                    Foldout foldout = change.what as Foldout;
+                    if (change.how == UIEvent.Locked) foldout.Lock(manager);
+                    else if (change.how == UIEvent.Unlocked) foldout.Unlock(manager);
+                    else if (change.how == UIEvent.Selected) foldout.Select(manager);
+                    else if (change.how == UIEvent.Deselected) foldout.Deselect(manager);
+                    else if (change.how == UIEvent.AllExpanded) foldout.ExpandAll(manager, true);
+                    else if (change.how == UIEvent.AllCollapsed) foldout.ExpandAll(manager, false);
+                    else throw new System.NotImplementedException("Unrecognized UIEvent \"" + change.how + "\" for change in Foldout");
 
+                    // Update the parents
+                    foreach (Foldout parent in foldout.GetParents(manager))
+                    {
+                        if (!parent.UpdateState(manager)) break; // stop updating early if there was no change 
+                    }
+                }
+                else throw new System.NotImplementedException("Unrecognized UI item of type \"" + change.what.GetType() + "\"");
+            }
             change = null;
         }
         #endregion Tests

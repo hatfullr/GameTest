@@ -160,9 +160,9 @@ namespace GameTest
         public static void DrawDebugOutline(Rect rect, Color color)
         {
             Rect left = new Rect(rect.xMin, rect.y, 1f, rect.height);
-            Rect right = new Rect(rect.xMax, rect.y, 1f, rect.height);
+            Rect right = new Rect(rect.xMax - 1f, rect.y, 1f, rect.height);
             Rect top = new Rect(rect.x, rect.yMin, rect.width, 1f);
-            Rect bottom = new Rect(rect.x, rect.yMax, rect.width, 1f);
+            Rect bottom = new Rect(rect.x, rect.yMax - 1f, rect.width, 1f);
             foreach (Rect r in new Rect[] { left, right, top, bottom })
             {
                 EditorGUI.DrawRect(r, color);

@@ -27,6 +27,8 @@ namespace GameTest
 
         private Rect dragBar;
 
+        private Test selectedTest;
+
         private enum DragOffset
         {
             Lower,
@@ -63,7 +65,8 @@ namespace GameTest
 
         public float GetQueueHeight()
         {
-            return Style.lineHeight * queue.Count;
+            GUIStyle queueStyle = Style.Get("GUIQueue/Queue");
+            return queueStyle.padding.top + Style.lineHeight * queue.Count + queueStyle.padding.bottom;
         }
 
         private void DrawTitle(Rect rect)
@@ -214,7 +217,21 @@ namespace GameTest
 
                             dragBar.y -= 0.5f * dragBar.height;
                         }
-                        else if (allowReorder) EditorGUI.DrawRect(itemRect, Style.GUIQueue.dragHoverColor);
+                        else
+                        {
+                            // Check for mouse up events
+                            if (Event.current != null)
+                            {
+                                if (Event.current.type == EventType.MouseUp)
+                                {
+                                    TestManagerUI window = EditorWindow.GetWindow<TestManagerUI>();
+                                    window.RevealTest(test);
+                                    window.PingTest(test);
+                                }
+                            }
+
+                            if (allowReorder) EditorGUI.DrawRect(itemRect, Style.GUIQueue.dragHoverColor);
+                        }
                     }
 
                     itemRect.y += itemRect.height;
