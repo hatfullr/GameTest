@@ -1181,6 +1181,8 @@ namespace GameTest
                 {
                     if (!parent.UpdateState(manager)) break; // stop updating early if there was no change 
                 }
+                if (change.how == UIEvent.Selected) manager.AddToQueue(change.what as Test);
+                else if (change.how == UIEvent.Deselected) manager.RemoveFromQueue(change.what as Test);
             }
             else if (change.what.GetType() == typeof(Foldout))
             {
@@ -1204,25 +1206,6 @@ namespace GameTest
 
             change = null;
         }
-
-        /*
-        private void OnSelected(object item)
-        {
-            if (manager.running || manager.stopping) return; // Otherwise stuff will keep being added into the queue during testing time
-
-            if (item.GetType() == typeof(Test)) manager.AddToQueue(item as Test);
-            else if (item.GetType() == typeof(Foldout)) (item as Foldout).Select(manager);
-            else throw new System.NotImplementedException("Unrecognized type " + item.GetType());
-        }
-        private void OnDeselected(object item)
-        {
-            if (manager.running || manager.stopping) return; // Otherwise stuff will keep being added into the queue during testing time
-
-            if (item.GetType() == typeof(Test)) manager.RemoveFromQueue(item as Test);
-            else if (item.GetType() == typeof(Foldout)) (item as Foldout).Deselect(manager);
-            else throw new System.NotImplementedException("Unrecognized type " + item.GetType());
-        }
-        */
         #endregion Tests
 
         #endregion UI

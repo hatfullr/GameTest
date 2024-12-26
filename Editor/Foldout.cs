@@ -130,35 +130,6 @@ namespace GameTest
                 }
             }
 
-
-            // Process events
-            // Check if the user just expanded the Foldout while holding down the Alt key
-            //if (Event.current.alt && expanded != wasExpanded) ExpandAll(ui.manager, expanded);
-
-            /*
-            if (wasSelected != selected)
-            {
-                // mixed is the same as the toggle not being selected
-                if (wasMixed)
-                {
-                    if (selected) Select(ui.manager);
-                }
-                else
-                {
-                    if (wasSelected) Deselect(ui.manager);
-                    else Select(ui.manager);
-                }
-            }
-            
-
-            if (locked != wasLocked)
-            {
-                if (locked && !wasLocked) Lock(ui.manager);
-                else if (!locked && wasLocked) Unlock(ui.manager);
-            }
-            else locked = IsAllLocked(ui.manager);
-            */
-
             UnityEngine.Profiling.Profiler.EndSample();
         }
         #endregion
