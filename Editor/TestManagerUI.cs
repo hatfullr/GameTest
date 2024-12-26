@@ -27,10 +27,16 @@ namespace GameTest
 
         public Rect viewRect = new Rect(0f, 0f, -1f, -1f);
         public Rect itemRect;
+        private Rect scrollRect;
 
         private float minWidth = 0f;
 
         private bool reloadingDomain = false;
+
+        private Change change;
+
+        private bool drawingMainView = false;
+        private Dictionary<string, Rect> testRects = new Dictionary<string, Rect>();
 
         private class Change
         {
@@ -44,7 +50,6 @@ namespace GameTest
             }
         }
 
-        private Change change;
 
         public enum Mode
         {
@@ -67,6 +72,7 @@ namespace GameTest
             AllExpanded,
             AllCollapsed,
             Result,
+            RevealTest,
         }
 
 
@@ -215,6 +221,7 @@ namespace GameTest
             minWidth = default;
             settingsWindow = null;
             reloadingDomain = false;
+            testRects = new Dictionary<string, Rect>();
 
             Refresh(() => Logger.Log("Reset"), message: "Resetting");
         }
@@ -257,7 +264,8 @@ namespace GameTest
         {
             if (reloadingDomain) return;
 
-            change = null;
+            testRects = new Dictionary<string, Rect>();
+            //change = null;
 
             EditorGUI.BeginChangeCheck();
 
@@ -315,6 +323,7 @@ namespace GameTest
                                 viewRect.width -= GUI.skin.verticalScrollbar.CalcSize(GUIContent.none).x;
                             }
 
+                            scrollRect = GUIUtility.GUIToScreenRect(scrollScope.rect);
                             GUI.ScrollViewScope scrollViewScope = new GUI.ScrollViewScope(
                                 scrollScope.rect,
                                 manager.scrollPosition,
@@ -343,8 +352,10 @@ namespace GameTest
 
                                 using (new EditorGUI.DisabledGroupScope(manager.running))
                                 {
+                                    drawingMainView = true;
                                     if (string.IsNullOrEmpty(manager.search)) DrawNormalMode();
                                     else DrawSearchMode();
+                                    drawingMainView = false;
                                 }
                             }
                         }
@@ -356,7 +367,7 @@ namespace GameTest
                 if (manager.loadingWheelVisible) DrawLoadingWheel(mainScope.rect);
             }
 
-            if (EditorGUI.EndChangeCheck() && change != null) ProcessChange();
+            if (EditorGUI.EndChangeCheck() || change != null) ProcessChange();
 
             UnityEngine.Profiling.Profiler.EndSample();
         }
@@ -525,6 +536,7 @@ namespace GameTest
         {
             foreach (Foldout foldout in manager.foldouts)
                 if (foldout.IsRoot()) foldout.Draw(this);
+            manager.pingData.HandlePing(this);
         }
             
 
@@ -802,6 +814,48 @@ namespace GameTest
             manager.loadingWheelText = null;
         }
 
+        /// <summary>
+        /// Do the same thing that UnityEditor does when a click occurs, e.g. on a console message that has a context attached to it. Creates a yellow highlight box that zooms in, holds, and then fades
+        /// to show where in the project the thing is that was just clicked.
+        /// </summary>
+        public void PingTest(Test test)
+        {
+            manager.pingData.test = test;
+        }
+
+        /// <summary>
+        /// Expand foldouts as necessary so that the given Test can be seen. If the Test is out of the scroll view, this will scroll the view to make the Test visible.
+        /// Does not ping the test. See the PingTest method.
+        /// </summary>
+        public void RevealTest(Test test)
+        {
+            manager.testToReveal = test.attribute.GetPath();
+            foreach (Foldout parent in test.GetParentFoldouts(manager))
+            {
+                parent.expanded = true;
+            }
+            change = new Change(null, UIEvent.RevealTest);
+            Repaint();
+        }
+
+        private void DoReveal()
+        {
+            if (!testRects.ContainsKey(manager.testToReveal)) return;
+            Rect rect = testRects[manager.testToReveal];
+
+            if (rect.yMin < scrollRect.yMin) // need to scroll the view upwards
+            {
+                manager.scrollPosition.y -= scrollRect.yMin - rect.yMin;
+            }
+            else if (rect.yMax > scrollRect.yMax) // need to scroll the view downwards
+            {
+                manager.scrollPosition.y += rect.yMax - scrollRect.yMax;
+            }
+
+            manager.testToReveal = null;
+            change = null;
+        }
+
         #region Tests
         /// <summary>
         /// Draw an item in the manager's list, which will be either a Foldout or a Test. This method draws only the following controls:
@@ -878,6 +932,17 @@ namespace GameTest
                     onClearPressed += (item as Test).Reset;
                     scriptIcon.tooltip = System.IO.Path.GetFileName((item as Test).attribute.sourceFile) + " (L" + lineNumber + ")\n" +
                         "<size=10>double-click to open</size>";
+                    string path = (item as Test).attribute.GetPath();
+
+                    if (drawingMainView)
+                    {
+                        testRects.Add(path, GUIUtility.GUIToScreenRect(itemRect));
+
+                        if (manager.pingData.test != null)
+                        {
+                            if (manager.pingData.test.attribute.GetPath() == path) manager.pingData.rect = itemRect;
+                        }
+                    }
                 }
                 else throw new System.NotImplementedException("Unimplemented type " + item);
 
@@ -1157,38 +1222,45 @@ namespace GameTest
 
         private void ProcessChange()
         {
-            if (change == null) throw new System.NullReferenceException("Property whatChanged of TestManagerUI cannot be null before calling ProcessChange()");
+            if (change == null) return;
 
-            if (change.what.GetType() == typeof(Test))
+            if (change.how == UIEvent.RevealTest)
             {
-                // Update the Foldouts
-                foreach (Foldout parent in (change.what as Test).GetParentFoldouts(manager))
-                {
-                    if (!parent.UpdateState(manager)) break; // stop updating early if there was no change 
-                }
-                if (change.how == UIEvent.Selected) manager.AddToQueue(change.what as Test);
-                else if (change.how == UIEvent.Deselected) manager.RemoveFromQueue(change.what as Test);
+                DoReveal();
+                return;
             }
-            else if (change.what.GetType() == typeof(Foldout))
+            else
             {
-                // Update the Tests and Foldouts in all children
-                Foldout foldout = change.what as Foldout;
-                if (change.how == UIEvent.Locked) foldout.Lock(manager);
-                else if (change.how == UIEvent.Unlocked) foldout.Unlock(manager);
-                else if (change.how == UIEvent.Selected) foldout.Select(manager);
-                else if (change.how == UIEvent.Deselected) foldout.Deselect(manager);
-                else if (change.how == UIEvent.AllExpanded) foldout.ExpandAll(manager, true);
-                else if (change.how == UIEvent.AllCollapsed) foldout.ExpandAll(manager, false);
-                else throw new System.NotImplementedException("Unrecognized UIEvent \"" + change.how + "\" for change in Foldout");
-
-                // Update the parents
-                foreach (Foldout parent in foldout.GetParents(manager))
+                if (change.what.GetType() == typeof(Test))
                 {
-                    if (!parent.UpdateState(manager)) break; // stop updating early if there was no change 
+                    // Update the Foldouts
+                    foreach (Foldout parent in (change.what as Test).GetParentFoldouts(manager))
+                    {
+                        if (!parent.UpdateState(manager)) break; // stop updating early if there was no change 
+                    }
+                    if (change.how == UIEvent.Selected) manager.AddToQueue(change.what as Test);
+                    else if (change.how == UIEvent.Deselected) manager.RemoveFromQueue(change.what as Test);
                 }
-            }
-            else throw new System.NotImplementedException("Unrecognized UI item of type \"" + change.what.GetType() + "\"");
+                else if (change.what.GetType() == typeof(Foldout))
+                {
+                    // Update the Tests and Foldouts in all children
+                    Foldout foldout = change.what as Foldout;
+                    if (change.how == UIEvent.Locked) foldout.Lock(manager);
+                    else if (change.how == UIEvent.Unlocked) foldout.Unlock(manager);
+                    else if (change.how == UIEvent.Selected) foldout.Select(manager);
+                    else if (change.how == UIEvent.Deselected) foldout.Deselect(manager);
+                    else if (change.how == UIEvent.AllExpanded) foldout.ExpandAll(manager, true);
+                    else if (change.how == UIEvent.AllCollapsed) foldout.ExpandAll(manager, false);
+                    else throw new System.NotImplementedException("Unrecognized UIEvent \"" + change.how + "\" for change in Foldout");
 
+                    // Update the parents
+                    foreach (Foldout parent in foldout.GetParents(manager))
+                    {
+                        if (!parent.UpdateState(manager)) break; // stop updating early if there was no change 
+                    }
+                }
+                else throw new System.NotImplementedException("Unrecognized UI item of type \"" + change.what.GetType() + "\"");
+            }
             change = null;
         }
         #endregion Tests

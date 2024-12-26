@@ -217,7 +217,21 @@ namespace GameTest
 
                             dragBar.y -= 0.5f * dragBar.height;
                         }
-                        else if (allowReorder) EditorGUI.DrawRect(itemRect, Style.GUIQueue.dragHoverColor);
+                        else
+                        {
+                            // Check for mouse up events
+                            if (Event.current != null)
+                            {
+                                if (Event.current.type == EventType.MouseUp)
+                                {
+                                    TestManagerUI window = EditorWindow.GetWindow<TestManagerUI>();
+                                    window.RevealTest(test);
+                                    window.PingTest(test);
+                                }
+                            }
+
+                            if (allowReorder) EditorGUI.DrawRect(itemRect, Style.GUIQueue.dragHoverColor);
+                        }
                     }
 
                     itemRect.y += itemRect.height;

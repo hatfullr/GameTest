@@ -45,6 +45,10 @@ namespace GameTest
             /// </summary>
             public const float foldoutMargin = 4f;
             public const float minTextWidth = 50f;
+            public static Color pingColor = new Color(Color.yellow.r, Color.yellow.g, Color.yellow.b, 0.25f);
+            public const float pingWaitTime = 2.5f;
+            public const float pingFadeInTime = 0.2f;
+            public const float pingFadeOutTime = 1.5f;
         }
         public static class GUIQueue
         {

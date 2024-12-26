@@ -54,6 +54,9 @@ namespace GameTest
 
         public bool stopping = false;
 
+        public string testToReveal;
+        public PingData pingData { get; private set; } = new PingData();
+
         /// <summary>
         /// Invoked when all Tests in the queue have been run and the editor has exited Play mode.
         /// </summary>
@@ -67,6 +70,50 @@ namespace GameTest
         /// Don't set this. Should only be set in the AssetModificationProcessor.
         /// </summary>
         public static string filePath;
+
+        public class PingData
+        {
+            private Test _test;
+            public Test test
+            {
+                get => _test;
+                set
+                {
+                    timeSincePingStart = -1f;
+                    _test = value;
+                }
+            }
+            public float waitTime = Style.TestManagerUI.pingWaitTime;
+            public float fadeInTime = Style.TestManagerUI.pingFadeInTime;
+            public float fadeOutTime = Style.TestManagerUI.pingFadeOutTime;
+            public Color color = Style.TestManagerUI.pingColor;
+            public Rect rect;
+
+            private float timeSincePingStart = -1f;
+
+            /// <summary>
+            /// Needs to be called in OnGUI
+            /// </summary>
+            public void HandlePing(EditorWindow window)
+            {
+                if (test == null) return;
+                if (timeSincePingStart < 0) timeSincePingStart = Time.realtimeSinceStartup;
+                float totalTime = fadeInTime + waitTime + fadeOutTime;
+                float t = Time.realtimeSinceStartup - timeSincePingStart;
+                if (!(t >= 0.0f && t < totalTime))
+                {
+                    timeSincePingStart = -1f;
+                    test = null;
+                    return;
+                }
+                float alpha;
+                if (t < fadeInTime) alpha = Mathf.Lerp(0f, color.a, t / fadeInTime);
+                else if (t < waitTime) alpha = color.a;
+                else alpha = Mathf.Lerp(color.a, 0f, 1f - (totalTime - t) / fadeOutTime);
+                EditorGUI.DrawRect(rect, new Color(color.r, color.g, color.b, alpha));
+                window.Repaint();
+            }
+        }
 
         /// <summary>
         /// Locate the TestManager ScriptableObject asset in this project, load it, then return it. If no asset was found, a new one is created at Utilities.dataPath. If more than one is found,
@@ -210,6 +257,9 @@ namespace GameTest
             originalQueue.Clear();
             running = default;
             stopping = default;
+
+            pingData = new PingData();
+            testToReveal = default;
 
             debug = Logger.DebugMode.Log | Logger.DebugMode.LogWarning | Logger.DebugMode.LogError;
             Logger.debug = debug;
