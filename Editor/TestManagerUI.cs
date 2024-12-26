@@ -4,6 +4,7 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using System.Text.RegularExpressions;
 using System.Linq;
+using Codice.CM.Common.Tree;
 
 /// TODO ideas:
 ///    1. Add a preferences window
@@ -360,35 +361,72 @@ namespace GameTest
             UnityEngine.Profiling.Profiler.EndSample();
         }
 
-        private float GetWelcomeHeight()
+        private void GetWelcomeRects(out Rect title, out Rect body, out Rect bg, out Rect[] links)
         {
-            GUIStyle messageStyle = Style.Get("TestManagerUI/Welcome/Message");
+            // Setup styles and content
             GUIContent message = new GUIContent(Style.welcomeMessage);
-            GUIStyle donateStyle = Style.Get("TestManagerUI/Donate");
-            GUIStyle docStyle = Style.Get("TestManagerUI/Documentation");
             GUIContent donate = Style.GetIcon("TestManagerUI/Donate");
             GUIContent doc = Style.GetIcon("TestManagerUI/Documentation");
 
-            const int nLinks = 2;
+            GUIStyle welcomeStyle = Style.Get("TestManagerUI/Welcome");
+            GUIStyle titleStyle = Style.Get("TestManagerUI/Welcome/Title");
+            GUIStyle messageStyle = Style.Get("TestManagerUI/Welcome/Message");
+            GUIStyle donateStyle = Style.Get("TestManagerUI/Donate");
+            GUIStyle docStyle = Style.Get("TestManagerUI/Documentation");
 
+            // Setup stuff relating to the link buttons
+            const int nLinks = 2;
             GUIStyle[] linkStyles = new GUIStyle[nLinks] { donateStyle, docStyle };
             GUIContent[] linkContent = new GUIContent[nLinks] { donate, doc };
+            RectOffset[] padding = new RectOffset[nLinks];
+            for (int i = 0; i < nLinks; i++) padding[i] = linkStyles[i].margin;
 
-            Rect[] linkRects = new Rect[nLinks];
-            for (int i = 0; i < nLinks; i++) linkRects[i] = new Rect(Vector2.zero, linkStyles[i].CalcSize(linkContent[i]));
+            links = new Rect[nLinks];
+            for (int i = 0; i < nLinks; i++) links[i] = new Rect(Vector2.zero, linkStyles[i].CalcSize(linkContent[i]));
 
-            Rect titleRect = new Rect(viewRect.x, viewRect.y, viewRect.width, 0f);
-            titleRect.height = 0;
-            for (int i = 0; i < nLinks; i++) titleRect.height = Mathf.Max(titleRect.height, linkRects[i].height);
+            // Setup Rects
+            title = new Rect(viewRect.x, viewRect.y, viewRect.width, 0f);
+            title.height = 0;
+            for (int i = 0; i < nLinks; i++) title.height = Mathf.Max(title.height, links[i].height);
 
-            Rect body = new Rect(
+            body = new Rect(
                 viewRect.x,
-                titleRect.yMax,
+                title.yMax,
                 viewRect.width,
-                messageStyle.CalcHeight(message, titleRect.width) + messageStyle.padding.vertical
+                messageStyle.CalcHeight(message, title.width) + messageStyle.padding.vertical
             );
 
-            return titleRect.height + body.height;
+            bg = new Rect(viewRect.x, viewRect.y, viewRect.width, title.height + body.height);
+            bg.y -= welcomeStyle.padding.top; // This hides the top part of the background, making it look kinda like a tab in the UI
+            bg.height += welcomeStyle.padding.top;
+
+            // Apply margins
+            float dy = titleStyle.margin.bottom + messageStyle.margin.top;
+            body.y += dy;
+            bg.height += dy;
+
+            // Alignment
+            links = Utilities.AlignRects(
+                links,
+                title,
+                Utilities.RectAlignment.LowerRight,
+                Utilities.RectAlignment.MiddleLeft,
+                padding: padding
+            );
+
+            title = Utilities.GetPaddedRect(title, titleStyle.padding);
+            for (int i = 0; i < nLinks; i++)
+            {
+                links[i] = Utilities.GetPaddedRect(links[i], EditorStyles.linkLabel.padding);
+            }
+
+            body = Utilities.GetPaddedRect(body, messageStyle.padding);
+        }
+
+        private float GetWelcomeHeight()
+        {
+            GetWelcomeRects(out Rect _, out Rect _, out Rect bgRect, out Rect[] _);
+            return bgRect.height;
         }
 
         private Rect DrawWelcome()
@@ -406,46 +444,13 @@ namespace GameTest
             GUIStyle donateStyle = Style.Get("TestManagerUI/Donate");
             GUIStyle docStyle = Style.Get("TestManagerUI/Documentation");
 
-            // Setup stuff relating to the link buttons
             const int nLinks = 2;
             string[] links = new string[nLinks] { Style.donationLink, Style.documentationLink };
-            GUIStyle[] linkStyles = new GUIStyle[nLinks] { donateStyle, docStyle };
             GUIContent[] linkContent = new GUIContent[nLinks] { donate, doc };
-            RectOffset[] padding = new RectOffset[nLinks];
-            for (int i = 0; i < nLinks; i++) padding[i] = linkStyles[i].margin;
 
-            Rect[] linkRects = new Rect[nLinks];
-            for (int i = 0; i < nLinks; i++) linkRects[i] = new Rect(Vector2.zero, linkStyles[i].CalcSize(linkContent[i]));
-
-            // Setup Rects
-            Rect titleRect = new Rect(viewRect.x, viewRect.y, viewRect.width, 0f);
-            titleRect.height = 0;
-            for (int i = 0; i < nLinks; i++) titleRect.height = Mathf.Max(titleRect.height, linkRects[i].height);
-
-            Rect body = new Rect(
-                viewRect.x,
-                titleRect.yMax,
-                viewRect.width,
-                messageStyle.CalcHeight(message, titleRect.width) + messageStyle.padding.vertical
-            );
-
-            Rect bgRect = new Rect(viewRect.x, viewRect.y, viewRect.width, titleRect.height + body.height);
-            bgRect.y -= welcomeStyle.padding.top; // This hides the top part of the background, making it look kinda like a tab in the UI
-            bgRect.height += welcomeStyle.padding.top;
-
-            // Apply margins
             float dy = titleStyle.margin.bottom + messageStyle.margin.top;
-            body.y += dy;
-            bgRect.height += dy;
 
-            // Alignment
-            linkRects = Utilities.AlignRects(
-                linkRects,
-                titleRect,
-                Utilities.RectAlignment.LowerRight,
-                Utilities.RectAlignment.MiddleLeft,
-                padding: padding
-            );
+            GetWelcomeRects(out Rect titleRect, out Rect body, out Rect bgRect, out Rect[] linkRects);
 
             Color bg = Color.black * 0.2f;
 
@@ -456,23 +461,23 @@ namespace GameTest
 
             using (new EditorGUIUtility.IconSizeScope(new Vector2(titleRect.height - welcomeStyle.padding.vertical, titleRect.height - welcomeStyle.padding.vertical)))
             {
-                EditorGUI.LabelField(Utilities.GetPaddedRect(titleRect, titleStyle.padding), title, titleStyle);
+                EditorGUI.LabelField(titleRect, title, titleStyle);
             }
 
-            for (int i = 0; i < nLinks; i++)
+            for (int i = 0; i < linkRects.Length; i++)
             {
-                if (EditorGUI.LinkButton(Utilities.GetPaddedRect(linkRects[i], EditorStyles.linkLabel.padding), linkContent[i])) Application.OpenURL(links[i]);
+                if (EditorGUI.LinkButton(linkRects[i], linkContent[i])) Application.OpenURL(links[i]);
             }
 
-            EditorGUI.LabelField(Utilities.GetPaddedRect(body, messageStyle.padding), message, messageStyle);
+            EditorGUI.LabelField(body, message, messageStyle);
 
             // DEBUGGING
             //foreach (System.Tuple<Rect, Color> kvp in new System.Tuple<Rect, Color>[]
             //{
-                //new System.Tuple<Rect,Color>(bgRect,      Color.green),
+                //new System.Tuple<Rect,Color>(bgRect,    Color.green),
                 //new System.Tuple<Rect,Color>(titleRect, Color.red),
-                //new System.Tuple<Rect,Color>(body,      Color.red)
-                //new System.Tuple<Rect,Color>(viewRect,      Color.red)
+                //new System.Tuple<Rect,Color>(body,      Color.yellow),
+                //new System.Tuple<Rect,Color>(viewRect,  Color.cyan)
             //}) Utilities.DrawDebugOutline(kvp.Item1, kvp.Item2);
 
             return bgRect;
@@ -501,6 +506,7 @@ namespace GameTest
                         if (foldout.tests.Count > 0) height += Style.TestManagerUI.foldoutMargin;
                     }
                 }
+                height += Style.TestManagerUI.foldoutMargin; // a bit of extra space at the bottom looks cleanest
             }
             else if (mode == Mode.Search)
             {
@@ -1088,25 +1094,6 @@ namespace GameTest
                                         if (wasSelected && !selected) evt = UIEvent.Deselected;
                                         change = new Change(item, evt);
                                     }
-                                    
-
-                                    /*
-                                    // TODO: record that a change happened, then at the end of OnGUI in TestManagerUI update everything that needs updating.
-                                    if (wasSelected != selected)
-                                    {
-                                        if (item.GetType() == typeof(Test))
-                                        {
-                                            if (!wasSelected && selected) (item as Test).Select(manager);
-                                            else if (wasSelected && !selected) (item as Test).Deselect(manager);
-                                        }
-                                        else if (item.GetType() == typeof(Foldout))
-                                        {
-                                            if (!wasSelected && selected) (item as Foldout).Select(manager);
-                                            else if (wasSelected && !selected) (item as Foldout).Deselect(manager);
-                                        }
-                                        else throw new System.NotImplementedException("Unrecognized UI object '" + item.GetType() + "'");
-                                    }
-                                    */
                                 }
                             }
                         }
