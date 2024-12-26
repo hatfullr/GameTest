@@ -1,12 +1,14 @@
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/K3K415S8MR)
 
+_Special thanks to Ganesh for help with testing._
+
 # GameTest
-Are you tired of finding new bugs in old code? Use `GameTest` to run automated tests that ensure code is working as intended. Unlike the [Unity Test Framework](https://docs.unity3d.com/Packages/com.unity.test-framework@1.4/manual/index.html) (UTF), `GameTest` does not require any special assembly definition files (`*.asmdef`) or any other prerequisites. `GameTest` works "out of the box".
+GameTest ensures that the implementation of your game's design is done correctly across all version and builds. Similar to the [Unity Test Framework](https://docs.unity3d.com/Packages/com.unity.test-framework@1.4/manual/index.html) (UTF), GameTest provides a way to write automated tests so that it is easy to detect and debug problems as your code grows to meet your design goals. GameTest can also be used instead of UTF for existing projects that cannot transition to rigid "assembly definition" files (`.asmdef`) because of code dependency issues. GameTest does not require `.asmdef` files.
 
 ## Features
-1. User interface with granular control of testing parameters
-2. Write test methods in any `MonoBehaviour`
-3. Create complex testing environment prefabs
+- "Plug-n-play" functionality. Incorporate GameTest in existing projects quickly with no extra setup.
+- Simple user interface with advanced controls on testing environments.
+- Coexists well with Unity Test Framework.
 
 ----------------------------
 
@@ -20,7 +22,7 @@ Are you tired of finding new bugs in old code? Use `GameTest` to run automated t
 If you run into issues, check [Installation Troubleshooting](#installation-troubleshooting).
 
 ### The GameTest Folder
-Upon opening the GameTest window, a folder called "GameTest" will be created in the "Assets" folder. This is where `GameTest` will store data about the tests in your project. If you ever need to manually reset `GameTest`, delete this folder and re-open GameTest. It is recommended that you do not rename or move this folder, and it's probably also a bad idea to store anything you care about there.
+Upon opening the GameTest window, a folder called "GameTest" will be created in the "Assets" folder. This is where GameTest will store data about the tests in your project. If you ever need to manually reset GameTest, delete this folder and re-open GameTest. It is recommended that you do not rename or move this folder, and it's probably also a bad idea to store anything you care about there.
 
 ## Quick Start
 Unit testing is intended to make sure code runs properly throughout version changes. This is particularly helpful when there are many complicated and inter-dependent systems. The following example keeps things simple. Suppose you have some Unity class called `Example`:
@@ -66,7 +68,7 @@ Open GameTest at `Window > GameTest` and type "Method" in the search bar. Check 
 ## Debugging
 When a test fails, it will throw an exception that is visible in the console log. Unfortunately, double-clicking the message will not deliver you to the line of code where the test failed. This is a limitation of the Unity editor API. To find the line where a test failed, follow these steps:
 1. In the console, click the "triple dot" button in the top-right.
-2. Turn on "Strip logging callstack". This removes any clutter from the stack trace in the console that might have come from `GameTest`.
+2. Turn on "Strip logging callstack". This removes any clutter from the stack trace in the console that might have come from GameTest.
 3. Click the message in the console.
 4. Find the link to your script in the stack trace and click on it.
 

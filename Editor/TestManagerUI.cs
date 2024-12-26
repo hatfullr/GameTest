@@ -772,7 +772,7 @@ namespace GameTest
             if (!EditorUtility.DisplayDialog(nameof(GameTest) + " (" + UnityEditor.PackageManager.PackageInfo.FindForAssembly(GetType().Assembly).version + ")",
                 string.Join("\n",
                     "Created by Roger Hatfull",
-                    "Special thanks to Gan",
+                    "Special thanks to Ganesh for help with testing",
                     "",
                     "The author is an independent developer who benefits greatly from donations. Please consider donating if you have found this package useful.",
                     "",
