@@ -441,8 +441,6 @@ namespace GameTest
             GUIStyle welcomeStyle = Style.Get("TestManagerUI/Welcome");
             GUIStyle titleStyle = Style.Get("TestManagerUI/Welcome/Title");
             GUIStyle messageStyle = Style.Get("TestManagerUI/Welcome/Message");
-            GUIStyle donateStyle = Style.Get("TestManagerUI/Donate");
-            GUIStyle docStyle = Style.Get("TestManagerUI/Documentation");
 
             const int nLinks = 2;
             string[] links = new string[nLinks] { Style.donationLink, Style.documentationLink };

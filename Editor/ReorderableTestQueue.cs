@@ -27,6 +27,8 @@ namespace GameTest
 
         private Rect dragBar;
 
+        private Test selectedTest;
+
         private enum DragOffset
         {
             Lower,
@@ -63,7 +65,8 @@ namespace GameTest
 
         public float GetQueueHeight()
         {
-            return Style.lineHeight * queue.Count;
+            GUIStyle queueStyle = Style.Get("GUIQueue/Queue");
+            return queueStyle.padding.top + Style.lineHeight * queue.Count + queueStyle.padding.bottom;
         }
 
         private void DrawTitle(Rect rect)
