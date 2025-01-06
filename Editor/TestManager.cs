@@ -15,12 +15,15 @@ namespace GameTest
     [System.Serializable]
     public class TestManager : ScriptableObject
     {
+        // If you change default values here, you must also change them in PreferencesWindow and some other places.
         public bool showWelcome = true;
-        public Logger.DebugMode debug;
+        public Logger.DebugMode debug = Logger.DebugMode.Log | Logger.DebugMode.LogWarning | Logger.DebugMode.LogError;
         public string search = null;
         public bool paused = false;
         public bool running = false;
         public TestManagerUI.TestSortOrder testSortOrder = TestManagerUI.TestSortOrder.Name;
+
+        [SerializeField] private string dataPath = null;
 
         public Vector2 scrollPosition;
 
@@ -115,6 +118,46 @@ namespace GameTest
             }
         }
 
+        void Awake()
+        {
+            Logger.debug = debug;
+        }
+
+        /// <summary>
+        /// Returns the currently set data path. The user can change the data path via the UI.
+        /// </summary>
+        public string GetDataPath()
+        {
+            if (string.IsNullOrEmpty(dataPath)) dataPath = Utilities.defaultDataPath;
+            return Utilities.EnsureDirectoryExists(dataPath);
+        }
+
+        public void SetDataPath(string path)
+        {
+            path = Utilities.GetUnityPath(path);
+            if (Path.GetFullPath(path) == Path.GetFullPath(dataPath)) return;
+
+            // Move the contents of the current dataPath into the new dataPath
+            if (!string.IsNullOrEmpty(dataPath))
+            {
+                Utilities.EnsureDirectoryExists(Path.GetDirectoryName(path));
+                FileUtil.MoveFileOrDirectory(dataPath, path);
+                FileUtil.MoveFileOrDirectory(Path.ChangeExtension(dataPath, ".meta"), Path.ChangeExtension(path, ".meta"));
+                AssetDatabase.Refresh();
+            }
+
+            dataPath = path;
+        }
+
+        /// <summary>
+        /// Checks if a TestManagerUI window is open. If so, the manager property of the window is returned. Otherwise, returns null.
+        /// </summary>
+        public static TestManager Get()
+        {
+            if (EditorWindow.HasOpenInstances<TestManagerUI>()) return EditorWindow.GetWindow<TestManagerUI>().manager;
+            return null;
+        }
+
         /// <summary>
         /// Locate the TestManager ScriptableObject asset in this project, load it, then return it. If no asset was found, a new one is created at Utilities.dataPath. If more than one is found,
         /// a Utilities.LogError is printed and null is returned.
@@ -129,7 +172,7 @@ namespace GameTest
             
             // Didn't find an existing TestManager, so create one
             TestManager result = ScriptableObject.CreateInstance(typeof(TestManager)) as TestManager;
-            filePath = Path.Join(Utilities.dataPath, nameof(GameTest) + ".asset");
+            filePath = Path.Join(Utilities.defaultDataPath, nameof(GameTest) + ".asset");
             AssetDatabase.CreateAsset(result, filePath);
             return result;
         }
@@ -192,6 +235,26 @@ namespace GameTest
             test.onFinished -= OnRunFinished;
             AddToFinishedQueue(test);
             guiQueue.ResetTimer();
+
+            // Ensure that the finished test's results are shown in the UI
+            string path = test.attribute.GetPath();
+            bool found = false;
+            foreach (Foldout foldout in foldouts)
+            {
+                foreach (Test t in foldout.tests)
+                {
+                    if (path == t.attribute.GetPath())
+                    {
+                        t.result = test.result;
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) continue;
+                break;
+            }
+
+            foreach (Foldout foldout in foldouts) foldout.UpdateState(this);
 
             if (queue.Count == 0) Stop(); // no more tests left to run
             else if (running && !paused) RunNext();
@@ -263,7 +326,7 @@ namespace GameTest
 
             debug = Logger.DebugMode.Log | Logger.DebugMode.LogWarning | Logger.DebugMode.LogError;
             Logger.debug = debug;
-            testSortOrder = default;
+            testSortOrder = TestManagerUI.TestSortOrder.Name;
             previousFrameNumber = 0;
 
             guiQueue.Reset();
@@ -311,9 +374,6 @@ namespace GameTest
             stopping = false;
         }
         #endregion
-
-
-
 
         #region Assembly and Test Management
         public IEnumerable<Test> GetTests()

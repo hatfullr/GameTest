@@ -4,11 +4,6 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using System.Text.RegularExpressions;
 using System.Linq;
-using Codice.CM.Common.Tree;
-
-/// TODO ideas:
-///    1. Add a preferences window
-///        a. Let the user control the sorting order of the tests in the TestManager
 
 namespace GameTest
 {
@@ -79,6 +74,7 @@ namespace GameTest
         #region Unity UI
         public void AddItemsToMenu(GenericMenu menu)
         {
+            menu.AddItem(new GUIContent("Preferences..."), false, ShowPreferences);
             menu.AddItem(new GUIContent("Reset"), false, ShowResetConfirmation);
             menu.AddItem(new GUIContent("About"), false, ShowAbout);
         }
@@ -141,6 +137,8 @@ namespace GameTest
 
         void OnDestroy()
         {
+            PreferencesWindow.CloseAll();
+
             if (manager != null)
             {
                 if (manager.running) manager.Stop();
@@ -153,6 +151,8 @@ namespace GameTest
         private void OnBeforeAssemblyReload()
         {
             reloadingDomain = true;
+
+            PreferencesWindow.CloseAll();
         }
 
         private void OnAfterAssemblyReload()
@@ -250,11 +250,13 @@ namespace GameTest
             if (manager == null) return;
             foreach (Test test in manager.GetTests())
                 if (test.selected) test.Reset();
+            UpdateFoldoutStates();
         }
         private void ResetAll()
         {
             if (manager == null) return;
             foreach (Test test in manager.GetTests()) test.Reset();
+            UpdateFoldoutStates();
         }
         #endregion Methods
 
@@ -265,9 +267,6 @@ namespace GameTest
             if (reloadingDomain) return;
 
             testRects = new Dictionary<string, Rect>();
-            //change = null;
-
-            EditorGUI.BeginChangeCheck();
 
             if (manager == null) manager = TestManager.Load();
 
@@ -366,8 +365,8 @@ namespace GameTest
 
                 if (manager.loadingWheelVisible) DrawLoadingWheel(mainScope.rect);
             }
-
-            if (EditorGUI.EndChangeCheck() || change != null) ProcessChange();
+            
+            if (change != null) ProcessChange();
 
             UnityEngine.Profiling.Profiler.EndSample();
         }
@@ -729,10 +728,12 @@ namespace GameTest
             void ClearFlags()
             {
                 foreach (Logger.DebugMode mode in values) manager.debug &= ~mode;
+                Logger.debug = manager.debug;
             }
             void SetAllFlags()
             {
                 foreach (Logger.DebugMode mode in values) manager.debug |= mode;
+                Logger.debug = manager.debug;
             }
 
             Rect rect = Style.GetRect("TestManagerUI/Toolbar/Debug", debugContent);
@@ -750,8 +751,16 @@ namespace GameTest
                 {
                     toolsMenu.AddItem(new GUIContent(mode.ToString()), manager.debug.HasFlag(mode), () =>
                     {
-                        if (manager.debug.HasFlag(mode)) manager.debug &= ~mode;
-                        else manager.debug |= mode;
+                        if (manager.debug.HasFlag(mode))
+                        {
+                            manager.debug &= ~mode;
+                            Logger.debug = manager.debug;
+                        }
+                        else
+                        {
+                            manager.debug |= mode;
+                            Logger.debug = manager.debug;
+                        }
                     });
                 }
 
@@ -770,7 +779,16 @@ namespace GameTest
         }
 
         /// <summary>
-        /// Say "are you sure?"
+        /// Show a window that lets the user change certain preferences.
+        /// </summary>
+        private void ShowPreferences()
+        {
+            PreferencesWindow.ShowWindow();
+        }
+
+        /// <summary>
+        /// Say "are you sure?" If the answer is yes, call DoReset(), which resets the TestManager, resets the UI, and then calls Refresh() to
+        /// locate Tests in the user's project.
         /// </summary>
         private void ShowResetConfirmation()
         {
@@ -1146,12 +1164,15 @@ namespace GameTest
                                     selected = EditorGUI.ToggleLeft(  // "controlled" flow
                                         tempRect,
                                         toggleContent,
-                                        selected,
+                                        wasSelected,
                                         toggleStyle
                                     );
                                     EditorGUI.showMixedValue = wasMixed;
 
-                                    if (wasSelected != selected && change == null)
+                                    // We have to limit the change check here to just what the user has clicked
+                                    // Otherwise, toggles in the UI think they have been clicked on when they really haven't
+                                    // It has to do with cascading changes as a result of a user click
+                                    if (wasSelected != selected && change == null && Utilities.IsMouseOverRect(tempRect))
                                     {
                                         UIEvent evt = UIEvent.Selected;
                                         if (wasSelected && !selected) evt = UIEvent.Deselected;
@@ -1202,6 +1223,9 @@ namespace GameTest
 
         private void UpdateFoldoutStates()
         {
+            foreach (Foldout foldout in manager.foldouts) foldout.UpdateState(manager);
+            
+            /*
             // First, make a list of all the Tests and their depth in the tree. Sort the list of Tests by depth, in reverse order. Update the foldouts in that order.
             Dictionary<Foldout, int> foldouts = new Dictionary<Foldout, int>();
             char[] separators = new char[3] { System.IO.Path.PathSeparator, System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar };
@@ -1218,6 +1242,7 @@ namespace GameTest
             {
                 if (!foldout.UpdateState(manager)) break; // stop updating early if there was no change 
             }
+            */
         }
 
         private void ProcessChange()
@@ -1256,12 +1281,13 @@ namespace GameTest
                     // Update the parents
                     foreach (Foldout parent in foldout.GetParents(manager))
                     {
-                        if (!parent.UpdateState(manager)) break; // stop updating early if there was no change 
+                        if (!parent.UpdateState(manager)) break; // stop updating early if there was no change
                     }
                 }
                 else throw new System.NotImplementedException("Unrecognized UI item of type \"" + change.what.GetType() + "\"");
             }
             change = null;
+            Repaint();
         }
         #endregion Tests
 
