@@ -26,12 +26,11 @@ namespace GameTest
         /// </summary>
         public static string packagesPath { get; } = Path.Join(projectPath, "Packages");
 
-#if UNITY_EDITOR
         /// <summary>
-        /// Location where data assets are stored.
+        /// Location of the folder where data gets stored by default. The user can change the data path in the UI, so TestManagerUI.GetDataPath
+        /// should likely be used instead.
         /// </summary>
-        public static string dataPath { get => EnsureDirectoryExists(Path.Join(assetsPath, "GameTest")); }
-#endif
+        public static string defaultDataPath = Path.Join(assetsPath, "GameTest");
 
         /// <summary>
         /// True if the editor is using the theme called "DarkSkin". Otherwise, false.
@@ -253,7 +252,7 @@ namespace GameTest
         /// </summary>
         public static string GetAssetPath(string name, string directory = null)
         {
-            if (directory == null) directory = dataPath;
+            if (directory == null) directory = defaultDataPath;
             string path = Path.Join(directory, name);
             if (Path.GetExtension(path) != ".asset") path = Path.ChangeExtension(path, ".asset");
             return GetUnityPath(path);

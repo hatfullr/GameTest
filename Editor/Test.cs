@@ -3,6 +3,7 @@ using UnityEngine;
 using System.IO;
 using UnityEditor;
 using System.Collections.Generic;
+using UnityEditor.PackageManager.UI;
 
 namespace GameTest
 {
@@ -46,7 +47,11 @@ namespace GameTest
             get
             {
                 string name = attribute.GetPath();
-                if (_defaultPrefab == null) _defaultPrefab = Utilities.SearchForAsset((GameObject g) => g.name == name, Utilities.dataPath, false);
+                if (_defaultPrefab == null)
+                {
+                    TestManager manager = TestManager.Get();
+                    if (manager != null) _defaultPrefab = Utilities.SearchForAsset((GameObject g) => g.name == name, manager.GetDataPath(), false);
+                }
                 if (_defaultPrefab == null)
                 {
                     string rawPath = Utilities.GetAssetPath(name);
@@ -392,8 +397,11 @@ namespace GameTest
             
             Object.DestroyImmediate(_defaultPrefab, true);
 
-            string path = Utilities.GetAssetPath(attribute.GetPath());
-            string dir = Path.GetDirectoryName(path);
+            TestManager manager = TestManager.Get();
+            string dataPath = Utilities.defaultDataPath;
+            if (manager != null) dataPath = manager.GetDataPath();
+
+            string dir = Path.GetDirectoryName(Utilities.GetAssetPath(attribute.GetPath(), dataPath));
 
             // Find and remove empty directories
             foreach (string directory in Utilities.IterateDirectories(dir, true))

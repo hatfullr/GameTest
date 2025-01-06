@@ -22,7 +22,7 @@ GameTest ensures that the implementation of your game's design is done correctly
 If you run into issues, check [Installation Troubleshooting](#installation-troubleshooting).
 
 ### The GameTest Folder
-Upon opening the GameTest window, a folder called "GameTest" will be created in the "Assets" folder. This is where GameTest will store data about the tests in your project. If you ever need to manually reset GameTest, delete this folder and re-open GameTest. It is recommended that you do not rename or move this folder, and it's probably also a bad idea to store anything you care about there.
+Upon opening the GameTest window, a folder called "GameTest" will be created in the "Assets" folder. This is where GameTest will store data about the tests in your project. If you ever need to manually reset GameTest, delete this folder and re-open GameTest. You can move this folder in the preferences window in the triple-dot menu at the top right of the UI. It's probably a bad idea to store anything you care about in the GameTest folder.
 
 ## Quick Start
 Unit testing is intended to make sure code runs properly throughout version changes. This is particularly helpful when there are many complicated and inter-dependent systems. The following example keeps things simple. Suppose you have some Unity class called `Example`:

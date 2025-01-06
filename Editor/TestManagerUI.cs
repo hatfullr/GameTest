@@ -4,11 +4,6 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using System.Text.RegularExpressions;
 using System.Linq;
-using Codice.CM.Common.Tree;
-
-/// TODO ideas:
-///    1. Add a preferences window
-///        a. Let the user control the sorting order of the tests in the TestManager
 
 namespace GameTest
 {
@@ -79,6 +74,7 @@ namespace GameTest
         #region Unity UI
         public void AddItemsToMenu(GenericMenu menu)
         {
+            menu.AddItem(new GUIContent("Preferences..."), false, ShowPreferences);
             menu.AddItem(new GUIContent("Reset"), false, ShowResetConfirmation);
             menu.AddItem(new GUIContent("About"), false, ShowAbout);
         }
@@ -141,6 +137,8 @@ namespace GameTest
 
         void OnDestroy()
         {
+            PreferencesWindow.CloseAll();
+
             if (manager != null)
             {
                 if (manager.running) manager.Stop();
@@ -153,6 +151,8 @@ namespace GameTest
         private void OnBeforeAssemblyReload()
         {
             reloadingDomain = true;
+
+            PreferencesWindow.CloseAll();
         }
 
         private void OnAfterAssemblyReload()
@@ -729,10 +729,12 @@ namespace GameTest
             void ClearFlags()
             {
                 foreach (Logger.DebugMode mode in values) manager.debug &= ~mode;
+                Logger.debug = manager.debug;
             }
             void SetAllFlags()
             {
                 foreach (Logger.DebugMode mode in values) manager.debug |= mode;
+                Logger.debug = manager.debug;
             }
 
             Rect rect = Style.GetRect("TestManagerUI/Toolbar/Debug", debugContent);
@@ -750,8 +752,16 @@ namespace GameTest
                 {
                     toolsMenu.AddItem(new GUIContent(mode.ToString()), manager.debug.HasFlag(mode), () =>
                     {
-                        if (manager.debug.HasFlag(mode)) manager.debug &= ~mode;
-                        else manager.debug |= mode;
+                        if (manager.debug.HasFlag(mode))
+                        {
+                            manager.debug &= ~mode;
+                            Logger.debug = manager.debug;
+                        }
+                        else
+                        {
+                            manager.debug |= mode;
+                            Logger.debug = manager.debug;
+                        }
                     });
                 }
 
@@ -770,7 +780,16 @@ namespace GameTest
         }
 
         /// <summary>
-        /// Say "are you sure?"
+        /// Show a window that lets the user change certain preferences.
+        /// </summary>
+        private void ShowPreferences()
+        {
+            PreferencesWindow.ShowWindow();
+        }
+
+        /// <summary>
+        /// Say "are you sure?" If the answer is yes, call DoReset(), which resets the TestManager, resets the UI, and then calls Refresh() to
+        /// locate Tests in the user's project.
         /// </summary>
         private void ShowResetConfirmation()
         {
