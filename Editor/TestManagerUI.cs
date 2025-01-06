@@ -250,11 +250,13 @@ namespace GameTest
             if (manager == null) return;
             foreach (Test test in manager.GetTests())
                 if (test.selected) test.Reset();
+            UpdateFoldoutStates();
         }
         private void ResetAll()
         {
             if (manager == null) return;
             foreach (Test test in manager.GetTests()) test.Reset();
+            UpdateFoldoutStates();
         }
         #endregion Methods
 
@@ -265,9 +267,6 @@ namespace GameTest
             if (reloadingDomain) return;
 
             testRects = new Dictionary<string, Rect>();
-            //change = null;
-
-            EditorGUI.BeginChangeCheck();
 
             if (manager == null) manager = TestManager.Load();
 
@@ -366,8 +365,8 @@ namespace GameTest
 
                 if (manager.loadingWheelVisible) DrawLoadingWheel(mainScope.rect);
             }
-
-            if (EditorGUI.EndChangeCheck() || change != null) ProcessChange();
+            
+            if (change != null) ProcessChange();
 
             UnityEngine.Profiling.Profiler.EndSample();
         }
@@ -1165,12 +1164,15 @@ namespace GameTest
                                     selected = EditorGUI.ToggleLeft(  // "controlled" flow
                                         tempRect,
                                         toggleContent,
-                                        selected,
+                                        wasSelected,
                                         toggleStyle
                                     );
                                     EditorGUI.showMixedValue = wasMixed;
 
-                                    if (wasSelected != selected && change == null)
+                                    // We have to limit the change check here to just what the user has clicked
+                                    // Otherwise, toggles in the UI think they have been clicked on when they really haven't
+                                    // It has to do with cascading changes as a result of a user click
+                                    if (wasSelected != selected && change == null && Utilities.IsMouseOverRect(tempRect))
                                     {
                                         UIEvent evt = UIEvent.Selected;
                                         if (wasSelected && !selected) evt = UIEvent.Deselected;
@@ -1221,6 +1223,9 @@ namespace GameTest
 
         private void UpdateFoldoutStates()
         {
+            foreach (Foldout foldout in manager.foldouts) foldout.UpdateState(manager);
+            
+            /*
             // First, make a list of all the Tests and their depth in the tree. Sort the list of Tests by depth, in reverse order. Update the foldouts in that order.
             Dictionary<Foldout, int> foldouts = new Dictionary<Foldout, int>();
             char[] separators = new char[3] { System.IO.Path.PathSeparator, System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar };
@@ -1237,6 +1242,7 @@ namespace GameTest
             {
                 if (!foldout.UpdateState(manager)) break; // stop updating early if there was no change 
             }
+            */
         }
 
         private void ProcessChange()
@@ -1275,12 +1281,13 @@ namespace GameTest
                     // Update the parents
                     foreach (Foldout parent in foldout.GetParents(manager))
                     {
-                        if (!parent.UpdateState(manager)) break; // stop updating early if there was no change 
+                        if (!parent.UpdateState(manager)) break; // stop updating early if there was no change
                     }
                 }
                 else throw new System.NotImplementedException("Unrecognized UI item of type \"" + change.what.GetType() + "\"");
             }
             change = null;
+            Repaint();
         }
         #endregion Tests
 

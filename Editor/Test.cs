@@ -248,19 +248,24 @@ namespace GameTest
 
             // invoke the method
             if (method.ReturnType == typeof(System.Collections.IEnumerator))
-            { // An IEnumerable is intended to be run over many frames as a coroutine, using the yield statement to separate frames.
+            { // An IEnumerator is intended to be run over many frames as a coroutine, using the yield statement to separate frames.
                 if (coroutineGO != null) Object.DestroyImmediate(coroutineGO);
                 coroutineGO = new GameObject("Coroutine helper", typeof(CoroutineMonoBehaviour));
                 coroutineGO.hideFlags = HideFlags.HideAndDontSave;
-                
+
                 try { StartCoroutine(method.Invoke(component, new object[] { gameObject }) as System.Collections.IEnumerator); }
                 catch (TargetException) { Logger.LogError("TargetException was thrown (1). Please submit a bug report."); }
             }
-            else
+            else if (method.ReturnType == typeof(void))
             {
                 try { method.Invoke(component, new object[] { gameObject }); } // probably of type void
                 catch (TargetException) { Logger.LogError("TargetException was thrown (2). Please submit a bug report."); }
-                
+                OnRunComplete();
+            }
+            else
+            {
+                result = Result.Fail;
+                Debug.LogError("Tests must return type void or " + typeof(System.Collections.IEnumerator) + ", not \"" + method.ReturnType + "\"", GetScript());
                 OnRunComplete();
             }
         }
@@ -336,10 +341,10 @@ namespace GameTest
         {
             if (type == LogType.Exception || type == LogType.Assert)
             {
-                CancelCoroutine();
+                //CancelCoroutine();
                 result = Result.Fail;
-                EditorApplication.isPaused = !EditorApplication.isPaused && // If false (already paused), stay paused
-                    attribute.pauseOnFail; // If not paused (playing) and we should pause, then pause
+                //EditorApplication.isPaused = !EditorApplication.isPaused && // If false (already paused), stay paused
+                //    attribute.pauseOnFail; // If not paused (playing) and we should pause, then pause
             }
         }
 

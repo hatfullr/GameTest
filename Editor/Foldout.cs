@@ -49,11 +49,6 @@ namespace GameTest
         {
             UnityEngine.Profiling.Profiler.BeginSample(nameof(GameTest) + ".Foldout");
 
-            //bool wasExpanded = expanded;
-            //bool wasSelected = selected;
-            //bool wasMixed = isMixed; //IsMixed(ui.manager);
-            //bool wasLocked = locked;
-
             EditorGUILayout.VerticalScope scope = new EditorGUILayout.VerticalScope();
             Rect rect = scope.rect;
             using (scope)
@@ -152,7 +147,8 @@ namespace GameTest
                 test.selected = selected;
                 manager.AddToQueue(test);
             }
-            foreach (Foldout foldout in GetChildren(manager)) foldout.Select(manager);
+            foreach (Foldout foldout in GetChildren(manager))
+                if (!foldout.IsLocked()) foldout.Select(manager);
         }
         /// <summary>
         /// Toggle off the Foldout, and thereby all its children.
@@ -167,7 +163,8 @@ namespace GameTest
                 test.selected = selected;
                 manager.RemoveFromQueue(test);
             }
-            foreach (Foldout foldout in GetChildren(manager)) foldout.Deselect(manager);
+            foreach (Foldout foldout in GetChildren(manager))
+                if (!foldout.IsLocked()) foldout.Deselect(manager);
         }
         /// <summary>
         /// Lock the Foldout, and thereby all its children.
@@ -324,22 +321,13 @@ namespace GameTest
             bool wasSelected = selected;
             Test.Result previousResult = result;
 
-            result = Test.Result.None;
             int nSelected = 0;
-            int nPassed = 0;
-            int nFailed = 0;
-            int nSkipped = 0;
             int nLocked = 0;
             int total = 0;
             foreach (Test test in GetTests(manager, false))
             {
                 if (test.selected) nSelected++;
                 if (test.locked) nLocked++;
-
-                if (test.result == Test.Result.Pass) nPassed++;
-                else if (test.result == Test.Result.Fail) nFailed++;
-                else if (test.result == Test.Result.Skipped) nSkipped++;
-
                 total++;
             }
             int nMixed = 0;
@@ -348,11 +336,6 @@ namespace GameTest
                 if (child.selected) nSelected++;
                 if (child.isMixed) nMixed++;
                 if (child.locked) nLocked++;
-
-                if (child.result == Test.Result.Pass) nPassed++;
-                else if (child.result == Test.Result.Fail) nFailed++;
-                else if (child.result == Test.Result.Skipped) nSkipped++;
-
                 total++;
             }
 
@@ -366,13 +349,23 @@ namespace GameTest
 
             if (total > 0) locked = nLocked == total;
 
-            int totalRan = nPassed + nFailed + nSkipped;
-            if (totalRan > 0)
+
+            int nFailed = 0;
+            int nPassed = 0;
+            int nSkipped = 0;
+            foreach (Test test in GetTests(manager, true))
             {
-                if (nPassed + nSkipped == totalRan) result = Test.Result.Pass;
-                else if (nFailed + nSkipped == totalRan) result = Test.Result.Fail;
-                else if (nSkipped == totalRan) result = Test.Result.Skipped;
+                if (test.result == Test.Result.Fail) nFailed++;
+                if (test.result == Test.Result.Pass) nPassed++;
+                else if (test.result == Test.Result.Skipped) nSkipped++;
             }
+
+            result = Test.Result.None;
+            if (nFailed > 0) result = Test.Result.Fail;
+            else if (nSkipped > 0) result = Test.Result.Skipped;
+            else if (nPassed > 0) result = Test.Result.Pass;
+
+            //Debug.Log(path + "    " + isMixed + " " + wasMixed + "    " + result + " " + previousResult + "    " + selected + " " + wasSelected + "    " + locked + " " + wasLocked);
 
             return isMixed != wasMixed || result != previousResult || selected != wasSelected || locked != wasLocked;
         }

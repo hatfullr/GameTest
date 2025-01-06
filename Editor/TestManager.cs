@@ -137,8 +137,6 @@ namespace GameTest
             path = Utilities.GetUnityPath(path);
             if (Path.GetFullPath(path) == Path.GetFullPath(dataPath)) return;
 
-            //path = Utilities.EnsureDirectoryExists(path);
-
             // Move the contents of the current dataPath into the new dataPath
             if (!string.IsNullOrEmpty(dataPath))
             {
@@ -237,6 +235,26 @@ namespace GameTest
             test.onFinished -= OnRunFinished;
             AddToFinishedQueue(test);
             guiQueue.ResetTimer();
+
+            // Ensure that the finished test's results are shown in the UI
+            string path = test.attribute.GetPath();
+            bool found = false;
+            foreach (Foldout foldout in foldouts)
+            {
+                foreach (Test t in foldout.tests)
+                {
+                    if (path == t.attribute.GetPath())
+                    {
+                        t.result = test.result;
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) continue;
+                break;
+            }
+
+            foreach (Foldout foldout in foldouts) foldout.UpdateState(this);
 
             if (queue.Count == 0) Stop(); // no more tests left to run
             else if (running && !paused) RunNext();
