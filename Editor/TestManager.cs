@@ -347,7 +347,7 @@ namespace GameTest
             running = true;
 
             if (!EditorApplication.isPlaying) EditorApplication.EnterPlaymode(); // can cause recompile
-            else Logger.Log("Starting");
+            Logger.Log("Starting");
         }
 
         /// <summary>
