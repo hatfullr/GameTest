@@ -151,7 +151,6 @@ namespace GameTest
         private void OnBeforeAssemblyReload()
         {
             reloadingDomain = true;
-
             PreferencesWindow.CloseAll();
         }
 
@@ -169,12 +168,8 @@ namespace GameTest
         private void OnPlayStateChanged(PlayModeStateChange change)
         {
             if (change == PlayModeStateChange.EnteredPlayMode && Utilities.IsSceneEmpty()) Focus();
-
-            if (change == PlayModeStateChange.EnteredEditMode && manager.running)
-            {
-                manager.Stop();
-            }
-
+            if (change == PlayModeStateChange.EnteredEditMode && manager.running) manager.Stop();
+            if (change == PlayModeStateChange.EnteredPlayMode && !manager.running) manager.Start();
             // If we don't Repaint() here, then the toolbar buttons can appear incorrect. This should always happen as the very last thing.
             if (change == PlayModeStateChange.EnteredEditMode) Repaint();
         }
