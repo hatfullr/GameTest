@@ -1,6 +1,6 @@
 {
   "name": "gametest",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "displayName": "GameTest",
   "description": "Create and manage unit tests.\nSee the Samples tab!",
   "author": "Roger Hatfull",
