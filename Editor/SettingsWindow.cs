@@ -46,7 +46,7 @@ namespace GameTest
             GUIContent label = new GUIContent("Prefab Override", Style.Tooltips.settingsWindowPrefab);
             using (new EditorGUILayout.VerticalScope(Style.Get("Settings/Header")))
             {
-                EditorGUILayout.ObjectField(label, test.prefab, typeof(GameObject), false);
+                test.prefab = EditorGUILayout.ObjectField(label, test.prefab, typeof(GameObject), false) as GameObject;
             }
         }
 
@@ -86,15 +86,18 @@ namespace GameTest
             using (new EditorGUILayout.HorizontalScope(Style.Get("Settings/Footer")))
             {
                 GUILayout.FlexibleSpace();
-                if (GUILayout.Button("Reset"))
+                using (new EditorGUI.DisabledGroupScope(test.prefab != null))
                 {
-                    if (!EditorUtility.DisplayDialog("Reset this test?", "This action cannot be undone.",
-                        "Yes", "No"
-                    )) return;
-                    test.DestroyDefaultPrefab();
-                    Init(test);
-                    if (Logger.debug.HasFlag(Logger.DebugMode.Log)) Logger.Log("Reset " + test.attribute.GetPath());
-                    GUIUtility.ExitGUI();
+                    if (GUILayout.Button(new GUIContent("Reset", "Reset this test's prefab. Only available if the Prefab Override is not set.")))
+                    {
+                        if (!EditorUtility.DisplayDialog("Reset this test's prefab?", "This action cannot be undone.",
+                            "Yes", "No"
+                        )) return;
+                        test.DestroyDefaultPrefab();
+                        Init(test);
+                        if (Logger.debug.HasFlag(Logger.DebugMode.Log)) Logger.Log("Reset " + test.attribute.GetPath());
+                        GUIUtility.ExitGUI();
+                    }
                 }
             }
         }
