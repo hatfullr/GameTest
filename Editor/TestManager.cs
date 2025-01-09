@@ -175,7 +175,9 @@ namespace GameTest
             // Didn't find an existing TestManager, so create one
             TestManager result = ScriptableObject.CreateInstance(typeof(TestManager)) as TestManager;
             filePath = Path.Join(Utilities.defaultDataPath, nameof(GameTest) + ".asset");
-            AssetDatabase.CreateAsset(result, filePath);
+            Utilities.EnsureDirectoryExists(Path.GetDirectoryName(filePath));
+            AssetDatabase.Refresh();
+            AssetDatabase.CreateAsset(result, Utilities.GetUnityPath(filePath));
             return result;
         }
 

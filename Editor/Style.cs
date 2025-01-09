@@ -21,6 +21,7 @@ namespace GameTest
             "<b>1.</b> In any MonoBehaviour, write \"using GameTest;\" at the top, write a method with a \"[Test]\" attribute, and include \"Assert.\" statement(s). Then recompile.",
             "<b>2.</b> After recompiling, find and select your test below to add it to the queue.",
             "<b>3.</b> Click the Play button above (in the toolbar). A test fails if it throws an AssertionException, and passes otherwise. Check the Console for detailed results.",
+            "",
             "Click the GitHub button or see README.md for additional information.",
             "",
             "<size=14>Tips:</size>",
