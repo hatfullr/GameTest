@@ -297,6 +297,12 @@ namespace GameTest
             // If the path begins with either "Assets" or "Packages", then it's already a Unity path.
             if (path.StartsWith("Assets") || path.StartsWith("Packages")) return path;
 
+            string basename = Path.GetFileName(path);
+            if (basename == "Assets" || basename == "Packages")
+            {
+                if (Path.GetFullPath(Path.GetDirectoryName(path)) == Path.GetFullPath(projectPath)) return basename;
+            }
+
             path = Path.GetFullPath(path); // normalize the path
 
             if (IsPathChild(assetsPath, path)) // it's in the "Assets" folder
