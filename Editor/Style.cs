@@ -89,16 +89,15 @@ namespace GameTest
         public static class Tooltips
         {
             public const string clearSelected = "Clear selected test results";
-            public const string playOff = "Run selected tests";
+            public const string playOff = "Run queued tests in order";
             public const string playOn = "Stop testing";
-            public const string pauseOff = "Pause testing";
-            public const string pauseOn = "Resume testing";
-            public const string skip = "Stop the current test and skip to the next";
+            public const string pauseOff = "Pause testing. While paused, use the Skip button to manually advance through tests.";
+            public const string pauseOn = "Resume testing. While paused, use the Skip button to manually advance through tests.";
+            public const string skip = "Skip the current test (if a test is running) and start the next";
             public const string goToEmptyScene = "Go to empty scene";
             public const string debugOff = "Enable/disable debug messages";
             public const string debugOn = "Enable/disable debug messages";
-            public const string refresh = "Refresh test methods and classes by searching all assemblies. This should never be necessary, but could " +
-                        "be helpful if GameTest is having trouble detecting your tests.";
+            public const string refresh = "Relocate methods with a [Test] attribute. This can help if " + nameof(GameTest) + " has trouble finding your tests.";
             public const string welcome = "Show/hide the welcome message";
             public const string testPassed = "Passed";
             public const string testFailed = "Failed";

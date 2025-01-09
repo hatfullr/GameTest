@@ -3,7 +3,6 @@ using UnityEngine;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using System.Text.RegularExpressions;
-using System.Linq;
 
 namespace GameTest
 {
@@ -158,20 +157,17 @@ namespace GameTest
         {
             manager = TestManager.Load();
             reloadingDomain = false;
-            Refresh(() =>
-            {
-                if (manager != null)
-                    if (manager.running && !manager.paused) manager.RunNext();
-            });
+            Refresh();
         }
 
         private void OnPlayStateChanged(PlayModeStateChange change)
         {
             if (change == PlayModeStateChange.EnteredPlayMode && Utilities.IsSceneEmpty()) Focus();
-            if (change == PlayModeStateChange.EnteredEditMode && manager.running) manager.Stop();
-            if (change == PlayModeStateChange.EnteredPlayMode && !manager.running) manager.Start();
+
+            if (manager != null) manager.OnPlayStateChanged(change);
+
             // If we don't Repaint() here, then the toolbar buttons can appear incorrect. This should always happen as the very last thing.
-            if (change == PlayModeStateChange.EnteredEditMode) Repaint();
+            Repaint();
         }
 
         void OnLostFocus()
@@ -223,6 +219,7 @@ namespace GameTest
 
         private void Refresh(System.Action onFinished = null, string message = "Refreshing")
         {
+            if (manager != null) manager.OnBeforeTestManagerUIRefresh();
             StartLoadingWheel(message);
             Repaint();
 
@@ -236,7 +233,9 @@ namespace GameTest
                     StopLoadingWheel();
                     Repaint();
 
-                    if (onFinished != null) onFinished(); 
+                    if (onFinished != null) onFinished();
+
+                    manager.OnAfterTestManagerUIRefresh();
                 });
         }
 
@@ -660,7 +659,7 @@ namespace GameTest
             if (manager.running != current) // The user clicked on the button
             {
                 if (manager.running) manager.Stop();
-                else manager.Start();
+                else manager.RequestStart();
             }
         }
 

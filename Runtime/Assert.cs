@@ -21,6 +21,15 @@ namespace GameTest
         public static Object currentTestScript = null;
 
         /// <summary>
+        /// Simply raise an AssertException with a message.
+        /// </summary>
+        /// <param name="message">The debug message to show in the console.</param>
+        [HideInCallstack] public static void Fail(string message = "")
+        {
+            ThrowException(message);
+        }
+
+        /// <summary>
         /// Assert the values are approximately equal. An absolute error check is used for approximate equality check (|a-b| <= tolerance). 
         /// Default tolerance is 0.00001f.
         /// </summary>
