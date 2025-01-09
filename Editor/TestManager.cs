@@ -292,7 +292,7 @@ namespace GameTest
         {
             Logger.Log("Starting");
             running = true;
-            RunNext();
+            if (!paused) RunNext();
         }
 
         /// <summary>
@@ -318,6 +318,14 @@ namespace GameTest
             if (onStop != null) onStop.Invoke();
             Logger.Log("Finished", null, null);
             stopping = false;
+        }
+
+        public static void PauseOnFail()
+        {
+            TestManager manager = TestManager.Get();
+            if (manager == null) return;
+            manager.paused = true;
+            EditorApplication.isPaused = true;
         }
 
         [HideInCallstack]

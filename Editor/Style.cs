@@ -89,11 +89,11 @@ namespace GameTest
         public static class Tooltips
         {
             public const string clearSelected = "Clear selected test results";
-            public const string playOff = "Run selected tests";
+            public const string playOff = "Run queued tests in order";
             public const string playOn = "Stop testing";
-            public const string pauseOff = "Pause testing";
-            public const string pauseOn = "Resume testing";
-            public const string skip = "Stop the current test and skip to the next";
+            public const string pauseOff = "Pause testing. While paused, use the Skip button to manually advance through tests.";
+            public const string pauseOn = "Resume testing. While paused, use the Skip button to manually advance through tests.";
+            public const string skip = "Skip the current test (if a test is running) and start the next";
             public const string goToEmptyScene = "Go to empty scene";
             public const string debugOff = "Enable/disable debug messages";
             public const string debugOn = "Enable/disable debug messages";

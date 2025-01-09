@@ -268,6 +268,9 @@ namespace GameTest
             // Run the coroutine
             yield return coroutineMethod;
 
+            int startFrame = Time.frameCount;
+            while (startFrame == Time.frameCount) yield return null;
+
             // Clean up
             OnRunComplete();
         }
@@ -278,6 +281,7 @@ namespace GameTest
         [HideInCallstack]
         public void OnRunComplete()
         {
+            bool wasCoroutine = coroutineGO != null;
             CancelCoroutine();
             if (coroutineGO != null) Object.DestroyImmediate(coroutineGO);
             coroutineGO = null;
@@ -289,7 +293,12 @@ namespace GameTest
 
             PrintResult();
 
-            if (attribute.pauseOnFail && result == Result.Fail) EditorApplication.isPaused = true;
+            //if (result == Result.Fail && attribute.pauseOnFail && !wasCoroutine)
+            //{
+            //    EditorApplication.isPaused = true;
+            //    TestManager manager = TestManager.Get();
+            //    if (manager != null) manager.paused = true;
+            //}
 
             SetCurrentTest(null);
 
@@ -328,10 +337,8 @@ namespace GameTest
         {
             if (type == LogType.Exception || type == LogType.Assert)
             {
-                //CancelCoroutine();
                 result = Result.Fail;
-                //EditorApplication.isPaused = !EditorApplication.isPaused && // If false (already paused), stay paused
-                //    attribute.pauseOnFail; // If not paused (playing) and we should pause, then pause
+                if (attribute.pauseOnFail) TestManager.PauseOnFail();
             }
         }
 

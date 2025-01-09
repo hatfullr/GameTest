@@ -22,7 +22,7 @@ namespace GameTest
         /// </summary>
         public string tearDown;
         /// <summary>
-        /// Pause the editor when this test fails. No other subsequent tests will run. default = false.
+        /// Pause both the editor and GameTest when this test fails. default = false.
         /// </summary>
         public bool pauseOnFail;
         /// <summary>
@@ -47,7 +47,7 @@ namespace GameTest
         /// </summary>
         /// <param name="setUp">Name of a static method which returns a GameObject and accepts no parameters.</param>
         /// <param name="tearDown">Name of a static method which returns void and accepts the GameObject returned by SetUp.</param>
-        /// <param name="pauseOnFail">Pause the editor when this test fails. No other subsequent tests will run. default = false.</param>
+        /// <param name="pauseOnFail">Pause both the editor and GameTest when this test fails. default = false.</param>
         /// <param name="name">The test method name which appears in the test manager. The default is the name of the method. Names must be unique per-file.</param>
         /// <param name="sourceFile">DO NOT USE. It is used by reflection techniques to locate the source file that this attribute was used in.</param>
         /// <param name="lineNumber">DO NOT USE. It is used by reflection techniques to locate the line number where this attribute was used in.</param>
@@ -70,7 +70,7 @@ namespace GameTest
         /// <summary>
         /// This method will be added to Window > GameTest Manager.
         /// </summary>
-        /// <param name="pauseOnFail">Pause testing when this test fails. No other subsequent tests will run. default = false.</param>
+        /// <param name="pauseOnFail">Pause both the editor and GameTest when this test fails. default = false.</param>
         /// <param name="name">The test method name which appears in the test manager. The default is the name of the method. Names must be unique per-file.</param>
         /// <param name="sourceFile">DO NOT USE. It is used by reflection techniques to locate the source file that this attribute was used in.</param>
         /// <param name="lineNumber">DO NOT USE. It is used by reflection techniques to locate the line number where this attribute was used in.</param>
@@ -92,7 +92,7 @@ namespace GameTest
         /// This method will be added to Window > GameTest Manager.
         /// </summary>
         /// <param name="setUp">Name of a static method which returns a GameObject and accepts no parameters.</param>
-        /// <param name="pauseOnFail">Pause testing when this test fails. No other subsequent tests will run. default = false.</param>
+        /// <param name="pauseOnFail">Pause both the editor and GameTest when this test fails. default = false.</param>
         /// <param name="name">The test method name which appears in the test manager. The default is the name of the method. Names must be unique per-file.</param>
         /// <param name="sourceFile">DO NOT USE. It is used by reflection techniques to locate the source file that this attribute was used in.</param>
         /// <param name="lineNumber">DO NOT USE. It is used by reflection techniques to locate the line number where this attribute was used in.</param>
