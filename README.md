@@ -100,20 +100,20 @@ public class Example : MonoBehaviour
         Assert.IsTrue(true); // passes
     }
 	
-	[Test] // Coroutine test
-	private IEnumerator CoroutineTest(GameObject gameObject)
-	{
-		int start = Time.frameCount;
-		yield return null; // go to next frame
-		Assert.AreEqual(start + 1, Time.frameCount);
-		yield return new WaitForEndOfFrame(); // Unity hasn't gone to the next frame yet
-		Assert.AreEqual(start + 1, Time.frameCount);
-		
-		float startTime = Time.realtimeSinceStartup;
-		yield return new WaitForSecondsRealtime(1f);
-		float duration = Time.realtimeSinceStartup - startTime;
-		Assert.AreApproximatelyEqual(duration, 1f, 0.01f);
-	}
+    [Test] // Coroutine test
+    private IEnumerator CoroutineTest(GameObject gameObject)
+    {
+        int start = Time.frameCount;
+        yield return null; // go to next frame
+        Assert.AreEqual(start + 1, Time.frameCount);
+        yield return new WaitForEndOfFrame(); // Unity hasn't gone to the next frame yet
+        Assert.AreEqual(start + 1, Time.frameCount);
+        
+        float startTime = Time.realtimeSinceStartup;
+        yield return new WaitForSecondsRealtime(1f);
+        float duration = Time.realtimeSinceStartup - startTime;
+        Assert.AreApproximatelyEqual(duration, 1f, 0.01f);
+    }
 }
 ```
 
