@@ -353,17 +353,22 @@ namespace GameTest
             int nFailed = 0;
             int nPassed = 0;
             int nSkipped = 0;
+            int nTotal = 0;
             foreach (Test test in GetTests(manager, true))
             {
                 if (test.result == Test.Result.Fail) nFailed++;
-                if (test.result == Test.Result.Pass) nPassed++;
+                else if (test.result == Test.Result.Pass) nPassed++;
                 else if (test.result == Test.Result.Skipped) nSkipped++;
+                nTotal++;
             }
-
+            int nRan = nFailed + nPassed + nSkipped;
             result = Test.Result.None;
-            if (nFailed > 0) result = Test.Result.Fail;
-            else if (nSkipped > 0) result = Test.Result.Skipped;
-            else if (nPassed > 0) result = Test.Result.Pass;
+            if (nRan > 0)
+            {
+                if (nFailed > 0) result = Test.Result.Fail;
+                else if (nPassed > 0) result = Test.Result.Pass;
+                else if (nSkipped > 0) result = Test.Result.Skipped;
+            }
 
             //Debug.Log(path + "    " + isMixed + " " + wasMixed + "    " + result + " " + previousResult + "    " + selected + " " + wasSelected + "    " + locked + " " + wasLocked);
 

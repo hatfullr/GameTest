@@ -3,7 +3,6 @@ using UnityEngine;
 using System.IO;
 using UnityEditor;
 using System.Collections.Generic;
-using UnityEditor.PackageManager.UI;
 
 namespace GameTest
 {
@@ -19,6 +18,7 @@ namespace GameTest
         public GameObject prefab;
 
         public Result result;
+
         /// <summary>
         /// The test method to be executed.
         /// </summary>
@@ -83,19 +83,6 @@ namespace GameTest
 #pragma warning disable CS0618 // "obsolete" markers
             isInSuite = method.DeclaringType.GetCustomAttribute(typeof(SuiteAttribute)) != null;
 #pragma warning restore CS0618
-        }
-        
-        public Test(Test original)
-        {
-            attribute = original.attribute;
-            method = original.method;
-            isInSuite = original.isInSuite;
-
-            selected = original.selected;
-            locked = original.locked;
-            result = original.result;
-            script = original.script;
-            prefab = original.prefab;
         }
 
         private class CoroutineMonoBehaviour : MonoBehaviour { }
@@ -197,7 +184,7 @@ namespace GameTest
         [HideInCallstack]
         public void Run()
         {
-            if (method == null) throw new System.Exception("Missing method reference on Test " + attribute.GetPath());
+            if (method == null) throw new System.Exception("Missing method reference on Test " + attribute.GetPath() + ". Try refreshing the " + nameof(GameTest) + " window");
 
             if (!EditorApplication.isPlaying)
             {

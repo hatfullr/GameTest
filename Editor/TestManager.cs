@@ -21,9 +21,14 @@ namespace GameTest
         public string search = null;
         public bool paused = false;
         public bool running = false;
+        /// <summary>
+        /// Set to true when user presses the Start toolbar button (calls RequestStart). Set to false when Stop() is called.
+        /// </summary>
+        public bool startRequested = false;
         public TestManagerUI.TestSortOrder testSortOrder = TestManagerUI.TestSortOrder.Name;
 
         [SerializeField] private string dataPath = null;
+        [SerializeField] private bool uiRefreshing = false;
 
         public Vector2 scrollPosition;
 
@@ -118,11 +123,8 @@ namespace GameTest
             }
         }
 
-        void Awake()
-        {
-            Logger.debug = debug;
-        }
 
+        #region Persistence Methods
         /// <summary>
         /// Returns the currently set data path. The user can change the data path via the UI.
         /// </summary>
@@ -169,7 +171,7 @@ namespace GameTest
                 filePath = AssetDatabase.GUIDToAssetPath(guid);
                 return AssetDatabase.LoadAssetAtPath<TestManager>(filePath);
             }
-            
+
             // Didn't find an existing TestManager, so create one
             TestManager result = ScriptableObject.CreateInstance(typeof(TestManager)) as TestManager;
             filePath = Path.Join(Utilities.defaultDataPath, nameof(GameTest) + ".asset");
@@ -185,21 +187,137 @@ namespace GameTest
             EditorUtility.SetDirty(this);
             AssetDatabase.SaveAssetIfDirty(this);
         }
+        #endregion
+
+
+        #region Unity Events 
+        // Some of these (EditorWindow events) need to be called by the TestManagerUI
+
+        void Awake()
+        {
+            Logger.debug = debug;
+        }
 
         [HideInCallstack]
         public void Update()
         {
-            if (Time.frameCount > previousFrameNumber) OnUpdate();
+            if (Time.frameCount > previousFrameNumber && Test.current != null)
+            {
+                guiQueue.IncrementTimer(Time.deltaTime);
+            }
             previousFrameNumber = (uint)Time.frameCount;
         }
 
         /// <summary>
-        /// This method is only called when the editor has advanced a single frame.
+        /// "factory reset" the TestManager, but don't clear out the asset data. If you want to clear the asset data, use TestManager.ClearData().
         /// </summary>
-        [HideInCallstack]
-        private void OnUpdate()
+        public void Reset()
         {
-            if (Test.current != null) guiQueue.IncrementTimer(Time.deltaTime);
+            foldouts.Clear();
+            scrollPosition = default;
+            showWelcome = true;
+            loadingWheelVisible = false;
+            loadingWheelText = null;
+            search = default;
+            searchMatches.Clear();
+            originalQueue.Clear();
+            running = default;
+            startRequested = default;
+            stopping = default;
+            uiRefreshing = default;
+
+            pingData = new PingData();
+            testToReveal = default;
+
+            debug = Logger.DebugMode.Log | Logger.DebugMode.LogWarning | Logger.DebugMode.LogError;
+            Logger.debug = debug;
+            testSortOrder = TestManagerUI.TestSortOrder.Name;
+            previousFrameNumber = 0;
+
+            guiQueue.Reset();
+        }
+
+        public void OnPlayStateChanged(PlayModeStateChange change)
+        {
+            if (running && change == PlayModeStateChange.ExitingPlayMode) Stop();
+            if (change == PlayModeStateChange.EnteredPlayMode && startRequested && !uiRefreshing) Start();
+        }
+
+        public void OnBeforeTestManagerUIRefresh()
+        {
+            uiRefreshing = true;
+        }
+        public void OnAfterTestManagerUIRefresh()
+        {
+            uiRefreshing = false;
+            // isPlaying is true on EnteredPlayMode and ExitingEditMode
+            if (EditorApplication.isPlaying && startRequested) Start();
+        }
+        #endregion
+
+        #region Test Execution
+        /// <summary>
+        /// Submit a request to start the tests. The manager will then enter Play mode if the editor is not in Play mode already.
+        /// This can cause the domain to be reloaded, so the manager waits until the domain has been reloaded. Then the tests 
+        /// actually start.
+        /// </summary>
+        public void RequestStart()
+        {
+            if (running) return;
+            if (startRequested) return;
+
+            startRequested = true;
+
+            finished.Clear();
+            originalQueue.Clear();
+            originalQueue.AddRange(queue); // Save a copy of the original queue to restore queue order in Stop()
+
+            if (!EditorApplication.isPlaying)
+            {
+                EditorApplication.EnterPlaymode();
+                // Unity does the following:
+                //   1. ExitingPlayMode
+                //   2. OnBeforeAssemblyReload
+                //   3. OnAfterAssemblyReload
+                //   4. EnteredPlayMode
+                // Setps 2 and 3 don't happen if EditorSettings.enterPlayModeOptions.HasFlag(EnterPlayModeOptions.DisableDomainReload)
+            }
+            else Start();
+        }
+
+        /// <summary>
+        /// Begin working through the queue, running each Test.
+        /// </summary>
+        private void Start()
+        {
+            Logger.Log("Starting");
+            running = true;
+            RunNext();
+        }
+
+        /// <summary>
+        /// Stop running tests and clear the queues
+        /// </summary>
+        public void Stop()
+        {
+            if (stopping) return;
+
+            stopping = true;
+            SkipRemainingTests();
+
+            // Restore test ordering
+            queue.Clear();
+            queue.AddRange(originalQueue);
+            originalQueue.Clear();
+
+            running = false;
+            startRequested = false;
+            paused = false;
+
+            if (EditorApplication.isPlaying) EditorApplication.ExitPlaymode();
+            if (onStop != null) onStop.Invoke();
+            Logger.Log("Finished", null, null);
+            stopping = false;
         }
 
         [HideInCallstack]
@@ -216,13 +334,6 @@ namespace GameTest
 
             Test test = queue[0];
             queue.RemoveAt(0);
-
-            if (test.result == Test.Result.Skipped)
-            {
-                AddToFinishedQueue(test);
-                test.PrintResult();
-                return;
-            }
 
             test.onFinished -= OnRunFinished;
             test.onFinished += OnRunFinished;
@@ -274,104 +385,27 @@ namespace GameTest
             else
             {
                 if (queue.Count == 0) Stop(); // this shouldn't happen, but is a fallback in case it does somehow
-                else
-                {
-                    RunNext();
-                    //if (paused)
-                    //{
-                    //    Test.SetCurrentTest(queue[0]);
-                    //    queue.RemoveAt(0);
-                    //}
-                    //else RunNext();
-                }
+                else RunNext();
             }
         }
 
         private void SkipRemainingTests()
         {
-            // Mark all remaining tests for skipping
-            foreach (Test test in queue) test.result = Test.Result.Skipped;
+            running = false;
 
             // If there is a Test running currently, skip it
-            Skip();
-
-            if (paused)
+            if (Test.current != null)
             {
-                foreach (Test test in queue)
-                {
-                    AddToFinishedQueue(test);
-                    test.PrintResult();
-                }
+                Test.current.result = Test.Result.Skipped;
+                Test.current.OnRunComplete();
             }
-        }
 
-        /// <summary>
-        /// "factory reset" the TestManager, but don't clear out the asset data. If you want to clear the asset data, use TestManager.ClearData().
-        /// </summary>
-        public void Reset()
-        {
-            foldouts.Clear();
-            scrollPosition = default;
-            showWelcome = true;
-            loadingWheelVisible = false;
-            loadingWheelText = null;
-            search = default;
-            searchMatches.Clear();
-            originalQueue.Clear();
-            running = default;
-            stopping = default;
-
-            pingData = new PingData();
-            testToReveal = default;
-
-            debug = Logger.DebugMode.Log | Logger.DebugMode.LogWarning | Logger.DebugMode.LogError;
-            Logger.debug = debug;
-            testSortOrder = TestManagerUI.TestSortOrder.Name;
-            previousFrameNumber = 0;
-
-            guiQueue.Reset();
-        }
-
-
-        #region Test Execution
-        /// <summary>
-        /// Begin working through the queue, running each Test.
-        /// </summary>
-        public void Start()
-        {
-            finished.Clear();
-
-            originalQueue.Clear();
-            originalQueue.AddRange(queue); // Save a copy of the original queue to restore queue order in Stop()
-
-            running = true;
-
-            if (!EditorApplication.isPlaying) EditorApplication.EnterPlaymode(); // can cause recompile
-            Logger.Log("Starting");
-        }
-
-        /// <summary>
-        /// Stop running tests and clear the queues
-        /// </summary>
-        public void Stop()
-        {
-            if (stopping) return;
-
-            stopping = true;
-            SkipRemainingTests();
-
-            // Restore test ordering
-            queue.Clear();
-            queue.AddRange(originalQueue);
-            originalQueue.Clear();
-
-            running = false;
-            paused = false;
-
-            if (EditorApplication.isPlaying) EditorApplication.ExitPlaymode();
-            if (onStop != null) onStop.Invoke();
-            Logger.Log("Finished", null, null);
-            stopping = false;
+            foreach (Test test in queue)
+            {
+                test.result = Test.Result.Skipped;
+                test.PrintResult();
+                AddToFinishedQueue(test);
+            }
         }
         #endregion
 

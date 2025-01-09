@@ -97,8 +97,7 @@ namespace GameTest
             public const string goToEmptyScene = "Go to empty scene";
             public const string debugOff = "Enable/disable debug messages";
             public const string debugOn = "Enable/disable debug messages";
-            public const string refresh = "Refresh test methods and classes by searching all assemblies. This should never be necessary, but could " +
-                        "be helpful if GameTest is having trouble detecting your tests.";
+            public const string refresh = "Relocate methods with a [Test] attribute. This can help if " + nameof(GameTest) + " has trouble finding your tests.";
             public const string welcome = "Show/hide the welcome message";
             public const string testPassed = "Passed";
             public const string testFailed = "Failed";
