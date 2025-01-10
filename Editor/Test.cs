@@ -402,8 +402,8 @@ namespace GameTest
         public void DeleteDefaultPrefab()
         {
             if (_defaultPrefab == null) return;
-            
-            Object.DestroyImmediate(_defaultPrefab, true);
+
+            AssetDatabase.DeleteAsset(AssetDatabase.GetAssetPath(_defaultPrefab));
 
             TestManager manager = TestManager.Get();
             string dataPath = Utilities.defaultDataPath;
