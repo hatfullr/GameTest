@@ -228,11 +228,20 @@ namespace GameTest
             // check the game object
             if (gameObject == null) throw new System.NullReferenceException("GameObject == null. Check your SetUp method for " + attribute.name + " in " + Utilities.GetUnityPath(attribute.sourceFile));
 
-            Component component = gameObject.GetComponent(method.DeclaringType);
-
-            if (component == null && instantiatedDefaultGO == null)
-                throw new System.NullReferenceException("Component of type " + method.DeclaringType + " not found in the GameObject returned by the SetUp method.");
-
+            Component[] components = gameObject.GetComponentsInChildren(method.DeclaringType, true);
+            Component component;
+            if (components.Length == 0) throw new System.Exception("No components of type " + method.DeclaringType + " found in the testing prefab for " + 
+                attribute.GetPath() + ". Please make sure that the GameObject returned by your SetUp method for this test -- or your Prefab Override -- has " +
+                "a component of the proper type as a child, such that it can be found with GetComponentsInChildren(typeof(" + method.DeclaringType +"), true).");
+            else if (components.Length == 1) component = components[0];
+            else
+            {
+                Logger.LogWarning("Multiple components of type " + method.DeclaringType + " were found as subject of test " + attribute.GetPath() + ". The " +
+                    "component closest to the top of the hierarchy will be used, which is the first one returned by GetComponentsInChildren, including inactive " +
+                    "components.");
+                component = components[0];
+            }
+            
             // invoke the method
             if (method.ReturnType == typeof(System.Collections.IEnumerator))
             { // An IEnumerator is intended to be run over many frames as a coroutine, using the yield statement to separate frames.

@@ -1,5 +1,6 @@
 using UnityEditor;
 using System.IO;
+using System.Collections.Generic;
 
 namespace GameTest
 {
@@ -25,6 +26,24 @@ namespace GameTest
                 EditorUtility.DisplayDialog("Deletion Failed", "You must uninstall GameTest first via the Package Manager (Window > Package Manager) before deleting this ScriptableObject.", "Ok");
                 return AssetDeleteResult.DidDelete;
             }
+
+            // Keep watch for scripts being deleted that contain tests.
+            // We need to prepare the TestManager for those tests being deleted or else it throws errors.
+            if (EditorWindow.HasOpenInstances<TestManagerUI>())
+            {
+                TestManager manager = TestManager.Get();
+                if (manager != null)
+                {
+                    // Get the path to the file, excluding its file extension
+                    string path = Utilities.GetUnityPath(Path.Join(Path.GetDirectoryName(sourcePath), Path.GetFileNameWithoutExtension(sourcePath)));
+                    foreach (Foldout foldout in manager.foldouts.ToArray())
+                    {
+                        if (foldout.path != path) continue;
+                        manager.RemoveFoldout(foldout);
+                    }
+                }
+            }
+
             return AssetDeleteResult.DidNotDelete; // We didn't delete the sourcePath file.
         }
         private static AssetMoveResult OnWillMoveAsset(string sourcePath, string destinationPath)
