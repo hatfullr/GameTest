@@ -91,7 +91,11 @@ namespace GameTest
         {
             if (!comparer.Equals(expected, actual))
             {
-                string final = expected.ToString() + " != " + actual.ToString();
+                string expectedString = "null";
+                string actualString = "null";
+                if (expected != null) expectedString = expected.ToString();
+                if (actual != null) actualString = actual.ToString();
+                string final = expectedString + " != " + actualString;
                 if (!string.IsNullOrEmpty(message)) final += ", " + message;
                 ThrowException(final);
             }
@@ -114,7 +118,11 @@ namespace GameTest
         {
             if (comparer.Equals(expected, actual))
             {
-                string final = expected.ToString() + " != " + actual.ToString();
+                string expectedString = "null";
+                string actualString = "null";
+                if (expected != null) expectedString = expected.ToString();
+                if (actual != null) actualString = actual.ToString();
+                string final = expectedString + " == " + actualString;
                 if (!string.IsNullOrEmpty(message)) final += ", " + message;
                 ThrowException(message);
             }

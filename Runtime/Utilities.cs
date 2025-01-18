@@ -287,6 +287,35 @@ namespace GameTest
             }
         }
 
+        public static Object GetScript(string sourcePath)
+        {
+            string pathToSearch = Path.GetDirectoryName(Path.Join(
+                Path.GetFileName(Application.dataPath),     // Usually it's "Assets", unless Unity ever changes that
+                Path.GetRelativePath(Application.dataPath, sourcePath))
+            );
+
+            string basename = Path.GetFileName(sourcePath);
+
+            // It's ridiculous, but we fail to find scripts directly because Unity hasn't updated the cache yet,
+            // or something like that. This method searches the directory that we know the script is in to
+            // retrieve the GUIDs.
+            string[] guids = AssetDatabase.FindAssets("t:Script", new string[] { pathToSearch });
+            foreach (string guid in guids)
+            {
+                // Get the path of this asset by its GUID
+                string path = AssetDatabase.GUIDToAssetPath(guid);
+                // Simply check the basenames. There cannot be files of the same name in the same location.
+                if (Path.GetFileName(path) == basename)
+                {
+                    return AssetDatabase.LoadAssetAtPath(AssetDatabase.GUIDToAssetPath(guid), typeof(MonoScript));
+                }
+            }
+
+            Logger.LogError("Failed to find script '" + Path.GetFileName(sourcePath) + "' in '" + pathToSearch + "'");
+            return null;
+        }
+
+        public static GUID GetAssetGUID(Object asset) => AssetDatabase.GUIDFromAssetPath(AssetDatabase.GetAssetPath(asset));
 
         /// <summary>
         /// For a given full file path, return a new path that starts either with "Assets" or "Packages", in the way that
