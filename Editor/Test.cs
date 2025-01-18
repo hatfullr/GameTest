@@ -32,11 +32,13 @@ namespace GameTest
         public System.Action<Test> onFinished;
 
         private GameObject gameObject;
-        private Object script;
+        [SerializeField] private Object script;
         private GameObject instantiatedDefaultGO;
 
         private Coroutine coroutine;
-        
+
+        private string path = null;
+
         public static Test current { get; private set; }
         private static GameObject coroutineGO;
         private static bool sceneWarningPrinted = false;
@@ -362,39 +364,11 @@ namespace GameTest
         /// </summary>
         public Object GetScript()
         {
-            if (script != null) return script;
-
-            string pathToSearch = Path.GetDirectoryName(Path.Join(
-                Path.GetFileName(Application.dataPath),     // Usually it's "Assets", unless Unity ever changes that
-                Path.GetRelativePath(Application.dataPath, attribute.sourceFile))
-            );
-
-            string basename = Path.GetFileName(attribute.sourceFile);
-
-            // It's ridiculous, but we fail to find scripts directly because Unity hasn't updated the cache yet,
-            // or something like that. This method searches the directory that we know the script is in to
-            // retrieve the GUIDs.
-            string[] guids = AssetDatabase.FindAssets("t:Script", new string[] { pathToSearch });
-            string matched = null;
-            foreach (string guid in guids)
-            {
-                // Get the path of this asset by its GUID
-                string path = AssetDatabase.GUIDToAssetPath(guid);
-                // Simply check the basenames. There cannot be files of the same name in the same location.
-                if (Path.GetFileName(path) == basename)
-                {
-                    matched = guid;
-                    break;
-                }
-            }
-
-            if (matched == null) Logger.LogError("Failed to find script '" + method.DeclaringType.FullName + "' in '" + pathToSearch + "'");
-            else
-            {
-                script = AssetDatabase.LoadAssetAtPath(AssetDatabase.GUIDToAssetPath(matched), typeof(MonoScript));
-            }
+            if (script == null) script = Utilities.GetScript(attribute.sourceFile);
             return script;
         }
+
+        public GUID GetScriptGUID() => AssetDatabase.GUIDFromAssetPath(AssetDatabase.GetAssetPath(GetScript()));
 
         /// <summary>
         /// This never destroys the user's set prefab for this object.

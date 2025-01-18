@@ -518,6 +518,7 @@ namespace GameTest
         private void CreateTest(TestAttribute attribute, MethodInfo method)
         {
             // Locate the Foldout that this new Test would be a member of
+            GUID scriptGUID = Utilities.GetAssetGUID(Utilities.GetScript(attribute.sourceFile));
             Foldout foundFoldout = null;
             Test foundTest = null;
             string parent = Path.GetDirectoryName(attribute.GetPath());
@@ -528,7 +529,7 @@ namespace GameTest
                     foundFoldout = foldout;
                     foreach (Test test in foundFoldout.tests)
                     {
-                        if (test.attribute == attribute)
+                        if (test.GetScriptGUID() == scriptGUID && test.attribute.name == attribute.name)
                         {
                             foundTest = test;
                             break;
@@ -541,6 +542,7 @@ namespace GameTest
             if (foundTest != null) // Found existing matching Test, so update its method
             {
                 foundTest.method = method;
+                foundTest.attribute = attribute; // also update its attribute to the new one which was found
             }
             else // Did not find any existing Test, so make a new one
             {
