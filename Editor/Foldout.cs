@@ -28,7 +28,7 @@ namespace GameTest
 
         public Foldout(string path, bool selected = false, bool expanded = false, bool locked = false)
         {
-            this.path = path;
+            this.path = Utilities.ResolveCrossPlatformPath(path); // if the user switched platforms, try to catch the case here
             this.selected = selected;
             this.expanded = expanded;
             this.locked = locked;

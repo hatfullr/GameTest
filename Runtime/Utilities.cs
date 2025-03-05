@@ -4,7 +4,8 @@ using System.IO;
 using System.Reflection;
 using UnityEditor;
 using UnityEngine;
-
+using System.Linq;
+using System.Text.RegularExpressions;
 
 namespace GameTest
 {
@@ -318,6 +319,26 @@ namespace GameTest
 
         public static GUID GetAssetGUID(Object asset) => AssetDatabase.GUIDFromAssetPath(AssetDatabase.GetAssetPath(asset));
 
+        public static string ResolveCrossPlatformPath(string path)
+        {
+            if (!File.Exists(Path.GetFullPath(path)) && !Directory.Exists(Path.GetFullPath(path)))
+            {
+                List<string> items = Regex.Split(path, @"[\\/]").ToList(); // split on either \ or /
+
+                int i1 = items.IndexOf("Assets");
+                int i2 = items.IndexOf("Packages");
+                if (i1 == -1) i1 = int.MaxValue;
+                if (i2 == -1) i2 = int.MaxValue;
+
+                string newPath = null;
+                if (i1 < i2) newPath = Path.Combine(projectPath, Path.Combine(items.Skip(i1).ToArray()));
+                else if (i2 < i1) newPath = Path.Combine(projectPath, Path.Combine(items.Skip(i2).ToArray()));
+                if (!string.IsNullOrEmpty(newPath))
+                    if (File.Exists(newPath) || Directory.Exists(newPath)) path = newPath;
+            }
+            return path;
+        }
+
         /// <summary>
         /// For a given full file path, return a new path that starts either with "Assets" or "Packages", in the way that
         /// Unity expects for function AssetDatabase.LoadAssetAtPath().
@@ -332,6 +353,9 @@ namespace GameTest
             {
                 if (Path.GetFullPath(Path.GetDirectoryName(path)) == Path.GetFullPath(projectPath)) return basename;
             }
+
+            // cross-platform woes
+            path = ResolveCrossPlatformPath(path);
 
             path = Path.GetFullPath(path); // normalize the path
 
@@ -349,6 +373,7 @@ namespace GameTest
                     Path.GetRelativePath(packagesPath, path)
                 );
             }
+
             throw new InvalidUnityPath(path);
         }
 
@@ -376,10 +401,8 @@ namespace GameTest
                 if (parentVolume != childVolume) return false;
             }
 
-            //Debug.Log(parent + " " + child);
             foreach (string path in IterateDirectories(child))
             {
-                //Debug.Log(path);
                 if (parent == path) return true;
             }
             return false;

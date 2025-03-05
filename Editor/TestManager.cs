@@ -131,6 +131,7 @@ namespace GameTest
         public string GetDataPath()
         {
             if (string.IsNullOrEmpty(dataPath)) dataPath = Utilities.defaultDataPath;
+            dataPath = Utilities.ResolveCrossPlatformPath(dataPath);
             return Utilities.EnsureDirectoryExists(dataPath);
         }
 
@@ -198,6 +199,12 @@ namespace GameTest
         void Awake()
         {
             Logger.debug = debug;
+        }
+
+        // OnEnable is called both inside and outside of play mode, whenever scripts are recompiled, etc.
+        void OnEnable()
+        {
+            GetDataPath(); // this will fix the data path in case switched platforms
         }
 
         [HideInCallstack]
@@ -680,6 +687,9 @@ namespace GameTest
                 CreateTest(attribute, method);
             }
 
+            // It is possible that the user switched platforms. So we need to first validate all the Foldout paths before resuming.
+            foreach (Foldout foldout in foldouts) foldout.path = Utilities.ResolveCrossPlatformPath(foldout.path);
+            
             // Remove any old Tests that have now been removed from the user's code
             foreach (Foldout foldout in foldouts.ToArray())
             {
