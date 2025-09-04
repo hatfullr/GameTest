@@ -15,6 +15,8 @@ namespace GameTest
     [System.Serializable]
     public class TestManager : ScriptableObject
     {
+        public static string assetPath { get => Path.Join(Utilities.defaultDataPath, nameof(GameTest) + ".asset"); }
+
         // If you change default values here, you must also change them in PreferencesWindow and some other places.
         public bool showWelcome = true;
         public Logger.DebugMode debug = Logger.DebugMode.Log | Logger.DebugMode.LogWarning | Logger.DebugMode.LogError;
@@ -36,6 +38,8 @@ namespace GameTest
 
         public List<Test> queue = new List<Test>();
         public List<Test> finished = new List<Test>();
+
+        public bool testsVisible = true;
 
         /// <summary>
         /// When the tests begin, the queue is saved into this variable so that the orders of the tests can be maintained.
@@ -135,6 +139,13 @@ namespace GameTest
             return Utilities.EnsureDirectoryExists(dataPath);
         }
 
+        public string GetHiddenDataPath()
+        {
+            string path = GetDataPath() + "~";
+            if (!Directory.Exists(path)) Directory.CreateDirectory(path); // also creates subdirectories
+            return path;
+        }
+
         public void SetDataPath(string path)
         {
             path = Utilities.GetUnityPath(path);
@@ -175,7 +186,7 @@ namespace GameTest
 
             // Didn't find an existing TestManager, so create one
             TestManager result = ScriptableObject.CreateInstance(typeof(TestManager)) as TestManager;
-            filePath = Path.Join(Utilities.defaultDataPath, nameof(GameTest) + ".asset");
+            filePath = assetPath;
             Utilities.EnsureDirectoryExists(Path.GetDirectoryName(filePath));
             AssetDatabase.Refresh();
             AssetDatabase.CreateAsset(result, Utilities.GetUnityPath(filePath));
@@ -300,6 +311,11 @@ namespace GameTest
         private void Start()
         {
             Logger.Log("Starting");
+            if (!testsVisible)
+            {
+                ToggleTestVisibility();
+                ReimportTests();
+            }
             running = true;
             if (!paused) RunNext();
         }
@@ -327,14 +343,6 @@ namespace GameTest
             if (onStop != null) onStop.Invoke();
             Logger.Log("Finished", null, null);
             stopping = false;
-        }
-
-        public static void PauseOnFail()
-        {
-            TestManager manager = TestManager.Get();
-            if (manager == null) return;
-            manager.paused = true;
-            EditorApplication.isPaused = true;
         }
 
         [HideInCallstack]
@@ -584,70 +592,12 @@ namespace GameTest
         private void UpdateTestAttributesAndMethods(HashSet<System.Reflection.Assembly> assemblies)
         {
             List<System.Tuple<TestAttribute, MethodInfo>> result = new List<System.Tuple<TestAttribute, MethodInfo>>();
-            object[] classAttributes, methodAttributes;
+            object[] methodAttributes;
             foreach (System.Reflection.Assembly assembly in assemblies)
             {
                 foreach (System.Type type in assembly.GetTypes())
                 {
                     if (!type.IsClass) continue; // only work with classes
-
-#pragma warning disable CS0618 // "obsolete" markers
-                    classAttributes = type.GetCustomAttributes(typeof(SuiteAttribute), false);
-#pragma warning restore CS0618
-                    if (classAttributes.Length > 0)
-                    {
-                        // Locate the SuiteAttribute if there is one. It has to be done this way for some reason I can't understand.
-                        foreach (object attr in classAttributes)
-                        {
-#pragma warning disable CS0618 // "obsolete" markers
-                            if (attr.GetType() != typeof(SuiteAttribute)) continue;
-                            SuiteAttribute suiteAttribute = attr as SuiteAttribute;
-#pragma warning restore CS0618
-
-                            // Get the Suite's SetUp and TearDown methods. These are null if it doesn't have them
-                            MethodInfo[] methods = type.GetMethods(Utilities.bindingFlags);
-
-                            MethodInfo setUp = null;
-                            MethodInfo tearDown = null;
-                            foreach (MethodInfo method in methods)
-                            {
-                                if (IsMethodIgnored(method)) continue;
-                                if (method.Name == "SetUp")
-                                {
-                                    setUp = method;
-                                    if (tearDown != null) break;
-                                }
-                                else if (method.Name == "TearDown")
-                                {
-                                    tearDown = method;
-                                    if (setUp != null) break;
-                                }
-                            }
-
-                            foreach (MethodInfo method in methods)
-                            {
-                                if (IsMethodIgnored(method)) continue;
-                                if (setUp != null)
-                                    if (method.Name == setUp.Name) continue;
-                                if (tearDown != null)
-                                    if (method.Name == tearDown.Name) continue;
-
-                                TestAttribute testAttribute;
-
-                                if (setUp != null && tearDown != null)
-                                    testAttribute = new TestAttribute(setUp.Name, tearDown.Name, suiteAttribute.pauseOnFail, method.Name, suiteAttribute.sourceFile);
-                                else if (setUp != null && tearDown == null)
-                                    testAttribute = new TestAttribute(setUp.Name, suiteAttribute.pauseOnFail, method.Name, suiteAttribute.sourceFile);
-                                else
-                                    testAttribute = new TestAttribute(suiteAttribute.pauseOnFail, method.Name, suiteAttribute.sourceFile);
-
-                                result.Add(new System.Tuple<TestAttribute, MethodInfo>(testAttribute, method));
-                            }
-                            break;
-                        }
-                        continue;
-                    }
-
 
                     // If the class was not a Suite, check its methods for TestAttributes.
                     foreach (MethodInfo method in type.GetMethods(Utilities.bindingFlags))
@@ -784,5 +734,77 @@ namespace GameTest
             //Utilities.Log("Tests updated");
         }
         #endregion
+
+
+        public void ToggleTestVisibility()
+        {
+            testsVisible = !testsVisible;
+
+            if (testsVisible)
+            {
+                // Move all the tests from the hidden folder into the normal folder
+                
+                string destination = Utilities.GetUnityPath(GetDataPath());
+                string path = destination + "~";
+                foreach (string directory in Directory.GetDirectories(path))
+                {
+                    string newDirectory = Path.Join(destination, Path.GetFileName(directory));
+                    Directory.Move(directory, newDirectory);
+                }
+                foreach (string file in Directory.GetFiles(path))
+                {
+                    File.Move(file, Path.Join(destination, Path.GetFileName(file)));
+                }
+
+                Logger.Log("Made test prefabs visible in the project. See " + destination);
+            }
+            else
+            {
+                // Move all the tests from the normal folder to the hidden folder
+
+                string path = Utilities.GetUnityPath(GetDataPath());
+                string destination = path + "~";
+                string asset = Utilities.GetUnityPath(assetPath);
+                foreach (string directory in Directory.GetDirectories(path))
+                {
+                    string newDirectory = Path.Join(destination, Path.GetFileName(directory));
+                    Directory.Move(directory, newDirectory);
+                    string meta = directory + ".meta";
+                    if (File.Exists(meta)) File.Delete(meta);
+                }
+                foreach (string file in Directory.GetFiles(path))
+                {
+                    if (asset == file) continue;
+                    if (Path.GetExtension(file) == ".meta") continue;
+                    File.Move(file, Path.Join(destination, Path.GetFileName(file)));
+                }
+
+                Logger.Log("Made test prefabs invisible in the project. See " + destination);
+            }
+            AssetDatabase.Refresh();
+        }
+
+        public void ReimportTests()
+        {
+            Load();
+
+            try
+            {
+                //Place the Asset Database in a state where
+                //importing is suspended for most APIs
+                AssetDatabase.StartAssetEditing();
+                foreach (Test test in GetTests())
+                    AssetDatabase.ImportAsset(AssetDatabase.GetAssetPath(test.prefab));
+            }
+            finally
+            {
+                //By adding a call to StopAssetEditing inside
+                //a "finally" block, we ensure the AssetDatabase
+                //state will be reset when leaving this function
+                AssetDatabase.StopAssetEditing();
+            }
+
+            Logger.Log("Reimported tests");
+        }
     }
 }

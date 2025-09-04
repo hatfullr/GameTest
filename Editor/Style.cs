@@ -113,6 +113,7 @@ namespace GameTest
             public const string settingsWindowPrefab = "When this test runs, a copy of this GameObject is instantiated as the testing environment. " +
                 "If no GameObject is given, a new GameObject is instantiated with the MonoBehaviour that contains the test method, and " +
                 "the properties of the MonoBehaviour are updated to match the properties below.";
+            public const string testVisibility = "Toggle visibility of test prefabs in the project. Hiding prefabs can significantly reduce how long it takes to save project prefabs and reload the domain.";
         }
 
         public static Color failColor = new Color(1f, 0f, 0f, 0.1f);
@@ -301,6 +302,9 @@ namespace GameTest
                     s = new GUIStyle(EditorStyles.toolbarButton);
                     break;
                 case "TestManagerUI/Toolbar/Welcome":
+                    s = new GUIStyle(EditorStyles.toolbarButton);
+                    break;
+                case "TestManagerUI/Toolbar/TestVisibility":
                     s = new GUIStyle(EditorStyles.toolbarButton);
                     break;
 
@@ -615,6 +619,16 @@ namespace GameTest
                     c = new GUIContent(EditorGUIUtility.IconContent("console.infoicon.sml"));
                     c.tooltip = Tooltips.welcome;
                     break;
+
+                case "TestManagerUI/Toolbar/TestVisibility/Off":
+                    c = new GUIContent(EditorGUIUtility.IconContent("scenevis_hidden"));
+                    c.tooltip = Tooltips.testVisibility;
+                    break;
+                case "TestManagerUI/Toolbar/TestVisibility/On":
+                    c = new GUIContent(EditorGUIUtility.IconContent("scenevis_visible_hover"));
+                    c.tooltip = Tooltips.testVisibility;
+                    break;
+
                 #endregion Toolbar
 
                 #region Welcome

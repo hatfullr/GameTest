@@ -28,7 +28,6 @@ namespace GameTest
         /// </summary>
         public TestAttribute attribute;
         public bool selected, locked;
-        [HideInInspector] public bool isInSuite;
         public System.Action<Test> onFinished;
 
         private GameObject gameObject;
@@ -36,8 +35,6 @@ namespace GameTest
         private GameObject instantiatedDefaultGO;
 
         private Coroutine coroutine;
-
-        private string path = null;
 
         public static Test current { get; private set; }
         private static GameObject coroutineGO;
@@ -82,9 +79,6 @@ namespace GameTest
         {
             this.attribute = attribute;
             this.method = method;
-#pragma warning disable CS0618 // "obsolete" markers
-            isInSuite = method.DeclaringType.GetCustomAttribute(typeof(SuiteAttribute)) != null;
-#pragma warning restore CS0618
         }
 
         private class CoroutineMonoBehaviour : MonoBehaviour { }
@@ -116,71 +110,23 @@ namespace GameTest
             return ret;
         }
 
-        public GameObject DefaultSetUp()
+        private void SetUp()
         {
             if (prefab != null)
             {
                 instantiatedDefaultGO = null;
                 instantiatedDefaultGO = Object.Instantiate(prefab);
-                return instantiatedDefaultGO;
+                gameObject = instantiatedDefaultGO;
             }
-            // Checking if the method is a part of a Unit Test Suite
-#pragma warning disable CS0618 // "obsolete" markers
-            if (method.DeclaringType.GetCustomAttribute(typeof(SuiteAttribute), false) != null) return null;
-#pragma warning restore CS0618 // "obsolete" markers
-            return new GameObject(attribute.name + " (" + method.DeclaringType + ")", method.DeclaringType);
+            else gameObject = new GameObject(attribute.name + " (" + method.DeclaringType + ")", method.DeclaringType);
         }
 
-        public void DefaultTearDown()
+        private void TearDown()
         {
             if (gameObject != null) Object.DestroyImmediate(gameObject);
             if (instantiatedDefaultGO != null) Object.DestroyImmediate(instantiatedDefaultGO);
             gameObject = null;
             instantiatedDefaultGO = null;
-        }
-
-        private void SetUp()
-        {
-            if (!string.IsNullOrEmpty(attribute.setUp))
-            {
-                // Custom method
-                MethodInfo setUp = method.DeclaringType.GetMethod(attribute.setUp, Utilities.bindingFlags);
-                object result = setUp.Invoke(method.DeclaringType, null);
-
-                if (isInSuite)
-                {
-                    if (result != null) throw new System.Exception("Return type of SetUp in Suite must be void: " + method.DeclaringType);
-                }
-                else
-                {
-                    if (result.GetType() != typeof(GameObject)) throw new System.Exception("The SetUp method must return a GameObject, which is destroyed in TearDown. Received '" + result.GetType() + "' instead");
-
-                    try
-                    {
-                        gameObject = result as GameObject;
-                    }
-                    catch (System.Exception e)
-                    {
-                        throw new System.Exception("Failed to convert the result of the SetUp function to a GameObject. The SetUp function must always return a GameObject which is destroyed in TearDown.\n" + e.Message);
-                    }
-                }
-            }
-            else
-            {
-                // Do the default setup
-                gameObject = DefaultSetUp();
-            }
-        }
-
-        private void TearDown()
-        {
-            if (!string.IsNullOrEmpty(attribute.tearDown))
-            {
-                MethodInfo tearDown = method.DeclaringType.GetMethod(attribute.tearDown, Utilities.bindingFlags);
-                if (isInSuite) tearDown.Invoke(null, null);
-                else tearDown.Invoke(gameObject.GetComponent(method.DeclaringType), new object[] { gameObject });
-            }
-            else DefaultTearDown();
         }
 
         [HideInCallstack]
@@ -304,13 +250,6 @@ namespace GameTest
 
             PrintResult();
 
-            //if (result == Result.Fail && attribute.pauseOnFail && !wasCoroutine)
-            //{
-            //    EditorApplication.isPaused = true;
-            //    TestManager manager = TestManager.Get();
-            //    if (manager != null) manager.paused = true;
-            //}
-
             SetCurrentTest(null);
 
             if (onFinished != null) onFinished(this);
@@ -349,7 +288,6 @@ namespace GameTest
             if (type == LogType.Exception || type == LogType.Assert)
             {
                 result = Result.Fail;
-                if (attribute.pauseOnFail) TestManager.PauseOnFail();
             }
         }
 

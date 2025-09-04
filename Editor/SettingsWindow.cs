@@ -17,6 +17,13 @@ namespace GameTest
 
         public void Init(Test test)
         {
+            TestManager manager = TestManager.Get();
+            if (!manager.testsVisible)
+            {
+                manager.ToggleTestVisibility();
+                manager.ReimportTests();
+            }
+
             minSize = new Vector2(
                 EditorGUIUtility.labelWidth + EditorGUIUtility.fieldWidth,
                 minSize.y
@@ -53,7 +60,7 @@ namespace GameTest
         private void DrawInspector()
         {
             //prefabEditor.serializedObject.Update();
-            using (new EditorGUI.DisabledGroupScope(test.prefab != null))
+            using (new EditorGUI.DisabledScope(test.prefab != null))
             {
                 Editor prefabEditor = Editor.CreateEditor(test.defaultPrefab);
                 prefabEditor.DrawHeader();
@@ -86,7 +93,7 @@ namespace GameTest
             using (new EditorGUILayout.HorizontalScope(Style.Get("Settings/Footer")))
             {
                 GUILayout.FlexibleSpace();
-                using (new EditorGUI.DisabledGroupScope(test.prefab != null))
+                using (new EditorGUI.DisabledScope(test.prefab != null))
                 {
                     if (GUILayout.Button(new GUIContent("Reset", "Reset this test's prefab. Only available if the Prefab Override is not set.")))
                     {

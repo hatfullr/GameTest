@@ -27,8 +27,6 @@ namespace GameTest
 
         private Rect dragBar;
 
-        private Test selectedTest;
-
         private enum DragOffset
         {
             Lower,
@@ -225,7 +223,7 @@ namespace GameTest
                                 if (Event.current.type == EventType.MouseUp)
                                 {
                                     TestManagerUI window = EditorWindow.GetWindow<TestManagerUI>();
-                                    window.RevealTest(test);
+                                    TestManagerTestView.RevealTest(window, test);
                                     window.PingTest(test);
                                 }
                             }

@@ -34,16 +34,6 @@ namespace GameTest
             this.locked = locked;
         }
 
-        /// <summary>
-        /// Returns true if any tests in this Foldout come from a Suite, and false otherwise.
-        /// </summary>
-        public bool IsSuite()
-        {
-            foreach (Test test in tests)
-                if (test.isInSuite) return true;
-            return false;
-        }
-
         #region UI Methods
         public void Draw(TestManagerUI ui)
         {

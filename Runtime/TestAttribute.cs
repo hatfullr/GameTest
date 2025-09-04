@@ -14,22 +14,9 @@ namespace GameTest
         /// </summary>
         public string name;
         /// <summary>
-        /// Name of a static method which returns a GameObject and accepts no parameters.
-        /// </summary>
-        public string setUp;
-        /// <summary>
-        /// Name of a static method which returns void and accepts the GameObject returned by SetUp.
-        /// </summary>
-        public string tearDown;
-        /// <summary>
-        /// Pause both the editor and GameTest when this test fails. default = false.
-        /// </summary>
-        public bool pauseOnFail;
-        /// <summary>
         /// DO NOT MODIFY. This is the path to the source file that this attribute was used in. It is set by a reflection technique.
         /// </summary>
         public string sourceFile;
-
         /// <summary>
         /// DO NOT MODIFY. This is the line number where this attribute was used in.</param>
         /// </summary>
@@ -45,67 +32,14 @@ namespace GameTest
         /// <summary>
         /// This method will be added to Window > GameTest Manager.
         /// </summary>
-        /// <param name="setUp">Name of a static method which returns a GameObject and accepts no parameters.</param>
-        /// <param name="tearDown">Name of a static method which returns void and accepts the GameObject returned by SetUp.</param>
-        /// <param name="pauseOnFail">Pause both the editor and GameTest when this test fails. default = false.</param>
         /// <param name="name">The test method name which appears in the test manager. The default is the name of the method. Names must be unique per-file.</param>
         /// <param name="sourceFile">DO NOT USE. It is used by reflection techniques to locate the source file that this attribute was used in.</param>
         /// <param name="lineNumber">DO NOT USE. It is used by reflection techniques to locate the line number where this attribute was used in.</param>
         public TestAttribute(
-            string setUp,
-            string tearDown,
-            bool pauseOnFail = false,
             [System.Runtime.CompilerServices.CallerMemberName] string name = default,
             [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = default,
             [System.Runtime.CompilerServices.CallerLineNumber] int lineNumber = default)
         {
-            this.pauseOnFail = pauseOnFail;
-            this.setUp = setUp;
-            this.tearDown = tearDown;
-            this.name = name;
-            this.sourceFile = Path.GetFullPath(sourceFile);
-            this.lineNumber = lineNumber;
-        }
-
-        /// <summary>
-        /// This method will be added to Window > GameTest Manager.
-        /// </summary>
-        /// <param name="pauseOnFail">Pause both the editor and GameTest when this test fails. default = false.</param>
-        /// <param name="name">The test method name which appears in the test manager. The default is the name of the method. Names must be unique per-file.</param>
-        /// <param name="sourceFile">DO NOT USE. It is used by reflection techniques to locate the source file that this attribute was used in.</param>
-        /// <param name="lineNumber">DO NOT USE. It is used by reflection techniques to locate the line number where this attribute was used in.</param>
-        public TestAttribute(
-            bool pauseOnFail = false,
-            [System.Runtime.CompilerServices.CallerMemberName] string name = default,
-            [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = default,
-            [System.Runtime.CompilerServices.CallerLineNumber] int lineNumber = default)
-        {
-            setUp = "";
-            tearDown = "";
-            this.pauseOnFail = pauseOnFail;
-            this.name = name;
-            this.sourceFile = Path.GetFullPath(sourceFile);
-            this.lineNumber = lineNumber;
-        }
-
-        /// <summary>
-        /// This method will be added to Window > GameTest Manager.
-        /// </summary>
-        /// <param name="setUp">Name of a static method which returns a GameObject and accepts no parameters.</param>
-        /// <param name="pauseOnFail">Pause both the editor and GameTest when this test fails. default = false.</param>
-        /// <param name="name">The test method name which appears in the test manager. The default is the name of the method. Names must be unique per-file.</param>
-        /// <param name="sourceFile">DO NOT USE. It is used by reflection techniques to locate the source file that this attribute was used in.</param>
-        /// <param name="lineNumber">DO NOT USE. It is used by reflection techniques to locate the line number where this attribute was used in.</param>
-        public TestAttribute(
-            string setUp,
-            bool pauseOnFail = false,
-            [System.Runtime.CompilerServices.CallerMemberName] string name = default,
-            [System.Runtime.CompilerServices.CallerFilePath] string sourceFile = default,
-            [System.Runtime.CompilerServices.CallerLineNumber] int lineNumber = default)
-        {
-            this.setUp = setUp;
-            tearDown = "";
-            this.pauseOnFail = pauseOnFail;
             this.name = name;
             this.sourceFile = Path.GetFullPath(sourceFile);
             this.lineNumber = lineNumber;
@@ -146,9 +80,9 @@ namespace GameTest
             return this == (other as TestAttribute);
         }
 
-        public override int GetHashCode() => (sourceFile + name + setUp + tearDown + pauseOnFail).GetHashCode();
+        public override int GetHashCode() => (sourceFile + name).GetHashCode();
 
-        public static bool operator ==(TestAttribute left, TestAttribute right) => left.sourceFile == right.sourceFile && left.name == right.name && left.setUp == right.setUp && left.tearDown == right.tearDown && left.pauseOnFail == right.pauseOnFail;
+        public static bool operator ==(TestAttribute left, TestAttribute right) => left.sourceFile == right.sourceFile && left.name == right.name;
         public static bool operator !=(TestAttribute left, TestAttribute right) => !(left == right);
 #endregion
 #endif
